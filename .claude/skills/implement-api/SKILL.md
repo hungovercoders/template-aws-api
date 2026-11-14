@@ -74,7 +74,9 @@ it tells you exactly what is missing.
    scenario, an unknown tag, an invalid document); if `spec:lint` fails the
    contract breaks a standard in `rules/house.yaml` or `.spectral.yaml`.
    Either way report the output to the user - do not fix the spec yourself,
-   and never relax or disable a rule.
+   and never relax or disable a rule. If `task http:check` fails, the
+   committed `http/contract.http` is out of date with the contract: run
+   `task http:generate` and commit the file - it is generated, not spec.
 3. **`task generate`** - produces `src/generated/api.d.ts` (types for every
    operation) and `src/generated/openapi.json` (the runtime contract).
 4. **See it red.** Run `task test:unit`: `test/routes.test.ts` lists every

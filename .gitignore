@@ -1,6 +1,7 @@
 node_modules/
 dist/
 src/generated/
+http/http-client.private.env.json
 .tools/
 .local/
 .hypothesis/
