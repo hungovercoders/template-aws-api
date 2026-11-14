@@ -22,12 +22,19 @@ gate in `task ci` - holds it to what actually changed:
 | Additive - existing consumers are unaffected | A new operation, a new optional request property, a new response property | A new **minor** |
 | Clarifying - the API behaves the same | Descriptions, examples | A new **patch** |
 
-The gate compares the contract with the last published one using
-[oasdiff](https://github.com/oasdiff/oasdiff): on a branch, the contract on
-the default branch; on the default branch, the previous commit. It prints
-every change, grouped by whether it breaks consumers, and fails if the
-version does not match. So a breaking change cannot be merged by accident: it
-is listed in the CI log and needs a deliberate major version.
+The gate compares the spec with the last published one: on a branch, the
+default branch; on the default branch, the previous commit. It prints every
+contract change, grouped by whether it breaks consumers (using
+[oasdiff](https://github.com/oasdiff/oasdiff)), and fails if the version does
+not match. So a breaking contract change cannot be merged by accident.
+
+A rule can also change while the contract's shape stays the same - the same
+field, a different answer - and no contract diff can see that. So the gate
+also lists every existing scenario that was changed or removed, as "Existing
+behaviour changed". It demands at least a new minor for those and says
+plainly that, if consumers can observe the difference, the change is breaking
+and needs a new major. That call is a person's; the gate makes sure it is
+made in the open.
 
 ```sh
 task spec:compat                         # against the default branch / previous commit

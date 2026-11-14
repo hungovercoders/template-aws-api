@@ -20,7 +20,7 @@ removal alike. Nothing is changed in the code alone.
 | You want to | The route |
 | --- | --- |
 | Add an operation or a behaviour | Add scenarios and the contract for it; `task scaffold` writes the stubs; implement them |
-| Change a rule | Change the scenarios that state it, and the contract if its shape changes; fix what goes red |
+| Change a rule | Change the scenarios that state it, and the contract if its shape changes. If consumers can observe the difference it is breaking - a new major version - even when the contract's shape is the same; fix what goes red |
 | Fix a bug | A bug is a scenario that is missing or wrong. Write the scenario that fails first, then fix the code |
 | Remove something | Delete its scenarios and its part of the contract (breaking: a new major version); delete the code and steps the gates then call unused |
 | Rename or reshape data | Change the contract; the generated types make the compiler find every use |
