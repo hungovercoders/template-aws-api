@@ -16,12 +16,34 @@ copy them to `specs/openapi.yaml` and `specs/features/` first.
 Your job is to make `task ci` green without changing what the specs say.
 `task ci` is the definition of done - not your reading of the code.
 
+## The skeleton is already built - do not build it again
+
+This repository is a template. Everything that is the same for every API was
+solved once and is already here: the Lambda entry point and router
+(`src/handler.ts`, `src/lib/`), request validation, error responses, the
+DynamoDB client, the local stack (`local/`), the test harness
+(`steps/world.ts`), the gates (`Taskfile.yml`, `scripts/`, `test/routes.test.ts`),
+CI and the Terraform (`infra/`).
+
+You bring only the business logic the specs describe. That means you write:
+
+- `steps/<area>.ts` - step definitions
+- `src/operations/<operationId>.ts` and the entries in `src/routes.ts`
+- `src/domain/`, `src/store/` and their unit tests in `test/`
+
+Do not regenerate, restructure, "improve" or replace anything else, and do not
+add a framework, another router, validator, test runner or build tool. If the
+skeleton genuinely cannot express something the specs need (for example a
+table index), make the smallest change and tell the user what you changed and
+why - it is probably something the template should gain for every API.
+
 ## Rules
 
 1. **`specs/` is read-only.** Never edit the contract or a feature file to make a
    gate pass. If the two disagree, or a scenario is ambiguous or cannot be
    satisfied, stop and ask the user with the exact scenario and operation.
-2. **Never weaken a gate.** Do not edit `Taskfile.yml`, `cucumber.mjs`,
+2. **Never weaken a gate.** The gates are how you find out whether you are
+   right; they give the same answer every time. Do not edit `Taskfile.yml`, `cucumber.mjs`,
    `scripts/spec-check.ts`, `test/routes.test.ts`, `.github/workflows/ci.yml`
    or the contract checks in `steps/world.ts` and `src/lib/contract.ts`; do not
    skip, tag out or mark scenarios pending.
