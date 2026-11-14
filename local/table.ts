@@ -1,5 +1,6 @@
 // The table itself is created by applying infra/ to AWS Emulator (see
-// local/stack.mjs); this only empties it between scenarios.
+// local/stack.mjs); this only empties it, between scenarios and before the fuzz run.
+//   node local/table.ts reset
 import { BatchWriteCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamo, tableName } from "../src/lib/dynamo.ts";
 
@@ -21,3 +22,5 @@ export async function resetTable(): Promise<void> {
     start = page.LastEvaluatedKey;
   } while (start);
 }
+
+if (process.argv[1]?.endsWith("table.ts") && process.argv[2] === "reset") await resetTable();

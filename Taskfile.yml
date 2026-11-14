@@ -146,7 +146,15 @@ tasks:
     env:
       NODE_OPTIONS: ''
     cmds:
-      - npx httpyac send http/*.http --env {{.ENV | default "local"}} {{.CLI_ARGS}}
+      - |
+        set -e
+        env="{{.ENV | default "local"}}"
+        if [ "$env" != "local" ]; then exec npx httpyac send http/*.http --env "$env" {{.CLI_ARGS}}; fi
+        # The local stack's URL and a token come from the running `task dev`.
+        test -f .local/stack.json || { echo "The local stack is not running. Start it in another terminal with: task dev"; exit 1; }
+        read_stack() { node -p "JSON.parse(require('fs').readFileSync('.local/stack.json','utf8')).$1"; }
+        NODE_EXTRA_CA_CERTS="$(read_stack ca)" npx httpyac send http/*.http --env local \
+          --var "base_url=$(read_stack base_url)" --var "token=$(read_stack token)" {{.CLI_ARGS}}
 
   spec:compat:
     desc: Gate - changes to the contract since the last published one are listed, and info.version is bumped to match (breaking needs a major)
@@ -209,7 +217,7 @@ tasks:
           -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" aws-emulator -p {{.EMULATOR_PORT}}
 
   dev:
-    desc: Run the built API locally on http://127.0.0.1:3000 against AWS Emulator
+    desc: Run the API on AWS Emulator and keep it up - prints its URL and a token; task http then talks to it
     deps: [build, emulator:install]
     env:
       NODE_OPTIONS: ''
@@ -217,7 +225,7 @@ tasks:
       - node local/stack.mjs
 
   features:
-    desc: Gate - the feature files, strict, against the built Lambda on AWS Emulator; every response is held to the contract
+    desc: Gate - the feature files, strict, through AWS Emulator's API Gateway to the built Lambda; every response is held to the contract
     deps: [build, emulator:install]
     cmds:
       - node local/stack.mjs -- task features:run -- {{.CLI_ARGS}}
@@ -229,7 +237,7 @@ tasks:
       - node local/stack.mjs -- task contract:fuzz:run
 
   acceptance:
-    desc: Gate - features, that they reach every documented response, then fuzz - one stack, infra/ applied to AWS Emulator, the built Lambda in front of it
+    desc: Gate - features, that they reach every documented response, then fuzz - one stack, infra/ applied to AWS Emulator, called through its API Gateway
     deps: [build, emulator:install]
     cmds:
       - node local/stack.mjs -- task features:run responses:check contract:fuzz:run
@@ -243,11 +251,11 @@ tasks:
     desc: The fuzz run against a stack that is already up (BASE_URL); used by contract:fuzz and acceptance
     cmds:
       # Start from an empty table whatever ran before.
-      - curl -fsS -X POST "$BASE_URL/__local/reset"
+      - node local/table.ts reset
       - >-
         uvx --from "schemathesis>=4,<5" schemathesis run specs/openapi.yaml
         --url "$BASE_URL" --seed 1 --max-examples 25 --request-timeout 10
-        -H "Authorization: Bearer test:fuzz"
+        --tls-verify "$AWS_CA_BUNDLE" -H "Authorization: Bearer $(node local/token.ts fuzz)"
         --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance
 
   build:
@@ -260,7 +268,6 @@ tasks:
       - >-
         npx esbuild src/handler.ts --bundle --platform=node --target=node22 --format=esm
         --outfile=dist/handler.mjs --external:@aws-sdk/* --log-level=warning
-        --banner:js="import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);"
 
   infra:validate:
     desc: Gate - the Terraform is formatted and valid
@@ -274,6 +281,13 @@ tasks:
   ci:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
     cmds:
+      - task: check
+      - task: infra:validate
+      - task: acceptance
+
+  check:
+    desc: The fast gates - everything in task ci that needs nothing running. What the pre-push hook runs.
+    cmds:
       - task: skeleton:check
       - task: docs:check
       - task: spec:check
@@ -284,8 +298,13 @@ tasks:
       - task: test:unit
       - task: typecheck
       - task: steps:check
-      - task: infra:validate
-      - task: acceptance
+
+  hooks:install:
+    desc: Opt in to the pre-push hook - git runs task check before every push (skip one push with git push --no-verify)
+    cmds:
+      - git config core.hooksPath .githooks
+    status:
+      - test "$(git config core.hooksPath)" = ".githooks"
 
   # --- Your AWS account (opt-in; see "Bring your AWS account" in docs/deploying.md) ---
 

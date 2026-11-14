@@ -37,5 +37,8 @@ for (const path of ["CONTRIBUTING.md", "SECURITY.md", "AGENTS.md", ".github/PULL
 const readme = spawnSync(process.execPath, ["scripts/readme.ts", "generate"], { stdio: "inherit" });
 if (readme.status !== 0) process.exit(readme.status ?? 1);
 
+// From here on the fast gates should be green, so run them before every push.
+if (spawnSync("git", ["config", "core.hooksPath", ".githooks"]).status === 0) done.push("installed the pre-push hook (task check before every push; git push --no-verify skips one)");
+
 console.log(done.length > 0 ? ["adopt: this repository now describes its API", ...done.map((line) => `  - ${line}`)].join("\n") : "adopt: nothing left to remove");
 console.log("  Review the changes and commit them. LICENSE is yours to check: change the copyright line if the code is not MIT or not yours to license that way.");

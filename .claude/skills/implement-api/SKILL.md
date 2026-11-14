@@ -323,11 +323,14 @@ not. Before `task contract:fuzz`, check your code against:
 network, `dpkg-deb` and `gpgv`) and need `terraform`; the fuzzer needs `uvx`.
 All come from `mise install`.
 
+The scenarios and the fuzz run call the API through AWS Emulator's API
+Gateway, authorizer and Lambda - the built bundle is the function. Its Node
+runtime lacks `node:http`, `node:https` and `node:module`: a dependency that
+needs one fails every request with `Runtime.ImportModuleError`.
+
 If the local stack cannot run where you are working, you can still run
-`task skeleton:check`, `task spec:check`, `task spec:lint`,
-`task spec:compat`, `task http:check`, `task test:unit`, `task typecheck`,
-`task build`, `task infra:validate`, `task docs:check` and the cucumber dry
-run. You can also call `handler` from `dist/handler.mjs` directly to try
+`task check` (every gate that needs nothing running), `task build`,
+`task infra:validate` and the cucumber dry run. You can also call `handler` from `dist/handler.mjs` directly to try
 requests that are refused before they reach DynamoDB: pass an event with
 `routeKey` (`"PATCH /things/{thing_id}"`), `pathParameters`, `body` and, for
 a secured operation, `requestContext.authorizer.jwt.claims.sub`. That is not done: say

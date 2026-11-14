@@ -19,6 +19,7 @@ const SKELETON = [
   "tsconfig.json",
   "vitest.config.ts",
   ".github/workflows/ci.yml",
+  ".githooks/",
   "rules/",
   "scripts/",
   "local/",

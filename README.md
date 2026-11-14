@@ -20,7 +20,7 @@ A brewery's beer catalogue. Signed-in staff add the beers they brew, keep the de
 
 | Task | What it does |
 | --- | --- |
-| `task dev` | Run the API locally on http://127.0.0.1:3000 |
+| `task dev` | Run the API on AWS Emulator; prints its URL and a token |
 | `task http` | Send it the requests in `http/contract.http` |
 | `task mock` | Serve the contract as a mock, with nothing implemented |
 | `task ci` | Every gate, in order: the definition of done |
