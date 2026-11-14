@@ -156,6 +156,9 @@ it tells you exactly what is missing.
      tagged for one operation. Expect them to stay red until the operations
      they also use exist.
 7. **`task features`** - every scenario green, strict.
+   `task acceptance` then runs `responses:check`: a response the contract
+   documents that no scenario received is a gap in the spec, not the code.
+   Report it to the user; do not write a scenario or drop the response yourself.
 8. **`task contract:fuzz`** - schemathesis sends generated requests, valid and
    invalid, and checks every response against the contract. A failure here is
    a real input your code mishandles (usually a 500, or a status the contract

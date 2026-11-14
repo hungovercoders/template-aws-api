@@ -145,6 +145,10 @@ guides in `docs/`, and these skills.
 - **Every operation** has a `summary`, a `400` response, and a response for
   every outcome a scenario describes. If a scenario says a request is
   refused, the contract documents that status for that operation.
+- **And the reverse:** every response you document needs a scenario that
+  receives it - the 400, 401 and 404 included. `responses:check` fails the
+  implementation otherwise, so check each operation's responses against the
+  scenarios tagged for it before asking for approval.
 - **Be exact about data.** Types, formats, enums, minimum and maximum,
   lengths, which properties are required. Request bodies set
   `additionalProperties: false`. The router enforces all of it, so a
