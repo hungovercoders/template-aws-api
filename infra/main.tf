@@ -27,8 +27,11 @@ provider "aws" {
 locals {
   # The contract is the single source of the API's routes: API Gateway gets
   # exactly the operations specs/openapi.yaml declares, nothing more.
-  contract = yamldecode(file("${path.module}/../specs/openapi.yaml"))
-  methods  = ["get", "put", "post", "delete", "patch", "head", "options"]
+  contract         = yamldecode(file("${path.module}/../specs/openapi.yaml"))
+  methods          = ["get", "put", "post", "delete", "patch", "head", "options"]
+  indexes          = ["gsi1", "gsi2"]
+  index_attributes = flatten([for index in local.indexes : ["${index}pk", "${index}sk"]])
+
   routes = toset(flatten([
     for path, item in try(local.contract.paths, {}) : [
       for method, operation in item : "${upper(method)} ${path}" if contains(local.methods, method)
@@ -37,8 +40,10 @@ locals {
 }
 
 # --- Data -------------------------------------------------------------------
-# Single table with generic string keys. The local stack applies this same
-# file to AWS Emulator, so there is no second definition to keep in step.
+# Single table with generic string keys, and two generic indexes (gsi1, gsi2)
+# for the access patterns the keys cannot serve. An index costs nothing until
+# an item carries its attributes. The local stack applies this same file to
+# AWS Emulator, so there is no second definition to keep in step.
 
 resource "aws_dynamodb_table" "this" {
   name         = var.name
@@ -54,6 +59,32 @@ resource "aws_dynamodb_table" "this" {
   attribute {
     name = "sk"
     type = "S"
+  }
+
+  dynamic "attribute" {
+    for_each = local.index_attributes
+    content {
+      name = attribute.value
+      type = "S"
+    }
+  }
+
+  dynamic "global_secondary_index" {
+    for_each = local.indexes
+    content {
+      name            = global_secondary_index.value
+      projection_type = "ALL"
+
+      key_schema {
+        attribute_name = "${global_secondary_index.value}pk"
+        key_type       = "HASH"
+      }
+
+      key_schema {
+        attribute_name = "${global_secondary_index.value}sk"
+        key_type       = "RANGE"
+      }
+    }
   }
 
   point_in_time_recovery {
