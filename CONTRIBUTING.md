@@ -24,7 +24,7 @@ removal alike. Nothing is changed in the code alone.
 | Fix a bug | A bug is a scenario that is missing or wrong. Write the scenario that fails first, then fix the code |
 | Remove something | Delete its scenarios and its part of the contract (breaking: a new major version); delete the code and steps the gates then call unused |
 | Rename or reshape data | Change the contract; the generated types make the compiler find every use |
-| Update a dependency | Renovate proposes it; `task ci` decides |
+| Update a dependency | Renovate proposes it; `task ci` decides. When it moves a skill source in `skills.json`, run `task skills:fetch` on its branch and push |
 | Work with a service the API integrates with | Ask whether a skill for it should be added; with the owner's agreement, `task skills:add`. A skill every API needs is a change to the template instead |
 
 Do not start from the code. A change made there first has no scenario that
@@ -102,8 +102,7 @@ skeleton every API shares.
   (`.github/rulesets/protect-demo-branches.json`); only add commits or merges.
 - `renovate.json` keeps npm, GitHub Actions, Terraform, mise, the emulator,
   Prism and schemathesis pins and the skill sources moving; install the
-  Renovate app to switch it on. When it moves a skill source, run
-  `task skills:fetch` on its branch and push. An emulator update merges
+  Renovate app to switch it on. An emulator update merges
   itself once `template` passes, which needs auto-merge allowed on the
   repository and `skeleton delivers the example` required on `main`.
 <!-- template-only:end -->
