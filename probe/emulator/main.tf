@@ -179,6 +179,8 @@ resource "aws_cloudwatch_event_target" "firehose" {
   role_arn       = aws_iam_role.all.arn
   input_path     = "$.detail"
 }
+# The rule also matches the pipe's events, whose detail is a raw stream record
+# with no "type". They are how the probe shows the error prefix working.
 resource "aws_cloudwatch_event_target" "firehose_partitioned" {
   count          = var.partitioned ? 1 : 0
   rule           = aws_cloudwatch_event_rule.all.name
@@ -297,19 +299,20 @@ locals {
     dlq-not-empty  = ["AWS/SQS", "ApproximateNumberOfMessagesVisible", "Maximum", { QueueName = aws_sqs_queue.dlq.name }]
     iterator-age   = ["AWS/Lambda", "IteratorAge", "Maximum", { FunctionName = aws_lambda_function.fn["forwarder"].function_name }]
     rule-failed    = ["AWS/Events", "FailedInvocations", "Sum", { RuleName = aws_cloudwatch_event_rule.all.name, EventBusName = aws_cloudwatch_event_bus.bus.name }]
-    firehose-s3    = ["AWS/Firehose", "DeliveryToS3.Success", "Minimum", { DeliveryStreamName = aws_kinesis_firehose_delivery_stream.plain.name }]
+    firehose-s3    = ["AWS/Firehose", "DeliveryToS3.Success", "Minimum", { DeliveryStreamName = aws_kinesis_firehose_delivery_stream.plain.name }, "LessThanThreshold", 1]
     firehose-fresh = ["AWS/Firehose", "DeliveryToS3.DataFreshness", "Maximum", { DeliveryStreamName = aws_kinesis_firehose_delivery_stream.plain.name }]
   }
 }
 resource "aws_cloudwatch_metric_alarm" "a" {
-  for_each            = local.alarms
-  alarm_name          = "${local.n}-${each.key}"
-  namespace           = each.value[0]
-  metric_name         = each.value[1]
-  statistic           = each.value[2]
-  dimensions          = each.value[3]
-  comparison_operator = "GreaterThanThreshold"
-  threshold           = 0
+  for_each    = local.alarms
+  alarm_name  = "${local.n}-${each.key}"
+  namespace   = each.value[0]
+  metric_name = each.value[1]
+  statistic   = each.value[2]
+  dimensions  = each.value[3]
+  # DeliveryToS3.Success is 1 for a delivery that worked, so that alarm is "below 1".
+  comparison_operator = try(each.value[4], "GreaterThanThreshold")
+  threshold           = try(each.value[5], 0)
   period              = 60
   evaluation_periods  = 1
   treat_missing_data  = "notBreaching"
