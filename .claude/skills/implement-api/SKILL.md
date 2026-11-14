@@ -118,9 +118,9 @@ it tells you exactly what is missing.
    Either way report the output to the user - do not fix the spec yourself,
    and never relax or disable a rule. The same goes for `task spec:compat`:
    a failure there is a contract change that is not versioned, which is the
-   user's to resolve (the `write-spec` skill covers it). If `task http:check` fails, the
-   committed `http/contract.http` is out of date with the contract: run
-   `task http:generate` and commit the file - it is generated, not spec.
+   user's to resolve (the `write-spec` skill covers it). If `task http:check` or `task readme:check` fails, a
+   committed file generated from the contract is out of date: run
+   `task http:generate` or `task readme:generate` and commit the result.
 3. **`task scaffold`** - generates the types, runtime contract and route
    table (`src/generated/`), then writes a typed stub for every operation
    that has no file (`src/operations/<operationId>.ts`) and a typed pending
