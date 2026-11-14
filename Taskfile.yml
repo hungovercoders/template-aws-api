@@ -34,8 +34,13 @@ tasks:
       NODE_OPTIONS: ''
     cmds:
       - npm ci
+      # What an optional component installs for itself.
+      - node --import tsx scripts/components.ts run install
     sources:
       - package-lock.json
+      - components.json
+      - .components
+      - tools/*/package-lock.json
     generates:
       - node_modules/.package-lock.json
 
@@ -44,9 +49,12 @@ tasks:
     deps: [install]
     cmds:
       - node scripts/generate.ts
+      # What an optional component generates from a contract of its own.
+      - node scripts/components.ts run generate
     sources:
-      - specs/openapi.yaml
+      - specs/*.yaml
       - scripts/generate.ts
+      - tools/**/*.ts
     generates:
       - src/generated/openapi.json
       - src/generated/api.d.ts
@@ -69,6 +77,62 @@ tasks:
     deps: [install]
     cmds:
       - node scripts/docs-check.ts
+
+  # component:asyncapi:start
+  asyncapi:install:
+    desc: Install AsyncAPI's own tools (parser, diff, Modelina) - a package of their own in tools/asyncapi, so they leave with the component
+    # task install runs this (what a component installs for itself), so the
+    # tasks below depend on install alone and there are never two at once.
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - npm ci --prefix tools/asyncapi
+    sources:
+      - tools/asyncapi/package-lock.json
+    generates:
+      - tools/asyncapi/node_modules/.package-lock.json
+
+  asyncapi:check:
+    desc: Gate - specs/asyncapi.yaml is a valid AsyncAPI 3 contract and every operation is covered by a tagged scenario (nothing to do without the file)
+    deps: [install]
+    cmds:
+      - node tools/asyncapi/asyncapi.ts check
+
+  asyncapi:lint:
+    desc: Gate - the AsyncAPI contract meets the house rules (rules/asyncapi.yaml) and this API's own (.spectral.asyncapi.yaml); warnings fail
+    deps: [install]
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - |
+        test -f specs/asyncapi.yaml || { echo "asyncapi:lint - no specs/asyncapi.yaml, so this API has no asynchronous side to check"; exit 0; }
+        rules=rules/asyncapi.yaml; test -f .spectral.asyncapi.yaml && rules=.spectral.asyncapi.yaml
+        npx spectral lint specs/asyncapi.yaml --ruleset "$rules" --fail-severity warn
+
+  asyncapi:compat:
+    desc: Gate - changes to the AsyncAPI contract since the last published one are listed, and its info.version is bumped to match (breaking needs a major)
+    deps: [install]
+    cmds:
+      - node tools/asyncapi/asyncapi.ts compat
+
+  asyncapi:generate:
+    desc: Generate the resolved AsyncAPI contract, the message types and the table of operations into src/generated/ (task generate runs it)
+    deps: [install]
+    cmds:
+      - node tools/asyncapi/asyncapi.ts generate
+
+  asyncapi:examples:
+    desc: Write messages/ - an example of every message in the AsyncAPI contract, for whoever sends or consumes one before the API exists
+    deps: [install]
+    cmds:
+      - node tools/asyncapi/asyncapi.ts examples
+
+  asyncapi:examples:check:
+    desc: Gate - the committed messages/ match the AsyncAPI contract (run task asyncapi:examples and commit if not)
+    deps: [install]
+    cmds:
+      - node tools/asyncapi/asyncapi.ts examples check
+  # component:asyncapi:end
 
   component:list:
     desc: The template's optional components, and whether this repository has each

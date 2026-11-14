@@ -4,19 +4,8 @@
 // fails when it no longer matches the contract. Keep requests of your own in
 // other files in http/.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { type Schema, sample } from "./sample.ts";
 
-type Schema = {
-  type?: string | string[];
-  format?: string;
-  enum?: unknown[];
-  example?: unknown;
-  default?: unknown;
-  properties?: Record<string, Schema>;
-  required?: string[];
-  items?: Schema;
-  minimum?: number;
-  minLength?: number;
-};
 type Parameter = { name: string; in: string; required?: boolean; schema?: Schema; example?: unknown };
 type Operation = {
   operationId?: string;
@@ -29,25 +18,6 @@ type Contract = { paths?: Record<string, Record<string, unknown>>; security?: Re
 
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
 const contract = JSON.parse(readFileSync("src/generated/openapi.json", "utf8")) as Contract;
-
-/** A plausible value for a schema: its example, else the simplest thing that satisfies it. */
-function sample(schema: Schema = {}, name = "value"): unknown {
-  if (schema.example !== undefined) return schema.example;
-  if (schema.default !== undefined) return schema.default;
-  if (schema.enum?.length) return schema.enum[0];
-  const type = Array.isArray(schema.type) ? schema.type.find((t) => t !== "null") : schema.type;
-  if (type === "object" || schema.properties) {
-    const required = schema.required ?? Object.keys(schema.properties ?? {});
-    return Object.fromEntries(required.map((key) => [key, sample(schema.properties?.[key], key)]));
-  }
-  if (type === "array") return [sample(schema.items, name)];
-  if (type === "integer" || type === "number") return schema.minimum ?? 1;
-  if (type === "boolean") return true;
-  if (schema.format === "uuid") return "00000000-0000-4000-8000-000000000000";
-  if (schema.format === "date-time") return "2026-01-01T00:00:00Z";
-  if (schema.format === "date") return "2026-01-01";
-  return name.replace(/_/g, " ").padEnd(schema.minLength ?? 0, "x");
-}
 
 const variables = new Map<string, unknown>();
 const requests: string[] = [];

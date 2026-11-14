@@ -4,5 +4,34 @@
     "repository": "https://github.com/hungovercoders/template-aws-api",
     "branch": "main"
   },
-  "components": {}
+  "components": {
+    "asyncapi": {
+      "title": "The AsyncAPI contract (specs/asyncapi.yaml) and its gates: the messages an API receives and the events it publishes",
+      "files": [
+        "tools/asyncapi/",
+        "rules/asyncapi.yaml",
+        "test/asyncapi.test.ts"
+      ],
+      "gates": {
+        "install": [
+          "asyncapi:install"
+        ],
+        "generate": [
+          "asyncapi:generate"
+        ],
+        "spec": [
+          "asyncapi:check",
+          "asyncapi:lint",
+          "asyncapi:compat",
+          "asyncapi:examples:check"
+        ],
+        "ci": [
+          "asyncapi:check",
+          "asyncapi:lint",
+          "asyncapi:compat",
+          "asyncapi:examples:check"
+        ]
+      }
+    }
+  }
 }
