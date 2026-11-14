@@ -1,6 +1,6 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-fe77d3fbc0750a0caa6248b2bbc7a8cd03fd61d6356cfc01e2423919783c93eb  .claude/skills/implement-api/SKILL.md
+594bfa784266b3d8a69f07815099ea4f220baf8c991e6dd8542b35fffc195a55  .claude/skills/implement-api/SKILL.md
 c9b3523536718393e5ea56fc45ca8968c1b7d1c1887cff20be3923c81517eb36  .claude/skills/write-spec/SKILL.md
 8117bdb6db21c708fbb50ea9f06aac121130b2c505916d9de7890e76c51f1161  .githooks/pre-push
 f7b75286aecf4ae21904fe048844c21e76f42ad1fc9c68361dbee7a787b6eb05  .github/workflows/ci.yml
