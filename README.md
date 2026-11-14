@@ -73,14 +73,15 @@ specs/openapi.yaml ──┬─► request validation inside the Lambda
                      ├─► response validation on every call the features make
                      └─► generated fuzz requests (schemathesis)
 
-specs/features/*.feature ──► cucumber, strict, against the real handler
-   (the behaviour)           running on AWS Emulator's DynamoDB
+specs/features/*.feature ──► cucumber, strict, against the built Lambda
+   (the behaviour)           on infra/ applied to AWS Emulator
 ```
 
 The same two files are both the instructions for building the API and the
-tests that prove it was built. Nothing is mocked: the features call the Lambda
-handler over HTTP through a local API Gateway stand-in, and the handler talks
-to DynamoDB on [AWS Emulator](https://github.com/aws/aws-emulator).
+tests that prove it was built. Nothing is mocked, and what is tested is what
+ships: the features call `dist/handler.mjs` - the deployed bundle - over HTTP,
+and it talks to a DynamoDB table that the project's own Terraform created on
+[AWS Emulator](https://github.com/aws/aws-emulator).
 
 ## Use it
 
@@ -123,7 +124,8 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | `task spec:lint` | The contract meets the house rules and your own (Spectral) |
 | `task typecheck` | The code agrees with the types generated from the contract |
 | `task test:unit` | Unit tests, including "every contract operation has a handler" |
-| `task features` | The feature files, strict, against the Lambda on AWS Emulator. `task features -- --tags @operation:createThing` runs a subset |
+| `task acceptance` | Features, then fuzz, against one stack - what `task ci` runs |
+| `task features` | The feature files, strict, against the built Lambda on AWS Emulator. `task features -- --tags @operation:create_thing` runs a subset |
 | `task contract:fuzz` | schemathesis generates requests from the contract (fixed seed) and checks every response conforms |
 | `task dev` | The API on http://127.0.0.1:3000 against AWS Emulator |
 | `task build` | Bundle the Lambda into `dist/` |
@@ -145,7 +147,7 @@ src/
 steps/
   world.ts              HTTP client that holds every response to the contract
   *.ts                  step definitions        ← implemented from the spec
-local/                  API Gateway stand-in, table setup, AWS Emulator runner
+local/                  AWS Emulator runner, Terraform apply, API Gateway stand-in
 infra/                  Terraform: Lambda, HTTP API, DynamoDB
 rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
@@ -231,9 +233,26 @@ task, and stops it. Emulated resources live in memory only.
   This template does not change that; set `EMULATOR_TELEMETRY=off` to turn it
   off ([details](https://docs.aws.amazon.com/emulator/latest/userguide/telemetry.html)).
 
-Only DynamoDB is emulated. API Gateway is stood in for by `local/server.ts`,
-which builds the same payload-format-2.0 event from the same contract routes
-and invokes the real handler.
+### How close to production the tests are
+
+Every run of `features`, `contract:fuzz` or `acceptance` builds this stack
+from scratch and throws it away:
+
+| Layer | In the tests | Same as production? |
+| --- | --- | --- |
+| Lambda code | `dist/handler.mjs`, the esbuild bundle Terraform packages | Yes - the same file |
+| Infrastructure | `infra/` applied to AWS Emulator with `terraform apply` | Same definitions; the emulator's control plane, not AWS's |
+| DynamoDB | The table that apply created, on AWS Emulator | Emulated |
+| API Gateway | `local/server.ts` builds the payload-format-2.0 event from the contract's routes | Stand-in |
+| Lambda runtime, IAM | Not exercised - the bundle runs in Node on the test machine | No |
+
+The last two rows are a limit of the emulator, not a choice: it accepts the
+Lambda and HTTP API definitions but cannot yet invoke a function. Until it
+can, API Gateway, IAM and the Lambda runtime are only proven by a real deploy.
+
+`task emulator:install` takes the latest emulator release, so its behaviour
+can change between runs; see its
+[fidelity notes](https://docs.aws.amazon.com/emulator/latest/userguide/fidelity.html).
 
 ## Deploy
 
@@ -254,5 +273,5 @@ to the routes in `infra/main.tf` before exposing anything that needs one.
 
 - Request and response bodies are JSON.
 - Errors are RFC 9457 `application/problem+json` (`Problem` in the contract).
-- One DynamoDB table with string keys `pk` and `sk`, defined in
-  `infra/main.tf` and mirrored for local runs in `local/table.ts`.
+- One DynamoDB table with string keys `pk` and `sk`, defined once in
+  `infra/main.tf` and created from it for local runs too.

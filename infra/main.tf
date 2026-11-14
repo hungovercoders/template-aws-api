@@ -37,7 +37,8 @@ locals {
 }
 
 # --- Data -------------------------------------------------------------------
-# Single table with generic string keys. local/table.ts is its local twin.
+# Single table with generic string keys. The local stack applies this same
+# file to AWS Emulator, so there is no second definition to keep in step.
 
 resource "aws_dynamodb_table" "this" {
   name         = var.name
