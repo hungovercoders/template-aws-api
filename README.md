@@ -39,6 +39,7 @@ once - not regenerated, slightly differently, by AI each time.
 | --- | --- | --- |
 | Lambda entry point and router | `specs/openapi.yaml` - the contract | `steps/*.ts` - glue for your feature sentences |
 | Request validation against the contract | `specs/features/*.feature` - the behaviour | `src/operations/*.ts` - one function per operation |
+| Authentication, from the contract's `security` | | |
 | RFC 9457 error responses | | `src/domain/`, `src/store/` - your rules and data access |
 | Types generated from the contract | | |
 | Local API Gateway stand-in + AWS Emulator | | |
@@ -360,6 +361,50 @@ and role are changed or removed later, and it is not committed.
 The deploy job deploys; it does not yet run the features against the deployed
 API. They reset data through the local harness, which a real stack does not
 have.
+
+## Authentication
+
+Who may call an operation is part of the contract, and the contract is the
+only place you say it:
+
+```yaml
+security:                 # for every operation, or per operation
+  - bearer_auth: []
+components:
+  securitySchemes:
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+```
+
+From that one declaration:
+
+| Where | What happens |
+| --- | --- |
+| AWS | Terraform puts an API Gateway JWT authorizer on exactly the secured routes. It verifies the token and answers 401 itself; the Lambda never sees an unauthenticated request. |
+| Your code | A secured operation always has `context.caller` (`subject` and the token's `claims`). |
+| Local stack and CI | The stand-in enforces the same routes. A caller is `Authorization: Bearer test:<subject>`; in step definitions, set `this.caller = "<subject>"`. |
+| `spec:check` | A secured operation must use an HTTP bearer scheme and document 401. |
+
+Deploying a contract with secured operations needs to know who issues the
+tokens - any OIDC provider (Cognito, Auth0, Entra ID, Clerk):
+
+```sh
+task deploy NAME=my-api -- -var jwt_issuer=https://issuer.example.com/ -var jwt_audience=my-client-id
+```
+
+In the CI deploy job these come from the repository variables `JWT_ISSUER`
+and `JWT_AUDIENCE`. Terraform refuses to deploy a secured route without an
+issuer, so a contract that asks for authentication can never be deployed open.
+
+Document 401 as `application/json` with a `message` - that is the body API
+Gateway sends, and the one 4xx the router does not produce. What a caller is
+*allowed* to do (roles, ownership) is your business logic: decide it in the
+operation from `context.caller` and answer 403 with a problem.
+
+Real tokens are verified only on AWS. The local test caller proves your
+routes and rules, not your identity provider's configuration.
 
 ## Logging and CORS
 

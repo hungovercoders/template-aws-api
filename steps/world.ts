@@ -13,6 +13,8 @@ export class ApiWorld extends World {
   base = (process.env.BASE_URL ?? "http://127.0.0.1:3000").replace(/\/$/, "");
   /** The most recent response, for Then steps to assert on. */
   last: Reply = { status: 0, headers: new Headers(), body: undefined };
+  /** Who the next calls are made as; undefined calls anonymously. Only matters for operations the contract secures. */
+  caller: string | undefined;
   /** Scenario-scoped memory for step definitions, e.g. records a Given step created, by name. */
   remembered = new Map<string, Json>();
 
@@ -24,7 +26,11 @@ export class ApiWorld extends World {
   async call(method: string, path: string, body?: unknown): Promise<Reply> {
     const res = await fetch(this.base + path, {
       method,
-      headers: body === undefined ? {} : { "content-type": "application/json" },
+      headers: {
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+        // The local stack's stand-in for a signed token; see local/server.ts.
+        ...(this.caller === undefined ? {} : { authorization: `Bearer test:${this.caller}` }),
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const text = await res.text();

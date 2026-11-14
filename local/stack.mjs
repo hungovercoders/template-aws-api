@@ -106,8 +106,11 @@ function deploy(env) {
   };
   if (!existsSync(join("infra", ".terraform", "providers"))) terraform(["init", "-input=false", "-no-color"]);
   const region = env.AWS_REGION ?? "us-east-1";
+  // Any issuer will do: the emulated authorizer is created but never consulted,
+  // because local/server.ts stands in for it with test callers.
+  const authorizer = ["-var", "jwt_issuer=https://issuer.invalid/", "-var", "jwt_audience=local"];
   console.log("applying infra/ to AWS Emulator");
-  terraform(["apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`]);
+  terraform(["apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`, ...authorizer]);
   const outputs = JSON.parse(terraform(["output", "-json", `-state=${state}`], true));
   console.log("infra/ applied to AWS Emulator");
   return { TABLE_NAME: outputs.table_name.value };

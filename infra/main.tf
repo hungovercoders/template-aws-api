@@ -32,6 +32,20 @@ locals {
   indexes          = ["gsi1", "gsi2"]
   index_attributes = flatten([for index in local.indexes : ["${index}pk", "${index}sk"]])
 
+  # Operations the contract secures get the JWT authorizer; the rest stay open.
+  # OpenAPI: an operation's own `security` replaces the document's, and an
+  # empty requirement ({}) allows anonymous calls.
+  secured_routes = toset(flatten([
+    for path, item in try(local.contract.paths, {}) : [
+      for method, operation in item : "${upper(method)} ${path}"
+      if contains(local.methods, method) && length(try(operation.security, try(local.contract.security, []))) > 0 && alltrue([
+        for requirement in try(operation.security, try(local.contract.security, [])) : length(requirement) > 0
+      ])
+    ]
+  ]))
+  jwt_issuer   = try(coalesce(var.jwt_issuer), null)
+  jwt_audience = compact(split(",", var.jwt_audience))
+
   routes = toset(flatten([
     for path, item in try(local.contract.paths, {}) : [
       for method, operation in item : "${upper(method)} ${path}" if contains(local.methods, method)
@@ -194,12 +208,38 @@ resource "aws_apigatewayv2_integration" "lambda" {
   payload_format_version = "2.0"
 }
 
+# Verifies the bearer token on every secured route before the Lambda runs,
+# and answers 401 itself when it is missing or invalid.
+resource "aws_apigatewayv2_authorizer" "jwt" {
+  count = local.jwt_issuer == null ? 0 : 1
+
+  api_id           = aws_apigatewayv2_api.this.id
+  name             = "jwt"
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+
+  jwt_configuration {
+    issuer   = local.jwt_issuer
+    audience = local.jwt_audience
+  }
+}
+
 resource "aws_apigatewayv2_route" "operation" {
   for_each = local.routes
 
-  api_id    = aws_apigatewayv2_api.this.id
-  route_key = each.value
-  target    = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  api_id             = aws_apigatewayv2_api.this.id
+  route_key          = each.value
+  target             = "integrations/${aws_apigatewayv2_integration.lambda.id}"
+  authorization_type = contains(local.secured_routes, each.value) ? "JWT" : "NONE"
+  authorizer_id      = contains(local.secured_routes, each.value) ? one(aws_apigatewayv2_authorizer.jwt[*].id) : null
+
+  lifecycle {
+    # Never deploy a route the contract secures without something to secure it.
+    precondition {
+      condition     = !contains(local.secured_routes, each.value) || local.jwt_issuer != null
+      error_message = "The contract secures ${each.value}, but no token issuer is configured. Set jwt_issuer (and jwt_audience)."
+    }
+  }
 }
 
 resource "aws_apigatewayv2_stage" "default" {

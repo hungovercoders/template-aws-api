@@ -4,7 +4,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from "aws-lambd
 import type { operations } from "../generated/api.d.ts";
 import { operationForRouteKey, validateRequest } from "./contract.ts";
 import { createLogger, type Logger } from "./log.ts";
-import { HttpProblem, problem, type Result } from "./problem.ts";
+import { HttpProblem, problem, unauthorized, type Result } from "./problem.ts";
 
 type OperationId = keyof operations;
 type Parameters<K extends OperationId, W extends "path" | "query"> = operations[K] extends { parameters: { [P in W]?: infer V } }
@@ -12,12 +12,22 @@ type Parameters<K extends OperationId, W extends "path" | "query"> = operations[
   : Record<string, never>;
 type Body<K extends OperationId> = operations[K] extends { requestBody?: { content: { "application/json": infer B } } } ? B : undefined;
 
+/** Who is calling, from the token API Gateway verified. */
+export type Caller = { subject: string; claims: Record<string, unknown> };
+
+function callerOf(event: APIGatewayProxyEventV2): Caller | undefined {
+  const claims = (event.requestContext as { authorizer?: { jwt?: { claims?: Record<string, unknown> } } } | undefined)?.authorizer?.jwt?.claims;
+  return claims && typeof claims.sub === "string" ? { subject: claims.sub, claims } : undefined;
+}
+
 /** A request that has already passed contract validation. */
 export type Context<K extends OperationId> = {
   path: Parameters<K, "path">;
   query: Parameters<K, "query">;
   body: Body<K>;
   event: APIGatewayProxyEventV2;
+  /** Always present for operations the contract secures; undefined otherwise. */
+  caller: Caller | undefined;
   /** Writes structured lines that carry this request's id and operation. */
   log: Logger;
 };
@@ -52,6 +62,11 @@ export function createHandler(routes: Routes): APIGatewayProxyHandlerV2 {
     const handle = handlers[operation.operationId];
     if (!handle) return problem(501, "Not Implemented", `${operation.operationId} is in the contract but has no handler in src/routes.ts.`);
 
+    // API Gateway's authorizer has already refused callers without a valid
+    // token; this holds the line if a secured route is ever wired up without one.
+    const caller = callerOf(event);
+    if (operation.secured && !caller) return unauthorized();
+
     let body: unknown;
     try {
       body = parseBody(event);
@@ -69,7 +84,7 @@ export function createHandler(routes: Routes): APIGatewayProxyHandlerV2 {
     }
 
     try {
-      return await handle({ ...checked.request, event, log } as Context<never>);
+      return await handle({ ...checked.request, event, caller, log } as Context<never>);
     } catch (error) {
       if (error instanceof HttpProblem) return problem(error.status, error.title, error.detail);
       log.error("unhandled error", { error });
