@@ -1,0 +1,94 @@
+# Contributing
+
+How to change this template. If you are building an API *from* it, you want
+the [README](README.md) instead; a change belongs here only if every API
+should get it.
+
+## Proposing a change
+
+1. **Open an issue** saying what is missing and what "done" looks like. A
+   change that would help only one API belongs in that API, not here.
+2. **Make it on `main`.** `task ci` is red there by design (there is no spec
+   to implement), so the check that matters is `template`: it runs every gate
+   with the example laid over your change.
+3. **Merge it down** to the example branches (below), and confirm
+   `example/implementation` is green.
+
+## Branches
+
+| Branch | Is | CI |
+| --- | --- | --- |
+| `main` | The template | `ci` red by design; `template` green |
+| `example/spec` | `main` plus the example spec | Red by design |
+| `example/implementation` | `example/spec` plus its implementation | Green |
+
+The example branches exist to be read and compared, not developed on.
+
+- **Every skeleton change is made on `main` and merged down:** `main` →
+  `example/spec` → `example/implementation`. Never change a skeleton file on
+  an example branch.
+- **The branches may differ only in what an API owns.** `example/spec` adds
+  `specs/`, `http/contract.http` and its README status banner;
+  `example/implementation` adds `src/operations/`, `src/domain/`,
+  `src/store/`, `steps/` (but `world.ts`) and their tests. `git diff main
+  example/spec --stat` and `git diff example/spec example/implementation
+  --stat` should list nothing else.
+- **When the starter `specs/openapi.yaml` changes on `main`,** the example
+  branches keep their own contract: restore it from before the merge and
+  re-apply the same idea by hand. Never resolve with `-X ours` or
+  `-X theirs`; both silently mix the starter into the example contract.
+- **Never rewrite what is pushed.** `main` and `example/*` are protected
+  against deletion and force-pushes
+  (`.github/rulesets/protect-demo-branches.json`); only add commits or merges.
+
+## Changing the skeleton
+
+`skeleton.lock` records every skeleton file - the router and contract
+library, the local stack, the gates, CI, the Terraform, the skills.
+`task skeleton:check`, the first gate in `task ci`, fails if any of them
+differs. That makes "do not rebuild the skeleton" a check rather than a
+request: an agent cannot quietly weaken a gate or rewrite the router to get
+green.
+
+Changing the skeleton is still possible - an index, a new alarm, an upgrade -
+but it is a deliberate step by a person:
+
+```sh
+task skeleton:lock      # accept the skeleton as it is now, then commit skeleton.lock
+```
+
+The changed lock shows in the diff, so a reviewer sees that the skeleton
+moved and asks why. Version pins (`*_VERSION` in `Taskfile.yml`, action
+versions in the workflow) are ignored, so Renovate's updates do not trip it.
+In this repository, run `task skeleton:lock` on `main` in the same commit as
+the skeleton change; the lock is identical on all three branches.
+
+## What gets documented
+
+Context is hard to manage, so a document exists only where it is necessary:
+
+1. **Prefer something executable.** A gate, a generator, a task's
+   description or an alarm's description says it once and cannot go stale.
+   Write prose only for what none of those can carry.
+2. **Every document names its reader and their moment.** Each guide opens
+   with who it is for and when. If you cannot fill that in, do not write it.
+3. **One home per fact.** State it once and link to it.
+
+`task docs:check`, a gate in `task ci`, holds this in place: it fails when
+`CLAUDE.md`, a skill, the README or a guide outgrows its line budget, when a
+guide does not say who it is for and when, and when a link between documents
+does not resolve. The budgets are at the top of `scripts/docs-check.ts`.
+Raising one is allowed, and is a decision: first ask what could be cut, or
+turned into a gate.
+
+Deliberately absent: architecture documents (the contract, the features and
+the Terraform are the description), decision records (a skeleton change is
+recorded by its `task skeleton:lock` commit) and a changelog (`task
+spec:compat` prints one).
+
+## Keeping dependencies current
+
+`renovate.json` covers npm, GitHub Actions, Terraform providers and mise
+tools, and raises the AWS Emulator and Prism versions pinned in
+`Taskfile.yml`. Install the [Renovate app](https://github.com/apps/renovate)
+on your repository to switch it on.

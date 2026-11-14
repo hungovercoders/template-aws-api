@@ -101,7 +101,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 (Node, Task, Terraform, uv) from `mise.toml`.
 
 1. **Create your repo** from this template (*Use this template* on GitHub; see
-   [Using this repository as a template](docs/maintaining.md#using-this-repository-as-a-template))
+   [Using this repository as a template](#using-this-repository-as-a-template))
    and run `mise install`.
 2. **Add your spec.** In Claude Code, `/write-spec` works through it with
    you: it asks for your requirements, drafts the features and contract, and
@@ -136,29 +136,18 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 
 ## Tasks
 
-`task` lists them. The ones you will use:
+Every command is a task. `task` lists them all, each with a one-line
+description; these are the ones you start with:
 
 | Task | What it does |
 | --- | --- |
 | `task ci` | Every gate, in order. The definition of done; what CI runs. |
 | `task scaffold` | Write what follows from the spec: a typed stub per operation, a pending step per sentence |
-| `task skeleton:check` | No skeleton file has changed since it was last accepted |
-| `task docs:check` | Documents and agent context are within budget and their links resolve |
-| `task spec:check` | The contract is valid and every operation has a tagged scenario |
-| `task spec:lint` | The contract meets the house rules and your own (Spectral) |
-| `task spec:compat` | Changes since the last published contract are listed and `info.version` is bumped to match |
-| `task mock` | Serve a mock of the contract on http://127.0.0.1:4010 - no implementation needed |
-| `task http` | Send requests from `http/*.http` to the mock, the local stack or a deployed API |
-| `task typecheck` | The code agrees with the types generated from the contract |
-| `task test:unit` | Unit tests, including "every contract operation has a handler" |
-| `task acceptance` | Features, then fuzz, against one stack - what `task ci` runs |
-| `task features` | The feature files, strict, against the built Lambda on AWS Emulator. `task features -- --tags @operation:create_thing` runs a subset |
-| `task contract:fuzz` | schemathesis generates requests from the contract (fixed seed) and checks every response conforms |
+| `task mock` | Serve a mock of the contract - no implementation needed |
+| `task http` | Send requests to the mock, the local stack or a deployed API |
+| `task features` | The feature files against the built Lambda on AWS Emulator |
 | `task dev` | The API on http://127.0.0.1:3000 against AWS Emulator |
-| `task build` | Bundle the Lambda into `dist/` |
-| `task infra:validate` | Terraform format and validation |
-| `task deploy` / `task destroy` | Apply or remove the stack on AWS (opt-in) |
-| `task aws:bootstrap` | One-off: create the state bucket and GitHub deploy role in your AWS account (opt-in) |
+| `task deploy` | Apply the stack to AWS (opt-in) |
 
 ## Layout
 
@@ -178,6 +167,8 @@ local/                  AWS Emulator runner, Terraform apply, API Gateway stand-
 infra/                  Terraform: Lambda, HTTP API, DynamoDB
 infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 docs/                   guides, each for one reader at one moment; runbook.md for alarms
+CONTRIBUTING.md         how the template itself is changed
+SECURITY.md             how to report a vulnerability
 skeleton.lock           what the skeleton is; skeleton:check fails if it changes
 rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
@@ -186,6 +177,24 @@ scripts/                generate, scaffold, spec:check and http:generate
 .claude/skills/write-spec/      the skill that helps you write the spec
 .claude/skills/implement-api/   the skill that drives an implementation
 ```
+
+## Using this repository as a template
+
+Create your repository with **Use this template** on GitHub. You only need
+`main`: leave "Include all branches" unticked. The example branches are for
+reading, not for building on.
+
+Then, in your new repository:
+
+- Delete `.github/rulesets/` and `.github/workflows/template.yml`, and
+  replace `CONTRIBUTING.md` and `SECURITY.md` with your own. They describe
+  how *this* repository is kept, tested and reported on, not your API.
+- Replace this README's top section with a description of your API. The rest
+  is a working manual for the tooling and can stay.
+- Change the copyright line in `LICENSE` if the code is not MIT or not yours
+  to license that way.
+- Add your spec and carry on from [Use it](#use-it). CI is red until the spec
+  is implemented, and green from then on.
 
 ## Guides
 
@@ -197,4 +206,6 @@ Each guide is for one reader at one moment. Read the one you need.
 | [Testing](docs/testing.md) | A gate fails, or you want to run or explore the API locally |
 | [Deploying](docs/deploying.md) | Putting an API on AWS; sign-in, CORS and CI deployment |
 | [Runbook](docs/runbook.md) | An alarm has fired |
-| [Maintaining the template](docs/maintaining.md) | Creating a repository from the template, changing the skeleton, updating dependencies |
+
+Changing the template itself: [CONTRIBUTING.md](CONTRIBUTING.md). Reporting a
+vulnerability: [SECURITY.md](SECURITY.md).

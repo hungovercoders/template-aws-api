@@ -1,0 +1,39 @@
+# Security
+
+## Reporting a vulnerability
+
+Please do not open a public issue. Report it privately through
+**Security → Report a vulnerability** on this repository (GitHub's private
+vulnerability reporting). Say what you found, how to reproduce it, and what
+an attacker could do with it.
+
+You will get a reply once it has been read. A fix is made on `main` and
+merged down to the example branches; you are credited unless you ask not to be.
+
+## What is covered
+
+The template's skeleton on `main`: the router and contract validation, the
+local stack, the gates and generators, the CI workflows and the Terraform.
+Only the latest `main` is supported; there are no maintained older versions.
+
+An API built from the template is its owner's responsibility, including the
+`SECURITY.md` it should replace this one with.
+
+## What the template does about security
+
+So you know what to rely on, and what to check when reporting:
+
+- **Authentication** is declared in the contract and enforced by an API
+  Gateway JWT authorizer; Terraform refuses to deploy a secured operation
+  without a token issuer. See [Authentication](docs/deploying.md#authentication).
+- **Every request is validated** against the contract before any operation
+  runs, and unknown fields are refused.
+- **Deployment from CI uses no stored keys**: GitHub assumes a role through
+  OIDC that is limited to one repository's `main` branch and one stack's
+  resources. See [Deploy](docs/deploying.md#deploy).
+- **AWS Emulator is verified** against AWS's signing key before it is used,
+  and is never installed system-wide.
+- **The local test caller** (`Bearer test:<subject>`) exists only in the
+  local stand-in; it is not in the deployed Lambda.
+
+The API is deployed without authentication unless the contract asks for it.
