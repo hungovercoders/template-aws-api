@@ -141,6 +141,7 @@ description; these are the ones you start with:
 | Task | What it does |
 | --- | --- |
 | `task ci` | Every gate, in order. The definition of done; what CI runs. |
+| `task check` | The fast gates only: nothing started, nothing downloaded. `task hooks:install` runs it before every push |
 | `task scaffold` | Write what follows from the spec: a typed stub per operation, a pending step per sentence |
 | `task mock` | Serve a mock of the contract - no implementation needed |
 | `task http` | Send requests to the mock, the local stack or a deployed API |
@@ -188,8 +189,8 @@ Then, in your new repository:
 
 - Write your spec, then run `task adopt` once. It removes what is only about
   the template (its self-test workflow, its branch ruleset, the template
-  sections of `CONTRIBUTING.md` and `SECURITY.md`) and replaces this README
-  with one that describes your API.
+  sections of `CONTRIBUTING.md` and `SECURITY.md`), replaces this README
+  with one that describes your API, and installs the pre-push hook.
 - From then on, every change follows `CONTRIBUTING.md`: the spec first, then
   the implementation, for the whole life of the API.
 - Change the copyright line in `LICENSE` if the code is not MIT or not yours

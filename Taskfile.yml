@@ -274,6 +274,13 @@ tasks:
   ci:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
     cmds:
+      - task: check
+      - task: infra:validate
+      - task: acceptance
+
+  check:
+    desc: The fast gates - everything in task ci that needs nothing running. What the pre-push hook runs.
+    cmds:
       - task: skeleton:check
       - task: docs:check
       - task: spec:check
@@ -284,8 +291,13 @@ tasks:
       - task: test:unit
       - task: typecheck
       - task: steps:check
-      - task: infra:validate
-      - task: acceptance
+
+  hooks:install:
+    desc: Opt in to the pre-push hook - git runs task check before every push (skip one push with git push --no-verify)
+    cmds:
+      - git config core.hooksPath .githooks
+    status:
+      - test "$(git config core.hooksPath)" = ".githooks"
 
   # --- Your AWS account (opt-in; see "Bring your AWS account" in docs/deploying.md) ---
 
