@@ -43,6 +43,7 @@ once - not regenerated, slightly differently, by AI each time.
 | Types generated from the contract | | |
 | Local API Gateway stand-in + AWS Emulator | | |
 | Contract-checking test harness, fuzzing | | |
+| Contract linting to shared standards | | |
 | mise, Taskfile, GitHub Actions CI | | |
 | Terraform: Lambda, HTTP API, DynamoDB | | |
 
@@ -95,7 +96,10 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
    - Add feature files to `specs/features/`. Tag each scenario with the
      operations it covers: `@operation:<operationId>`. Every operation needs
      at least one.
-   - `task spec:check` tells you when the spec is complete enough to build from.
+   - Add any contract rules of your own to `.spectral.yaml`
+     (see [Contract standards](#contract-standards)).
+   - `task spec:check` tells you when the spec is complete enough to build
+     from, and `task spec:lint` that it meets the standards.
 3. **Implement it.** In [Claude Code](https://claude.com/claude-code), run:
 
    ```
@@ -116,6 +120,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | --- | --- |
 | `task ci` | Every gate, in order. The definition of done; what CI runs. |
 | `task spec:check` | The contract is valid and every operation has a tagged scenario |
+| `task spec:lint` | The contract meets the house rules and your own (Spectral) |
 | `task typecheck` | The code agrees with the types generated from the contract |
 | `task test:unit` | Unit tests, including "every contract operation has a handler" |
 | `task features` | The feature files, strict, against the Lambda on AWS Emulator. `task features -- --tags @operation:createThing` runs a subset |
@@ -142,6 +147,8 @@ steps/
   *.ts                  step definitions        ← implemented from the spec
 local/                  API Gateway stand-in, table setup, AWS Emulator runner
 infra/                  Terraform: Lambda, HTTP API, DynamoDB
+rules/house.yaml        contract standards shared by every API
+.spectral.yaml          contract rules for this API ← you add
 scripts/                generate and spec:check
 .claude/skills/implement-api/   the skill that drives an implementation
 ```
@@ -153,6 +160,8 @@ Each gate fails for one reason and says what it is:
 - **`spec:check`** - no operations, an operation without an `operationId`, an
   operation no scenario is tagged for, or a tag naming an operation that does
   not exist.
+- **`spec:lint`** - the contract breaks a rule in `rules/house.yaml` or
+  `.spectral.yaml`. Warnings fail as well as errors.
 - **`test:unit`** (`test/routes.test.ts`) - an operation in the contract with
   no handler in `src/routes.ts`, or a handler for an operation that is not in
   the contract.
@@ -165,6 +174,44 @@ Each gate fails for one reason and says what it is:
 
 The router validates every incoming request against the contract before your
 code runs, so the 400 responses are the contract's, not hand-written checks.
+
+## Contract standards
+
+`task spec:lint` runs [Spectral](https://github.com/stoplightio/spectral)
+over `specs/openapi.yaml`. It is a gate in `task ci`, so a contract that
+breaks a rule cannot be implemented green.
+
+**House rules** (`rules/house.yaml`) ship with the template and apply to every
+API, on top of Spectral's built-in OpenAPI rules:
+
+| Rule | Standard |
+| --- | --- |
+| Naming | Property names, path and query parameters, `operationId`s, path segments and string enum values are **lower snake_case** (`created_at`, `beer_id`, `create_beer`, `/beer_styles`) |
+| Schema names | PascalCase - they become TypeScript type names |
+| Operations | Every operation has an `operationId` and a `summary`, and documents a `400` |
+| Errors | Every 4xx/5xx response is `application/problem+json` |
+| Request bodies | Object bodies set `additionalProperties: false` |
+
+**Your rules** go in `.spectral.yaml`, which extends the house rules. Add what
+is specific to your API or organisation - versioning, security schemes,
+documentation requirements - using any
+[Spectral rule](https://docs.stoplight.io/docs/spectral/d3482ff0ccae9-rules):
+
+```yaml
+extends: ["./rules/house.yaml"]
+
+rules:
+  property-description-required:
+    description: Every property is described.
+    severity: error
+    given: "$..properties[*]"
+    then:
+      field: description
+      function: truthy
+```
+
+Treat `rules/house.yaml` as part of the skeleton: change a house standard in
+the template, once, not in one API.
 
 ## AWS Emulator
 

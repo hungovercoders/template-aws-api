@@ -2,19 +2,19 @@ Feature: Rules the catalogue enforces
   Beer names are unique, the details must make sense, and a beer that is not
   in the catalogue cannot be fetched, changed, retired or rated.
 
-  @operation:createBeer
+  @operation:create_beer
   Scenario: Two beers cannot share a name
     Given the catalogue has the beer "Morning After", an ipa at 5.6% abv
     When staff add the beer "Morning After", a stout at 7.0% abv
     Then the request is refused because the name is taken
 
-  @operation:createBeer
+  @operation:create_beer
   Scenario: Names are compared ignoring case and surrounding spaces
     Given the catalogue has the beer "Morning After", an ipa at 5.6% abv
     When staff add the beer "  morning AFTER ", a stout at 7.0% abv
     Then the request is refused because the name is taken
 
-  @operation:updateBeer
+  @operation:update_beer
   Scenario: A beer cannot be renamed to another beer's name
     Given the catalogue has these beers:
       | name            | style | abv |
@@ -23,14 +23,14 @@ Feature: Rules the catalogue enforces
     When staff rename "Hair of the Dog" to "Morning After"
     Then the request is refused because the name is taken
 
-  @operation:updateBeer
+  @operation:update_beer
   Scenario: A beer can be renamed to a different spelling of its own name
     Given the catalogue has the beer "Morning After", an ipa at 5.6% abv
     When staff rename "Morning After" to "MORNING AFTER"
     Then the beer is returned
     And the beer is named "MORNING AFTER", an ipa at 5.6% abv
 
-  @operation:createBeer
+  @operation:create_beer
   Scenario Outline: A beer needs sensible details
     When staff try to add a beer with <problem>
     Then the request is refused as invalid, pointing at "<field>"
@@ -46,18 +46,18 @@ Feature: Rules the catalogue enforces
       | an abv above 20          | abv    |
       | an unexpected detail     |        |
 
-  @operation:updateBeer
+  @operation:update_beer
   Scenario: A change must change something
     Given the catalogue has the beer "Morning After", an ipa at 5.6% abv
     When staff send no changes for "Morning After"
     Then the request is refused as invalid
 
-  @operation:listBeers
+  @operation:list_beers
   Scenario: Beers cannot be listed by a style that does not exist
     When staff list the cider beers
     Then the request is refused as invalid, pointing at "style"
 
-  @operation:getBeer @operation:updateBeer @operation:retireBeer @operation:rateBeer
+  @operation:get_beer @operation:update_beer @operation:retire_beer @operation:rate_beer
   Scenario Outline: A beer that is not in the catalogue cannot be used
     When staff <action> a beer that is not in the catalogue
     Then the beer is not found
@@ -69,7 +69,7 @@ Feature: Rules the catalogue enforces
       | retire |
       | rate   |
 
-  @operation:getBeer
+  @operation:get_beer
   Scenario: A beer is identified by a UUID
     When staff fetch the beer with id "not-a-uuid"
-    Then the request is refused as invalid, pointing at "beerId"
+    Then the request is refused as invalid, pointing at "beer_id"
