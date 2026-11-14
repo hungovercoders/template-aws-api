@@ -58,16 +58,39 @@ const typed = (name: string) => `${name}: ${TYPES.find(([pattern]) => pattern.te
 
 const target = "steps/scaffold.ts";
 const existing = existsSync(target) ? readFileSync(target, "utf8") : "";
-const seen = new Set<string>();
-const added: string[] = [];
+// cucumber offers {int} for "4" and {float} for "3.5" in the same sentence.
+// {float} matches both, so two such stubs would be ambiguous: keep one, with
+// {float} wherever either wording had a decimal.
+type Stub = { keyword: string; pattern: string; args: string };
+const stubs = new Map<string, Stub>();
 for (const snippet of existsSync(snippets) ? readFileSync(snippets, "utf8").split(/\n\s*\n/) : []) {
   const match = /^(Given|When|Then)\((.+), async function \(([^)]*)\) \{$/m.exec(snippet);
   if (!match) continue;
-  const [, keyword, pattern, args] = match;
-  const key = `${keyword}(${pattern},`;
-  if (seen.has(key) || existing.includes(key)) continue;
-  seen.add(key);
-  const parameters = ["this: ApiWorld", ...args!.split(",").map((arg) => arg.trim()).filter(Boolean).map(typed)].join(", ");
+  const [, keyword, pattern, args] = match as unknown as [string, string, string, string];
+  const sentence = `${keyword}(${pattern.replace(/\{int\}/g, "{float}")},`;
+  const earlier = stubs.get(sentence);
+  if (!earlier) {
+    stubs.set(sentence, { keyword, pattern, args });
+    continue;
+  }
+  // Same sentence: take {float} for each slot where the two disagree.
+  const [slots, others] = [earlier.pattern.match(/\{\w+\}/g) ?? [], pattern.match(/\{\w+\}/g) ?? []];
+  let slot = 0;
+  earlier.pattern = earlier.pattern.replace(/\{\w+\}/g, (own) => (others[slot++] === "{float}" ? "{float}" : own));
+  earlier.args = (earlier.pattern.match(/\{\w+\}/g) ?? slots)
+    .map((name, i, all) => {
+      const kind = name.slice(1, -1);
+      const nth = all.slice(0, i).filter((other) => other === name).length;
+      return nth === 0 ? kind : `${kind}${nth + 1}`;
+    })
+    .concat(earlier.args.split(",").map((arg) => arg.trim()).filter((arg) => arg === "dataTable" || arg === "docString"))
+    .join(", ");
+}
+
+const added: string[] = [];
+for (const { keyword, pattern, args } of stubs.values()) {
+  if (existing.includes(`${keyword}(${pattern},`)) continue;
+  const parameters = ["this: ApiWorld", ...args.split(",").map((arg) => arg.trim()).filter(Boolean).map(typed)].join(", ");
   added.push(`${keyword}(${pattern}, async function (${parameters}) {\n  return "pending";\n});\n`);
 }
 
@@ -77,8 +100,9 @@ if (added.length > 0) {
       target,
       `// Written by \`task scaffold\`: one pending step for each sentence in specs/features
 // that had no step definition. Implement each one - merge sentences that differ
-// only in wording into a single pattern, and move them into files of your own
-// naming if you prefer. A pending step fails the run, so none can be forgotten.
+// only in wording into a single pattern, rename the arguments, and move them
+// into files of your own naming (then delete this file). A pending step fails
+// the run, so none can be forgotten.
 import { type DataTable, Given, Then, When } from "@cucumber/cucumber";
 import type { ApiWorld } from "./world.ts";
 `,
