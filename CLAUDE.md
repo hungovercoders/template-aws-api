@@ -32,5 +32,8 @@ files) is the requirement; `task ci` is the definition of done.
   the example branches keep their own contract: restore it from before the
   merge and re-apply the same idea by hand. Never resolve with `-X ours` or
   `-X theirs` - both silently mix the starter into the example contract.
+- `main` and `example/*` are protected against deletion and force-pushes
+  (`.github/rulesets/protect-demo-branches.json`). Only ever add commits or
+  merges to them; never rebase, amend or reset what has been pushed.
 - CI is red by design on `main` and `example/spec` and green on
   `example/implementation`.
