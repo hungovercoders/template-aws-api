@@ -1,7 +1,7 @@
 // Glue for specs/features: each sentence drives the API over HTTP only.
 // ApiWorld.call holds every response to the contract, so these steps assert
 // behaviour and leave shape to the OpenAPI document.
-import { type DataTable, Given, Then, When } from "@cucumber/cucumber";
+import { Before, type DataTable, Given, Then, When } from "@cucumber/cucumber";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { ApiWorld, Json } from "./world.ts";
@@ -323,4 +323,60 @@ Then(/^"([^"]*)" has (\d+) ratings? averaging ([\d.]+)$/, async function (this: 
   assert.ok(beer, `"${name}" is in the catalogue`);
   assert.equal(beer.rating_count, Number(count));
   assert.equal(beer.average_rating, Number(average));
+});
+
+// --- Who is calling ---------------------------------------------------------------
+
+const STAFF = "staff-member";
+
+// The sentences say "staff ..." throughout, so scenarios run signed in as staff
+// unless a step says otherwise.
+Before(function (this: ApiWorld) {
+  this.caller = STAFF;
+});
+
+/** Make calls with nobody signed in, then put staff back for the steps that follow. */
+async function anonymously<T>(world: ApiWorld, work: () => Promise<T>): Promise<T> {
+  world.caller = undefined;
+  try {
+    return await work();
+  } finally {
+    world.caller = STAFF;
+  }
+}
+
+When(
+  /^someone who is not signed in tries to add the beer "([^"]*)", an? (\w+) at ([\d.]+)% abv$/,
+  async function (this: ApiWorld, name: string, style: string, abv: string) {
+    await anonymously(this, () => this.call("POST", "/beers", { name, style, abv: Number(abv) }));
+  },
+);
+
+When(/^someone who is not signed in tries to (rename|retire) "([^"]*)"$/, async function (this: ApiWorld, action: string, name: string) {
+  const path = `/beers/${idOf(this, name)}`;
+  await anonymously(this, () => (action === "rename" ? this.call("PATCH", path, { name: "Renamed" }) : this.call("DELETE", path)));
+});
+
+When("someone who is not signed in lists the beers, fetches {string} and rates it {int}", async function (this: ApiWorld, name: string, score: number) {
+  const id = idOf(this, name);
+  const statuses = await anonymously(this, async () => [
+    (await this.call("GET", "/beers")).status,
+    (await this.call("GET", `/beers/${id}`)).status,
+    (await this.call("POST", `/beers/${id}/ratings`, { score })).status,
+  ]);
+  this.remembered.set("replies", { statuses });
+});
+
+Then("they are asked to sign in", function (this: ApiWorld) {
+  expectStatus(this, 401);
+});
+
+Then("every one of those requests succeeds", function (this: ApiWorld) {
+  assert.deepEqual(this.remembered.get("replies")!.statuses, [200, 200, 201]);
+});
+
+Then(/^"([^"]*)" is still in the catalogue, an? (\w+) at ([\d.]+)% abv$/, async function (this: ApiWorld, name: string, style: string, abv: string) {
+  const beer = await currently(this, name);
+  assert.ok(beer, `"${name}" is in the catalogue`);
+  assert.deepEqual({ name: beer.name, style: beer.style, abv: beer.abv }, { name, style, abv: Number(abv) });
 });
