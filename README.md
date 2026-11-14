@@ -5,13 +5,12 @@ files say what the API does, an OpenAPI contract says what it looks like, and
 a set of deterministic gates will not go green until the implementation
 delivers both.
 
-> **This is the `example/spec` branch: the template plus a complete spec.**
-> [`specs/openapi.yaml`](specs/openapi.yaml) is the contract for a Beer
-> Catalogue API and [`specs/features/`](specs/features) is its behaviour.
-> Nothing is implemented, so **CI is red on purpose** - `task ci` fails at
-> `test:unit`, listing the six operations that have no handler. Running
-> `/implement-api` here produces
-> [`example/implementation`](../../tree/example/implementation).
+> **This is the `example/implementation` branch: the example spec, delivered.**
+> The Beer Catalogue API from [`example/spec`](../../tree/example/spec),
+> implemented by following the `implement-api` skill. `specs/` and the
+> template's gates are untouched; the
+> [diff from `example/spec`](../../compare/example/spec...example/implementation)
+> is the step definitions, the operations and their unit tests. **CI is green.**
 
 | Branch | What it is | `task ci` |
 | --- | --- | --- |
