@@ -61,6 +61,12 @@ tasks:
     cmds:
       - node scripts/skeleton.ts lock
 
+  docs:check:
+    desc: Gate - CLAUDE.md, the skills, the README and the guides are within their line budgets, and their links resolve
+    deps: [install]
+    cmds:
+      - node scripts/docs-check.ts
+
   scaffold:
     desc: Write what follows from the specs - a typed stub for every operation without a file, a pending step for every unbound sentence
     deps: [generate]
@@ -241,6 +247,7 @@ tasks:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
     cmds:
       - task: skeleton:check
+      - task: docs:check
       - task: spec:check
       - task: spec:lint
       - task: spec:compat
@@ -250,7 +257,7 @@ tasks:
       - task: infra:validate
       - task: acceptance
 
-  # --- Your AWS account (opt-in; see "Bring your AWS account" in the README) ---
+  # --- Your AWS account (opt-in; see "Bring your AWS account" in docs/deploying.md) ---
 
   aws:bootstrap:
     desc: One-off, with admin credentials - create the state bucket and the GitHub OIDC deploy role (NAME=<stack name> REPO=<owner/repo>)
