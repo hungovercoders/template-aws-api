@@ -46,6 +46,14 @@ tasks:
     cmds:
       - node scripts/spec-check.ts
 
+  spec:lint:
+    desc: Gate - the contract meets the house rules (rules/house.yaml) and this API's own (.spectral.yaml); warnings fail
+    deps: [install]
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - npx spectral lint specs/openapi.yaml --fail-severity warn
+
   typecheck:
     desc: Gate - the code agrees with the types generated from the contract
     deps: [generate]
@@ -140,6 +148,7 @@ tasks:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
     cmds:
       - task: spec:check
+      - task: spec:lint
       - task: typecheck
       - task: test:unit
       - task: features

@@ -1,10 +1,10 @@
 import type { Routes } from "./lib/router.ts";
-import { createBeer } from "./operations/createBeer.ts";
-import { getBeer } from "./operations/getBeer.ts";
-import { listBeers } from "./operations/listBeers.ts";
-import { rateBeer } from "./operations/rateBeer.ts";
-import { retireBeer } from "./operations/retireBeer.ts";
-import { updateBeer } from "./operations/updateBeer.ts";
+import { create_beer } from "./operations/create_beer.ts";
+import { get_beer } from "./operations/get_beer.ts";
+import { list_beers } from "./operations/list_beers.ts";
+import { rate_beer } from "./operations/rate_beer.ts";
+import { retire_beer } from "./operations/retire_beer.ts";
+import { update_beer } from "./operations/update_beer.ts";
 
 // One entry per operationId in specs/openapi.yaml.
-export const routes: Routes = { createBeer, getBeer, listBeers, rateBeer, retireBeer, updateBeer };
+export const routes: Routes = { create_beer, get_beer, list_beers, rate_beer, retire_beer, update_beer };

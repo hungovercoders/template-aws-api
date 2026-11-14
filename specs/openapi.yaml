@@ -13,7 +13,7 @@ tags:
 paths:
   /beers:
     get:
-      operationId: listBeers
+      operationId: list_beers
       summary: List the beers in the catalogue
       tags: [beers]
       parameters:
@@ -42,14 +42,14 @@ paths:
                     name: Morning After
                     style: ipa
                     abv: 5.6
-                    ratingCount: 2
-                    averageRating: 4.5
-                    createdAt: "2026-11-14T09:00:00.000Z"
-                    updatedAt: "2026-11-14T09:30:00.000Z"
+                    rating_count: 2
+                    average_rating: 4.5
+                    created_at: "2026-11-14T09:00:00.000Z"
+                    updated_at: "2026-11-14T09:30:00.000Z"
         "400":
           $ref: "#/components/responses/BadRequest"
     post:
-      operationId: createBeer
+      operationId: create_beer
       summary: Add a beer to the catalogue
       tags: [beers]
       requestBody:
@@ -79,11 +79,11 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
-  /beers/{beerId}:
+  /beers/{beer_id}:
     parameters:
       - $ref: "#/components/parameters/BeerId"
     get:
-      operationId: getBeer
+      operationId: get_beer
       summary: Fetch one beer
       tags: [beers]
       responses:
@@ -98,7 +98,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
-      operationId: updateBeer
+      operationId: update_beer
       summary: Change a beer's details
       tags: [beers]
       requestBody:
@@ -123,7 +123,7 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
     delete:
-      operationId: retireBeer
+      operationId: retire_beer
       summary: Retire a beer from the catalogue
       tags: [beers]
       responses:
@@ -134,11 +134,11 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /beers/{beerId}/ratings:
+  /beers/{beer_id}/ratings:
     parameters:
       - $ref: "#/components/parameters/BeerId"
     post:
-      operationId: rateBeer
+      operationId: rate_beer
       summary: Rate a beer
       tags: [ratings]
       requestBody:
@@ -164,7 +164,7 @@ paths:
 components:
   parameters:
     BeerId:
-      name: beerId
+      name: beer_id
       in: path
       required: true
       schema:
@@ -224,7 +224,7 @@ components:
 
     Beer:
       type: object
-      required: [id, name, style, abv, ratingCount, averageRating, createdAt, updatedAt]
+      required: [id, name, style, abv, rating_count, average_rating, created_at, updated_at]
       additionalProperties: false
       properties:
         id:
@@ -236,18 +236,18 @@ components:
           $ref: "#/components/schemas/Style"
         abv:
           type: number
-        ratingCount:
+        rating_count:
           type: integer
           minimum: 0
-        averageRating:
+        average_rating:
           description: Mean of the scores to one decimal place; null until the beer has a rating.
           type: [number, "null"]
           minimum: 1
           maximum: 5
-        createdAt:
+        created_at:
           type: string
           format: date-time
-        updatedAt:
+        updated_at:
           type: string
           format: date-time
 

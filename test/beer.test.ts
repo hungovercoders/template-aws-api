@@ -1,14 +1,14 @@
 import { expect, test } from "vitest";
-import { averageRating, byName, nameKey } from "../src/domain/beer.ts";
+import { averageOf, byName, nameKey } from "../src/domain/beer.ts";
 
 test("a beer with no ratings has no average", () => {
-  expect(averageRating(0, 0)).toBeNull();
+  expect(averageOf(0, 0)).toBeNull();
 });
 
 test("the average is the mean to one decimal place", () => {
-  expect(averageRating(4, 15)).toBe(3.8);
-  expect(averageRating(3, 10)).toBe(3.3);
-  expect(averageRating(2, 9)).toBe(4.5);
+  expect(averageOf(4, 15)).toBe(3.8);
+  expect(averageOf(3, 10)).toBe(3.3);
+  expect(averageOf(2, 9)).toBe(4.5);
 });
 
 test("names are compared ignoring case and surrounding spaces", () => {

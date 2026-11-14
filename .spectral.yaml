@@ -1,0 +1,17 @@
+# The contract linter's ruleset (https://docs.stoplight.io/docs/spectral).
+# `task spec:lint` holds specs/openapi.yaml to it; warnings fail too.
+#
+# rules/house.yaml carries the standards every API from this template shares.
+# Add the rules that are specific to THIS API below - your own naming,
+# versioning, security or documentation requirements.
+extends: ["./rules/house.yaml"]
+
+rules: {}
+  # Example - require a description on every schema property:
+  # property-description-required:
+  #   description: Every property is described.
+  #   severity: error
+  #   given: "$..properties[*]"
+  #   then:
+  #     field: description
+  #     function: truthy

@@ -5,7 +5,7 @@ export type NewBeer = components["schemas"]["NewBeer"];
 export type BeerChanges = components["schemas"]["BeerChanges"];
 
 /** A beer as stored: the contract's Beer, with the rating total instead of the average. */
-export type StoredBeer = Omit<Beer, "averageRating"> & { ratingTotal: number };
+export type StoredBeer = Omit<Beer, "average_rating"> & { rating_total: number };
 
 /** Names are unique ignoring case and surrounding spaces; this is the form they are compared in. */
 export function nameKey(name: string): string {
@@ -18,12 +18,12 @@ export function oneDecimal(value: number): number {
 }
 
 /** Mean score to one decimal place; null until there is a rating. */
-export function averageRating(ratingCount: number, ratingTotal: number): number | null {
-  return ratingCount === 0 ? null : oneDecimal(ratingTotal / ratingCount);
+export function averageOf(count: number, total: number): number | null {
+  return count === 0 ? null : oneDecimal(total / count);
 }
 
-export function toBeer({ ratingTotal, ...beer }: StoredBeer): Beer {
-  return { ...beer, averageRating: averageRating(beer.ratingCount, ratingTotal) };
+export function toBeer({ rating_total, ...beer }: StoredBeer): Beer {
+  return { ...beer, average_rating: averageOf(beer.rating_count, rating_total) };
 }
 
 /** Catalogue order: by name, ignoring case. */

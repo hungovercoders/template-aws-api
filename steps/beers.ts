@@ -151,19 +151,19 @@ Then(/^the beer is named "([^"]*)", an? (\w+) at ([\d.]+)% abv$/, function (this
 });
 
 Then("the beer has no ratings yet", function (this: ApiWorld) {
-  assert.equal(this.last.body.ratingCount, 0);
-  assert.equal(this.last.body.averageRating, null);
+  assert.equal(this.last.body.rating_count, 0);
+  assert.equal(this.last.body.average_rating, null);
 });
 
 Then(/^the beer has (\d+) ratings? averaging ([\d.]+)$/, function (this: ApiWorld, count: string, average: string) {
-  assert.equal(this.last.body.ratingCount, Number(count));
-  assert.equal(this.last.body.averageRating, Number(average));
+  assert.equal(this.last.body.rating_count, Number(count));
+  assert.equal(this.last.body.average_rating, Number(average));
 });
 
 Then("{string} still has no ratings", async function (this: ApiWorld, name: string) {
   const { body } = await this.call("GET", `/beers/${idOf(this, name)}`);
-  assert.equal(body.ratingCount, 0);
-  assert.equal(body.averageRating, null);
+  assert.equal(body.rating_count, 0);
+  assert.equal(body.average_rating, null);
 });
 
 Then("the response says where to fetch the new beer", async function (this: ApiWorld) {

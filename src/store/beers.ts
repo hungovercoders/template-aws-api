@@ -35,19 +35,19 @@ async function transact(items: NonNullable<TransactWriteCommand["input"]["Transa
 export async function putNewBeer(beer: StoredBeer): Promise<void> {
   await transact(
     [
-      { Put: { TableName: tableName, Item: { ...lockKey(beer.name), beerId: beer.id }, ConditionExpression: "attribute_not_exists(pk)" } },
+      { Put: { TableName: tableName, Item: { ...lockKey(beer.name), beer_id: beer.id }, ConditionExpression: "attribute_not_exists(pk)" } },
       { Put: { TableName: tableName, Item: { ...beerKey(beer.id), entity: "beer", ...beer }, ConditionExpression: "attribute_not_exists(pk)" } },
     ],
     [new NameTaken()],
   );
 }
 
-export async function getBeer(id: string): Promise<StoredBeer | undefined> {
+export async function readBeer(id: string): Promise<StoredBeer | undefined> {
   const { Item } = await dynamo.send(new GetCommand({ TableName: tableName, Key: beerKey(id), ConsistentRead: true }));
   return Item && fromItem(Item);
 }
 
-export async function listBeers(style?: string): Promise<StoredBeer[]> {
+export async function readBeers(style?: string): Promise<StoredBeer[]> {
   // A scan is fine for a catalogue of this size; add a GSI before it grows.
   const beers: StoredBeer[] = [];
   let start: Record<string, any> | undefined;
@@ -68,8 +68,8 @@ export async function listBeers(style?: string): Promise<StoredBeer[]> {
   return beers;
 }
 
-export async function updateBeer(current: StoredBeer, changes: BeerChanges, updatedAt: string): Promise<StoredBeer> {
-  const next = { ...changes, updatedAt };
+export async function applyChanges(current: StoredBeer, changes: BeerChanges, updated_at: string): Promise<StoredBeer> {
+  const next = { ...changes, updated_at };
   const fields = Object.keys(next);
   const update = {
     TableName: tableName,
@@ -84,7 +84,7 @@ export async function updateBeer(current: StoredBeer, changes: BeerChanges, upda
   if (renamed) {
     await transact(
       [
-        { Put: { TableName: tableName, Item: { ...lockKey(changes.name!), beerId: current.id }, ConditionExpression: "attribute_not_exists(pk)" } },
+        { Put: { TableName: tableName, Item: { ...lockKey(changes.name!), beer_id: current.id }, ConditionExpression: "attribute_not_exists(pk)" } },
         { Update: update },
         { Delete: { TableName: tableName, Key: lockKey(current.name) } },
       ],
@@ -99,7 +99,7 @@ export async function updateBeer(current: StoredBeer, changes: BeerChanges, upda
     }
   }
   // Re-read rather than merge: ratings may have landed since `current` was read.
-  const updated = await getBeer(current.id);
+  const updated = await readBeer(current.id);
   if (!updated) throw new BeerNotFound();
   return updated;
 }
@@ -114,15 +114,15 @@ export async function deleteBeer(beer: StoredBeer): Promise<void> {
   );
 }
 
-export async function addRating(id: string, score: number, updatedAt: string): Promise<StoredBeer> {
+export async function addRating(id: string, score: number, updated_at: string): Promise<StoredBeer> {
   try {
     const { Attributes } = await dynamo.send(
       new UpdateCommand({
         TableName: tableName,
         Key: beerKey(id),
         ConditionExpression: "attribute_exists(pk)",
-        UpdateExpression: "ADD ratingCount :one, ratingTotal :score SET updatedAt = :updatedAt",
-        ExpressionAttributeValues: { ":one": 1, ":score": score, ":updatedAt": updatedAt },
+        UpdateExpression: "ADD rating_count :one, rating_total :score SET updated_at = :updated_at",
+        ExpressionAttributeValues: { ":one": 1, ":score": score, ":updated_at": updated_at },
         ReturnValues: "ALL_NEW",
       }),
     );

@@ -1,11 +1,11 @@
 import { HttpProblem } from "../lib/problem.ts";
-import { BeerNotFound, getBeer, NameTaken } from "../store/beers.ts";
+import { BeerNotFound, readBeer, NameTaken } from "../store/beers.ts";
 
 export const notFound = () => new HttpProblem(404, "Not Found", "There is no such beer in the catalogue.");
 export const nameTaken = () => new HttpProblem(409, "Conflict", "Another beer in the catalogue already has that name.");
 
 export async function findBeer(id: string) {
-  const beer = await getBeer(id);
+  const beer = await readBeer(id);
   if (!beer) throw notFound();
   return beer;
 }
