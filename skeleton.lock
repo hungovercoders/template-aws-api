@@ -1,10 +1,10 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-f25d181f2fc85ca92953c9ed8ecc7cd1c81901b3327fe2239e895ec4da7885c9  .claude/skills/implement-api/SKILL.md
-72d4b19f577c68ada987c2bd82031c43af061c6418e83af305878e9454ad263d  .claude/skills/write-spec/SKILL.md
-ef12cf15bfffc60cfa54d8479e6751548c8d007a5c35e2614900d972593ea95d  .githooks/pre-push
+fe77d3fbc0750a0caa6248b2bbc7a8cd03fd61d6356cfc01e2423919783c93eb  .claude/skills/implement-api/SKILL.md
+c9b3523536718393e5ea56fc45ca8968c1b7d1c1887cff20be3923c81517eb36  .claude/skills/write-spec/SKILL.md
+8117bdb6db21c708fbb50ea9f06aac121130b2c505916d9de7890e76c51f1161  .githooks/pre-push
 f7b75286aecf4ae21904fe048844c21e76f42ad1fc9c68361dbee7a787b6eb05  .github/workflows/ci.yml
-153e5b7ca17eab698f724700e5cfd9ee409989314fcbd9f7f58d484a84792ff0  Taskfile.yml
+29a8aaad542b8eb51a3447d706b9a568942ce70de814be937a4e98154f118b2a  Taskfile.yml
 6cade406af2dc8c0d818e28e193903a87ecec74ad116b91178915289edbab5a6  cucumber.mjs
 67c594fc663bb8e459c948440a875581fb2107e17cc952e47bf244d3176297a0  infra/alarms.tf
 bb84eae682ebcfb132aa4360a73435f52587f3ac1746906afe1491807f4738ce  infra/bootstrap/main.tf
@@ -19,6 +19,7 @@ e7a6a97716828feb56a7b5cb19201cb4519e156bde81c18b3f5f206d90450acb  infra/variable
 1de97b87dd20f5538499d4d99f4bc1ccd21e0c0baf3a4190f49b8541867a703e  local/token.ts
 5c62bd603951bb5b7268fd74e34632e27fdf91243464d278b96b38cddbb46e1a  rules/house.yaml
 1a92e48a59a35edc0a8168f249a73a99689c30df813d0a8df33a96388c534327  scripts/adopt.ts
+f95e572df0ecd830e51dfb648c6528a35ad76826874952783385d1d31feebc3a  scripts/check.ts
 06d6bea2636fb4685657224c45f65fef7818c99f599312040e5f51487e28fe7b  scripts/docs-check.ts
 4e803e391343ab19c21c5baf094846afe15c9d15b5ba805ddffe14561ce96eb7  scripts/generate.ts
 cf7bb52423c40059260a64eb2c5e5b936dfab6d277504f21a7736bbb8251847c  scripts/http-generate.ts

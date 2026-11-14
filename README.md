@@ -141,7 +141,7 @@ description; these are the ones you start with:
 | Task | What it does |
 | --- | --- |
 | `task ci` | Every gate, in order. The definition of done; what CI runs. |
-| `task check` | The fast gates only: nothing started, nothing downloaded. `task hooks:install` runs it before every push |
+| `task check` | The fast gates for the stage the repository has reached (`.stage`): nothing started, nothing downloaded. `task hooks:install` runs it before every push |
 | `task scaffold` | Write what follows from the spec: a typed stub per operation, a pending step per sentence |
 | `task mock` | Serve a mock of the contract - no implementation needed |
 | `task http` | Send requests to the mock, the local stack or a deployed API |

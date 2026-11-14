@@ -1,6 +1,7 @@
 #!/bin/sh
-# Early feedback, not the gate: the fast checks from `task ci` - nothing is
-# started and nothing is downloaded. CI still runs everything.
+# Early feedback, not the gate: the fast checks from `task ci` for the stage
+# in .stage - nothing is started and nothing is downloaded. CI still runs
+# everything.
 # Installed by `task hooks:install` (and by `task adopt`).
 echo "pre-push: task check (skip this once with: git push --no-verify)"
 exec task check

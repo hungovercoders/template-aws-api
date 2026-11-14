@@ -164,8 +164,10 @@ it tells you exactly what is missing.
    a real input your code mishandles (usually a 500, or a status the contract
    does not document): fix the code, never the check. See
    [What the fuzzer sends](#what-the-fuzzer-sends).
-9. **`task ci`** - all gates, in CI order. Done only when this exits 0. Report
-   the final output, and every choice you made where the specs were silent.
+9. **`task ci`** - all gates, in CI order. Done only when this exits 0. Then
+   run `task stage -- implemented` and commit `.stage`, so the pre-push hook
+   checks the code from now on. Report the final output, and every choice
+   you made where the specs were silent.
 
 ## When the spec has changed
 
