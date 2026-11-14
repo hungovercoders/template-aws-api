@@ -1,7 +1,7 @@
 // The gates and generators of the AsyncAPI contract (tools/asyncapi), run
 // against a contract of the test's own in a temporary repository.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterAll, expect, test, vi } from "vitest";
@@ -13,6 +13,7 @@ asyncapi: 3.1.0
 info:
   title: Beer Catalogue Events
   version: 1.0.0
+  description: The messages the Beer Catalogue receives and the events it publishes.
 channels:
   brewery_notices:
     address: brewery-notices
@@ -44,24 +45,19 @@ components:
     brewery_closed:
       name: brewery_closed
       summary: A brewery stopped trading.
+      contentType: application/cloudevents+json
       payload:
         $ref: '#/components/schemas/BreweryClosedEvent'
     beer_created:
       name: beer_created
       summary: A beer was added.
+      contentType: application/cloudevents+json
       payload:
         $ref: '#/components/schemas/BeerCreatedEvent'
   schemas:
-    Envelope:
-      type: object
-      required: [id, type, time]
-      properties:
-        id: { type: string, minLength: 1 }
-        type: { type: string }
-        time: { type: string, format: date-time }
     BreweryClosedEvent:
       allOf:
-        - $ref: '#/components/schemas/Envelope'
+        - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
         - type: object
           required: [data]
           properties:
@@ -74,7 +70,7 @@ components:
                 brewery_id: { type: string }
     BeerCreatedEvent:
       allOf:
-        - $ref: '#/components/schemas/Envelope'
+        - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
         - type: object
           required: [data]
           properties:
@@ -138,7 +134,7 @@ test.each<[string, string, (document: Document) => void]>([
     delete data(d).properties.abv;
   }],
   ["a constraint added to a property", "breaking", (d) => (data(d).properties.name.maxLength = 10)],
-  ["a payload closed to other properties", "breaking", (d) => (d.components.schemas.Envelope.additionalProperties = false)],
+  ["a payload closed to other properties", "breaking", (d) => (d.components.schemas.BeerCreatedEvent.allOf[1].additionalProperties = false)],
   ["an operation called summary removed", "breaking", (d) => {
     d.operations.summary = structuredClone(d.operations.publish_beer_created);
     const before = structuredClone(d);
@@ -154,6 +150,7 @@ test.each<[string, string, (document: Document) => void]>([
 // Each run starts node and loads AsyncAPI's parser; a test makes several.
 vi.setConfig({ testTimeout: 120_000 });
 const script = resolve("tools/asyncapi/asyncapi.ts");
+const ENVELOPE = resolve("tools/asyncapi/cloudevent.yaml");
 const tsx = import.meta.resolve("tsx");
 const root = mkdtempSync(join(tmpdir(), "asyncapi-test-"));
 // Never the repository these tests live in, whatever a hook has exported.
@@ -173,6 +170,9 @@ const write = (cwd: string, path: string, text: string) => {
 };
 const repository = (name: string, contract: string | null = CONTRACT) => {
   const dir = join(root, name);
+  // The envelope every message extends is the skeleton's, beside its tools.
+  mkdirSync(join(dir, "tools/asyncapi"), { recursive: true });
+  cpSync(ENVELOPE, join(dir, "tools/asyncapi/cloudevent.yaml"));
   if (contract) write(dir, "specs/asyncapi.yaml", contract);
   write(dir, "specs/features/events.feature", FEATURE);
   git(dir, "init", "-q");
@@ -238,6 +238,32 @@ test("compat holds info.version to what changed", () => {
   expect(compat().output).toContain("every published edit needs a new version");
 });
 
+test("every message is a CloudEvent with a type of its own, named the house way", () => {
+  const problems = (name: string, edit: (document: Document) => void) => run(repository(name, stringify(edited(edit))), "check").output;
+  const beer = (d: Document) => d.components.schemas.BeerCreatedEvent;
+  expect(problems("bare", (d) => (beer(d).allOf = [beer(d).allOf[1]]))).toContain("message beer_created is not a CloudEvent: its payload must extend the envelope");
+  expect(problems("media", (d) => (d.components.messages.beer_created.contentType = "application/json"))).toContain("a CloudEvent in structured mode is application/cloudevents+json");
+  expect(problems("untyped", (d) => delete beer(d).allOf[1].properties.type)).toContain("message beer_created does not fix its type");
+  expect(problems("camel", (d) => (beer(d).allOf[1].properties.type.const = "com.example.BeerCreated"))).toContain("a type is com.<org>.<api>.<thing>.<happened>.v<major>");
+  expect(problems("unversioned", (d) => (beer(d).allOf[1].properties.type.const = "com.example.beer.created"))).toContain("a type is com.<org>.<api>.<thing>.<happened>.v<major>");
+  expect(problems("shared", (d) => (beer(d).allOf[1].properties.type.const = "com.example.brewery.closed.v1"))).toContain("have the same type");
+  expect(problems("dataless", (d) => (beer(d).allOf[1].required = []))).toContain("does not require and describe its data");
+});
+
+test("the house rules lint the contract's names and its event types", () => {
+  const lint = (name: string, edit: (document: Document) => void) => {
+    const dir = repository(name, stringify(edited(edit)));
+    const result = spawnSync(resolve("node_modules/.bin/spectral"), ["lint", "specs/asyncapi.yaml", "--ruleset", resolve("rules/asyncapi.yaml"), "--fail-severity", "warn"], { cwd: dir, encoding: "utf8", env });
+    return { status: result.status, output: result.stdout + result.stderr };
+  };
+  expect(lint("clean", () => {}).status).toBe(0);
+  const named = lint("badtype", (d) => (d.components.schemas.BeerCreatedEvent.allOf[1].properties.type.const = "BeerCreated"));
+  expect(named.status).not.toBe(0);
+  expect(named.output).toContain("house-event-type-naming");
+  expect(lint("badmedia", (d) => (d.components.messages.beer_created.contentType = "application/json")).output).toContain("house-message-is-a-cloudevent");
+  expect(lint("camel", (d) => (data(d).properties.beerId = { type: "string" })).output).toContain("house-property-names-snake-case");
+});
+
 test("message names are one of a kind and never a path", () => {
   const twice = edited((d) => (d.components.messages.beer_created.name = "brewery_closed"));
   const dir = repository("names", stringify(twice));
@@ -289,8 +315,10 @@ test("removing a published contract is breaking, and examples are not left behin
 });
 
 test("an example on a base schema is not taken for the whole message", () => {
-  const based = edited((d) => (d.components.schemas.Envelope.example = { id: "only-the-base" }));
-  const dir = repository("based", stringify(based));
+  const dir = repository("based");
+  const envelope = parse(readFileSync(ENVELOPE, "utf8")) as Document;
+  envelope.CloudEvent.example = { id: "only-the-base" };
+  write(dir, "tools/asyncapi/cloudevent.yaml", stringify(envelope));
   run(dir, "examples");
   expect(JSON.parse(readFileSync(join(dir, "messages/beer_created.json"), "utf8")).data).toEqual({ beer_id: "beer id", name: "name", abv: 0 });
 });
@@ -319,7 +347,9 @@ test("examples are written from the contract and checked against it", () => {
   expect(run(dir, "examples", "check").status).toBe(1);
   expect(run(dir, "examples").status).toBe(0);
   expect(JSON.parse(readFileSync(join(dir, "messages/beer_created.json"), "utf8"))).toEqual({
+    specversion: "1.0",
     id: "id",
+    source: "source",
     type: "com.example.beer.created.v1",
     time: "2026-01-01T00:00:00Z",
     data: { beer_id: "beer id", name: "name", abv: 0 },

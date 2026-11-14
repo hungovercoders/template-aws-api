@@ -34,6 +34,7 @@ const SKELETON = [
   "test/log.test.ts",
   "test/components.test.ts",
   "test/asyncapi.test.ts",
+  "test/cloudevents.test.ts",
   "infra/",
   // The template's own skills. Skills copied from elsewhere are held by
   // `task skills:check` instead, so adding or updating one is not a skeleton change.
