@@ -25,6 +25,7 @@ const SKELETON = [
   ".githooks/",
   "rules/",
   "scripts/",
+  "tools/",
   "local/",
   "src/handler.ts",
   "src/lib/",
@@ -32,13 +33,15 @@ const SKELETON = [
   "test/routes.test.ts",
   "test/log.test.ts",
   "test/components.test.ts",
+  "test/asyncapi.test.ts",
   "infra/",
   // The template's own skills. Skills copied from elsewhere are held by
   // `task skills:check` instead, so adding or updating one is not a skeleton change.
   ".claude/skills/implement-api/",
   ".claude/skills/write-spec/",
 ];
-const NOT_SOURCE = /(^|\/)\.terraform(\/|\.lock\.hcl$)|\.tfstate/;
+// A tool package's dependencies move with Renovate, like the root package.json, which is not skeleton either.
+const NOT_SOURCE = /(^|\/)\.terraform(\/|\.lock\.hcl$)|\.tfstate|^tools\/[^/]+\/package(-lock)?\.json$/;
 
 // Routine version bumps are not skeleton changes: pins are read as "some version".
 function normalised(path: string, text: string): string {
