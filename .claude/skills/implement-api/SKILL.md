@@ -91,8 +91,10 @@ it tells you exactly what is missing.
    - Register it in `src/routes.ts` under its `operationId`.
    - Put rules that need no I/O in `src/domain/` with unit tests in `test/`,
      and DynamoDB access in `src/store/` using `dynamo` and `tableName` from
-     `src/lib/dynamo.ts`. The table has string keys `pk` and `sk`; if you need
-     an index, add it to `infra/main.tf` - the local stack is built from it.
+     `src/lib/dynamo.ts`. The table has string keys `pk` and `sk` and two
+     generic indexes, `gsi1` and `gsi2` (set `gsi1pk`/`gsi1sk` or
+     `gsi2pk`/`gsi2sk` on an item to put it in one). Use a Query on a key or
+     an index for anything that lists; never Scan.
    - Run `task features -- --tags @operation:<operationId>` until its
      scenarios pass, then move on.
 7. **`task features`** - every scenario green, strict.
