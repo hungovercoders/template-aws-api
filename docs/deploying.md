@@ -118,6 +118,7 @@ routes and rules, not your identity provider's configuration.
 ## Logging and CORS
 
 - **Logging.** The router writes one JSON line per request - `request_id`,
+  `trace_id` (the caller's, when it sent a W3C `traceparent` header),
   `route_key`, `operation_id`, `status`, `duration_ms` - and logs any
   unexpected error with the same `request_id`. Operations get the same logger
   as `context.log`, so their lines can be joined to the request in CloudWatch
