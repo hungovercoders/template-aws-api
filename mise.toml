@@ -2,5 +2,7 @@
 node = "22"
 task = "3.52"
 terraform = "1.17"
+# Compares two versions of the contract for `task spec:compat`.
+"aqua:oasdiff/oasdiff" = "1.37.0"
 # schemathesis runs through uvx in `task contract:fuzz`.
 uv = "0.11"
