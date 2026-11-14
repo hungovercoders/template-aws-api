@@ -7,6 +7,11 @@ files) is the requirement; `task ci` is the definition of done.
   every API and is already built. Do not rebuild or restructure it; write only
   the business logic the specs describe: `steps/`, `src/operations/`,
   `src/domain/`, `src/store/` and their tests.
+<!-- component:consume:start -->
+- A message the API receives is a `receive` operation in
+  `specs/asyncapi.yaml`; its logic is one function in `src/consumers/`. The
+  queue, validation, duplicates and retries are the skeleton's.
+<!-- component:consume:end -->
 - `task skeleton:check` fails if a skeleton file differs from `skeleton.lock`.
   Undo the change; do not run `task skeleton:lock` or edit the lock unless the
   user has asked for a skeleton change.

@@ -104,6 +104,14 @@ resource "aws_dynamodb_table" "this" {
   point_in_time_recovery {
     enabled = true
   }
+
+  # component:consume:start
+  # The record of each message handled removes itself (src/lib/consumer.ts).
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+  # component:consume:end
 }
 
 # --- Lambda -----------------------------------------------------------------

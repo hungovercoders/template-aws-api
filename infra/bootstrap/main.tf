@@ -147,6 +147,55 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["*"]
   }
 
+  # component:consume:start
+  # Async input: the queue, its dead-letter queue, the consumer function, its
+  # role and its mapping to the queue (infra/consume.tf).
+  statement {
+    sid       = "Queues"
+    actions   = ["sqs:*"]
+    resources = ["arn:${local.partition}:sqs:${var.region}:${local.account}:${var.name}-messages*"]
+  }
+
+  statement {
+    sid       = "Consumer"
+    actions   = ["lambda:*"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-consumer"]
+  }
+
+  # A mapping has no name to scope by before it exists; it can only be made for this stack's function.
+  statement {
+    sid       = "ConsumerMapping"
+    actions   = ["lambda:CreateEventSourceMapping", "lambda:UpdateEventSourceMapping", "lambda:DeleteEventSourceMapping", "lambda:GetEventSourceMapping", "lambda:ListEventSourceMappings", "lambda:TagResource", "lambda:UntagResource", "lambda:ListTags"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringLikeIfExists"
+      variable = "lambda:FunctionArn"
+      values   = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-consumer"]
+    }
+  }
+
+  statement {
+    sid = "ConsumerRole"
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:GetRole",
+      "iam:PassRole",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
+    ]
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-consumer"]
+  }
+  # component:consume:end
+
   # The Lambda's execution role. Managing a role means this role can decide
   # what the Lambda is allowed to do - review changes to infra/ accordingly.
   statement {
