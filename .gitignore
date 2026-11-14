@@ -12,3 +12,4 @@ infra/backend_override.tf
 *.tfstate
 *.tfstate.*
 *.tfplan
+.claude/worktrees/
