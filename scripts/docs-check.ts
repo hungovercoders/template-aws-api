@@ -8,7 +8,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
 
 const BUDGETS: [pattern: RegExp, lines: number, why: string][] = [
-  [/^CLAUDE\.md$/, 80, "read by every agent session"],
+  [/^AGENTS\.md$/, 80, "read by every agent session"],
+  [/^CLAUDE\.md$/, 15, "imports AGENTS.md; holds only what is specific to Claude Code"],
   [/^\.claude\/skills\/[^/]+\/SKILL\.md$/, 350, "read whenever the skill runs"],
   [/^README\.md$/, 220, "the front page: the pitch and how to start"],
   [/^CONTRIBUTING\.md$/, 150, "how the template itself is changed"],
@@ -17,6 +18,7 @@ const BUDGETS: [pattern: RegExp, lines: number, why: string][] = [
 ];
 
 const files = [
+  "AGENTS.md",
   "CLAUDE.md",
   "README.md",
   ...["CONTRIBUTING.md", "SECURITY.md"].filter(existsSync),
@@ -32,6 +34,10 @@ const slug = (heading: string) =>
 const anchors = (path: string) => new Set([...readFileSync(path, "utf8").matchAll(/^#{1,6} (.+)$/gm)].map((match) => slug(match[1]!.trim())));
 
 const problems: string[] = [];
+// One copy of the agent instructions: CLAUDE.md imports AGENTS.md rather than repeating it.
+if (!/^@AGENTS\.md$/m.test(readFileSync("CLAUDE.md", "utf8"))) {
+  problems.push("CLAUDE.md does not import AGENTS.md (a line reading exactly @AGENTS.md)");
+}
 for (const path of files) {
   const text = readFileSync(path, "utf8");
   const lines = text.split("\n").length - 1;

@@ -12,7 +12,7 @@ const LOCK = "skeleton.lock";
 
 // What an API built on the template does not own. Not listed, because they
 // are yours: specs/, http/, steps/ (but world.ts), src/operations, src/domain,
-// src/store, your tests, .spectral.yaml, README.md, CLAUDE.md, package.json.
+// src/store, your tests, .spectral.yaml, README.md, AGENTS.md, CLAUDE.md, package.json.
 const SKELETON = [
   "Taskfile.yml",
   "cucumber.mjs",
