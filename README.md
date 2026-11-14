@@ -6,6 +6,14 @@ test harness, CI, infrastructure, deployment - is solved here once. The only
 thing you bring is what makes your API *yours*: BDD feature files that say what
 it does and an OpenAPI contract that says what it looks like.
 
+> **This is the `example/spec` branch: the template plus a complete spec.**
+> [`specs/openapi.yaml`](specs/openapi.yaml) is the contract for a Beer
+> Catalogue API and [`specs/features/`](specs/features) is its behaviour.
+> Nothing is implemented, so **CI is red on purpose** - `task ci` fails at
+> `test:unit`, listing the six operations that have no handler. Running
+> `/implement-api` here produces
+> [`example/implementation`](../../tree/example/implementation).
+
 ## Why a template, not a prompt
 
 The skeleton is the same for every API you will build, so it should be built
@@ -42,14 +50,6 @@ If you find yourself asking AI to write a router, a test harness, a pipeline
 or Terraform for an API built from this template, stop: it is already here.
 If something every API needs is missing, add it to the template once rather
 than to one API.
-
-> **This is the `example/spec` branch: the template plus a complete spec.**
-> [`specs/openapi.yaml`](specs/openapi.yaml) is the contract for a Beer
-> Catalogue API and [`specs/features/`](specs/features) is its behaviour.
-> Nothing is implemented, so **CI is red on purpose** - `task ci` fails at
-> `test:unit`, listing the six operations that have no handler. Running
-> `/implement-api` here produces
-> [`example/implementation`](../../tree/example/implementation).
 
 | Branch | What it is | `task ci` |
 | --- | --- | --- |
