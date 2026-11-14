@@ -1,20 +1,257 @@
 openapi: 3.1.0
 info:
-  title: Replace me
-  version: 0.1.0
+  title: Beer Catalogue API
+  version: 1.0.0
   description: >
-    Replace this file with your API contract. Until it declares at least one
-    operation, `task ci` fails at `spec:check` - that is the template working
-    as intended.
+    A brewery's beer catalogue. Staff add the beers they brew, keep the details
+    current and retire beers; drinkers rate them from 1 to 5.
 
-# Add your operations here. Every operation needs an operationId, and at
-# least one scenario in specs/features tagged @operation:<operationId>.
-paths: {}
+tags:
+  - name: beers
+  - name: ratings
+
+paths:
+  /beers:
+    get:
+      operationId: listBeers
+      summary: List the beers in the catalogue
+      tags: [beers]
+      parameters:
+        - name: style
+          in: query
+          description: Only return beers of this style.
+          schema:
+            $ref: "#/components/schemas/Style"
+      responses:
+        "200":
+          description: The beers, ordered by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                additionalProperties: false
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Beer"
+              example:
+                items:
+                  - id: 3f6c1c2e-6a53-4d5e-9d0b-0a0f6d2a9d11
+                    name: Morning After
+                    style: ipa
+                    abv: 5.6
+                    ratingCount: 2
+                    averageRating: 4.5
+                    createdAt: "2026-11-14T09:00:00.000Z"
+                    updatedAt: "2026-11-14T09:30:00.000Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: createBeer
+      summary: Add a beer to the catalogue
+      tags: [beers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBeer"
+            example:
+              name: Morning After
+              style: ipa
+              abv: 5.6
+      responses:
+        "201":
+          description: The beer was added.
+          headers:
+            Location:
+              description: Where the new beer can be fetched.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /beers/{beerId}:
+    parameters:
+      - $ref: "#/components/parameters/BeerId"
+    get:
+      operationId: getBeer
+      summary: Fetch one beer
+      tags: [beers]
+      responses:
+        "200":
+          description: The beer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: updateBeer
+      summary: Change a beer's details
+      tags: [beers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeerChanges"
+            example:
+              abv: 5.8
+      responses:
+        "200":
+          description: The beer with the changes applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: retireBeer
+      summary: Retire a beer from the catalogue
+      tags: [beers]
+      responses:
+        "204":
+          description: The beer was retired.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /beers/{beerId}/ratings:
+    parameters:
+      - $ref: "#/components/parameters/BeerId"
+    post:
+      operationId: rateBeer
+      summary: Rate a beer
+      tags: [ratings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewRating"
+            example:
+              score: 4
+      responses:
+        "201":
+          description: The rating was recorded; the beer with its new average.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
 components:
+  parameters:
+    BeerId:
+      name: beerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
   schemas:
-    # The error body the template's router emits (RFC 9457). Reference it
-    # from every 4xx/5xx response you document.
+    Style:
+      type: string
+      enum: [lager, ale, ipa, stout, sour]
+
+    NewBeer:
+      type: object
+      required: [name, style, abv]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: \S
+          description: Unique in the catalogue, ignoring case and surrounding spaces.
+        style:
+          $ref: "#/components/schemas/Style"
+        abv:
+          type: number
+          minimum: 0
+          maximum: 20
+          description: Alcohol by volume, percent. Recorded to one decimal place.
+
+    BeerChanges:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: \S
+        style:
+          $ref: "#/components/schemas/Style"
+        abv:
+          type: number
+          minimum: 0
+          maximum: 20
+
+    NewRating:
+      type: object
+      required: [score]
+      additionalProperties: false
+      properties:
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+
+    Beer:
+      type: object
+      required: [id, name, style, abv, ratingCount, averageRating, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        style:
+          $ref: "#/components/schemas/Style"
+        abv:
+          type: number
+        ratingCount:
+          type: integer
+          minimum: 0
+        averageRating:
+          description: Mean of the scores to one decimal place; null until the beer has a rating.
+          type: [number, "null"]
+          minimum: 1
+          maximum: 5
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # The error body the template's router emits (RFC 9457).
     Problem:
       type: object
       required: [type, title, status]
@@ -40,6 +277,7 @@ components:
                 type: string
               message:
                 type: string
+
   responses:
     BadRequest:
       description: The request does not satisfy the contract.
@@ -48,7 +286,13 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
     NotFound:
-      description: The resource does not exist.
+      description: There is no such beer in the catalogue.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: Another beer in the catalogue already has that name.
       content:
         application/problem+json:
           schema:

@@ -5,9 +5,13 @@ files say what the API does, an OpenAPI contract says what it looks like, and
 a set of deterministic gates will not go green until the implementation
 delivers both.
 
-> **CI on this branch is red on purpose.** `main` is the skeleton: no contract,
-> no features, no implemented Lambda. `task ci` fails until you add a spec and
-> implement it - that is the template working.
+> **This is the `example/spec` branch: the template plus a complete spec.**
+> [`specs/openapi.yaml`](specs/openapi.yaml) is the contract for a Beer
+> Catalogue API and [`specs/features/`](specs/features) is its behaviour.
+> Nothing is implemented, so **CI is red on purpose** - `task ci` fails at
+> `test:unit`, listing the six operations that have no handler. Running
+> `/implement-api` here produces
+> [`example/implementation`](../../tree/example/implementation).
 
 | Branch | What it is | `task ci` |
 | --- | --- | --- |
