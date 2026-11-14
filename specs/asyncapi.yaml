@@ -1,0 +1,55 @@
+asyncapi: 3.1.0
+info:
+  title: Beer Catalogue messages
+  version: 0.1.0
+  description: >-
+    The messages the Beer Catalogue accepts. Ratings also arrive from
+    elsewhere - a taproom's app - on the catalogue's queue.
+channels:
+  beer_ratings:
+    address: beer-ratings
+    description: Ratings of beers, submitted somewhere other than the catalogue's own API.
+    messages:
+      beer_rating_submitted:
+        $ref: "#/components/messages/beer_rating_submitted"
+operations:
+  receive_beer_rating:
+    action: receive
+    summary: Record a rating that was submitted elsewhere
+    channel:
+      $ref: "#/channels/beer_ratings"
+    messages:
+      - $ref: "#/channels/beer_ratings/messages/beer_rating_submitted"
+components:
+  messages:
+    beer_rating_submitted:
+      name: beer_rating_submitted
+      title: Beer rating submitted
+      summary: A drinker scored a beer.
+      contentType: application/cloudevents+json
+      payload:
+        $ref: "#/components/schemas/BeerRatingSubmitted"
+  schemas:
+    BeerRatingSubmitted:
+      allOf:
+        - $ref: "../tools/asyncapi/cloudevent.yaml#/CloudEvent"
+        - type: object
+          required: [data]
+          properties:
+            type:
+              type: string
+              const: com.hungovercoders.taproom.beer_rating.submitted.v1
+            data:
+              type: object
+              required: [beer_id, score]
+              additionalProperties: false
+              properties:
+                beer_id:
+                  description: The beer, by its id in the catalogue.
+                  type: string
+                  minLength: 1
+                score:
+                  description: A whole number from 1 to 5.
+                  type: integer
+                  minimum: 1
+                  maximum: 5

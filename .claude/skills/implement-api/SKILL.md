@@ -62,8 +62,7 @@ You bring only the business logic the specs describe. That means you write:
 `task skeleton:check` enforces this: it is the first gate in `task ci` and
 fails if any skeleton file differs from `skeleton.lock`. If it fails, undo
 your change to the file it names. Never run `task skeleton:lock` yourself and
-never edit `skeleton.lock` - accepting a skeleton change is the user's
-decision.
+never edit `skeleton.lock` - accepting a skeleton change is the user's decision.
 
 Do not regenerate, restructure, "improve" or replace anything else, and do not
 add a framework, another router, validator, test runner or build tool. If the
@@ -110,10 +109,11 @@ it tells you exactly what is missing.
 
 1. **Read the specs.** Read `specs/openapi.yaml` and every feature file in
    full. List the operations (by `operationId`) and, for each, the scenarios
-   tagged `@operation:<operationId>`. Read `skills.json` too: use the skills it
-   lists where they fit. Before writing code for an integration it records with
-   no skill, or one the specs imply that it does not record, ask the user
-   whether a skill for it should be added (`task skills:add`). Never add one unasked.
+   tagged `@operation:<operationId>`. Read `skills.json`: use its skills where they fit, and ask the
+   user before adding one for an integration that has none (`task skills:add`); never add one unasked.
+   <!-- component:consume:start -->
+   For a `receive` operation in `specs/asyncapi.yaml`, also follow [messages.md](messages.md).
+   <!-- component:consume:end -->
 2. **`task spec:check` and `task spec:lint`** must pass before you write code.
    If `spec:check` fails the spec is incomplete (an operation with no
    scenario, an unknown tag, an invalid document); if `spec:lint` fails the

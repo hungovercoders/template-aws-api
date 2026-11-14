@@ -13,7 +13,7 @@ async function addBeer(world: ApiWorld, name: string, style: string, abv: number
   return body;
 }
 
-function idOf(world: ApiWorld, name: string): string {
+export function idOf(world: ApiWorld, name: string): string {
   const beer = world.remembered.get(name);
   assert.ok(beer, `the scenario has not added a beer named "${name}"`);
   return beer.id;
@@ -270,7 +270,7 @@ Then("the page marker is refused", function (this: ApiWorld) {
 // --- Changes that arrive together -----------------------------------------------
 
 /** The beer a scenario added under `name`, as the catalogue has it now; undefined once retired. */
-async function currently(world: ApiWorld, name: string): Promise<Json | undefined> {
+export async function currently(world: ApiWorld, name: string): Promise<Json | undefined> {
   const { status, body } = await world.call("GET", `/beers/${idOf(world, name)}`);
   return status === 200 ? body : undefined;
 }
