@@ -110,7 +110,8 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
    definitions and operations, and works gate by gate until `task ci` is
    green. It may not edit `specs/`, weaken a gate or rebuild the skeleton. You can follow the same
    steps by hand - they are written out in the skill.
-4. **Deploy.** `task deploy NAME=my-api` (see [Deploy](#deploy)).
+4. **Deploy, when you are ready.** Opt-in: `task deploy NAME=my-api` from your
+   machine, or bring your AWS account so CI deploys `main` (see [Deploy](#deploy)).
 
 ## Tasks
 
@@ -129,7 +130,8 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | `task dev` | The API on http://127.0.0.1:3000 against AWS Emulator |
 | `task build` | Bundle the Lambda into `dist/` |
 | `task infra:validate` | Terraform format and validation |
-| `task deploy` / `task destroy` | Apply or remove the stack on AWS |
+| `task deploy` / `task destroy` | Apply or remove the stack on AWS (opt-in) |
+| `task aws:bootstrap` | One-off: create the state bucket and GitHub deploy role in your AWS account (opt-in) |
 
 ## Layout
 
@@ -148,6 +150,7 @@ steps/
   *.ts                  step definitions        ← implemented from the spec
 local/                  AWS Emulator runner, Terraform apply, API Gateway stand-in
 infra/                  Terraform: Lambda, HTTP API, DynamoDB
+infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
 scripts/                generate and spec:check
@@ -222,8 +225,12 @@ credentials and certificate it writes to `~/.aws/emulator/<port>/`, runs the
 task, and stops it. Emulated resources live in memory only.
 
 - **Linux (and CI):** `task emulator:install` runs automatically. It downloads
-  the package, verifies AWS's signature and unpacks it into `.tools/` - nothing
-  is installed system-wide.
+  the pinned package, verifies AWS's signature and unpacks it into `.tools/` -
+  nothing is installed system-wide.
+- **Version:** pinned as `EMULATOR_VERSION` in `Taskfile.yml`, so every run
+  tests against the same emulator. AWS publishes security fixes only in the
+  latest release, so raise the pin regularly; published versions are listed in
+  [versions.json](https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json).
 - **macOS / Windows:** AWS ships no native package; run `task emulator:docker`
   in one terminal and the other tasks in a second. A running emulator is
   picked up automatically.
@@ -249,24 +256,78 @@ The last two rows are a limit of the emulator, not a choice: it accepts the
 Lambda and HTTP API definitions but cannot yet invoke a function. Until it
 can, API Gateway, IAM and the Lambda runtime are only proven by a real deploy.
 
-`task emulator:install` takes the latest emulator release, so its behaviour
-can change between runs; see its
-[fidelity notes](https://docs.aws.amazon.com/emulator/latest/userguide/fidelity.html).
+A new emulator release can change a response to match AWS more closely, which
+is why the version is pinned; see
+[how fidelity changes affect your tests](https://docs.aws.amazon.com/emulator/latest/userguide/versioning.html).
 
 ## Deploy
 
 Terraform in `infra/` creates the Lambda (Node 22, arm64), an API Gateway HTTP
-API with one route per contract operation, and a DynamoDB table.
+API with one route per contract operation, and a DynamoDB table. The API is
+deployed without authentication; add an authorizer to the routes in
+`infra/main.tf` before exposing anything that needs one.
+
+Deploying is **opt-in**. Nothing in `task ci` touches AWS, and the template
+works end to end without an AWS account.
+
+### From your machine
+
+With AWS credentials in your shell:
 
 ```sh
-task deploy NAME=my-api            # uses your AWS credentials; region defaults to eu-west-2
-task deploy NAME=my-api -- -var region=eu-west-1
+task deploy NAME=my-api                       # region: AWS_REGION, else eu-west-2
+AWS_REGION=eu-west-1 task deploy NAME=my-api
 task destroy NAME=my-api
 ```
 
-State is local by default - configure a backend in `infra/main.tf` before
-sharing a stack. The API is deployed without authentication; add an authorizer
-to the routes in `infra/main.tf` before exposing anything that needs one.
+State is a local file (`infra/terraform.tfstate`) unless `TF_STATE_BUCKET` is
+set, in which case it is kept in that S3 bucket under `<NAME>/`. `task deploy`
+refuses to run while `AWS_ENDPOINT_URL` points at an emulator.
+
+### Bring your AWS account: deploy from CI
+
+The `deploy` job in `.github/workflows/ci.yml` deploys `main` after `task ci`
+passes. It is skipped until you set it up, which takes three steps:
+
+1. **Bootstrap the account, once.** With administrator credentials in your
+   shell:
+
+   ```sh
+   task aws:bootstrap NAME=my-api REPO=my-org/my-api
+   ```
+
+   This applies `infra/bootstrap/`, which creates an S3 bucket for Terraform
+   state and an IAM role that GitHub Actions assumes through OIDC - no access
+   keys are created or stored. The role can be assumed only by this
+   repository's `main` branch and can manage only the resources `infra/`
+   creates for the stack called `NAME`. If the account already has GitHub's
+   OIDC provider, add `-- -var create_oidc_provider=false`. For a region other
+   than eu-west-2, add `-- -var region=<region>`.
+
+2. **Give GitHub the outputs.** The command prints four values. Add each as a
+   repository **variable** (Settings → Secrets and variables → Actions →
+   Variables). None of them is a secret.
+
+   | Variable | What it is |
+   | --- | --- |
+   | `AWS_DEPLOY_ROLE_ARN` | The role the job assumes. Setting this is what switches the job on. |
+   | `AWS_REGION` | Where the stack is deployed |
+   | `TF_STATE_BUCKET` | Where Terraform state is kept |
+   | `STACK_NAME` | The `NAME` you bootstrapped |
+
+3. **Push to `main`.** When `task ci` is green the `deploy` job runs
+   `task deploy`; the API's URL is the `base_url` output at the end of its log.
+
+To switch it off again, delete the `AWS_DEPLOY_ROLE_ARN` variable. To remove
+everything: `task destroy NAME=my-api`, then
+`terraform -chdir=infra/bootstrap destroy` with the same variables.
+
+Keep `infra/bootstrap/terraform.tfstate` somewhere safe - it is how the bucket
+and role are changed or removed later, and it is not committed.
+
+The deploy job deploys; it does not yet run the features against the deployed
+API. They reset data through the local harness, which a real stack does not
+have.
 
 ## Conventions the template assumes
 

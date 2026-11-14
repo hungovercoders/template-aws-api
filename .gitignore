@@ -6,6 +6,9 @@ src/generated/
 .hypothesis/
 .task/
 infra/.terraform/
+infra/.terraform-aws/
+infra/bootstrap/.terraform/
+infra/backend_override.tf
 *.tfstate
 *.tfstate.*
 *.tfplan
