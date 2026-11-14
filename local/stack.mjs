@@ -130,7 +130,12 @@ Object.assign(env, deploy(env));
 // The built Lambda, behind the local API Gateway stand-in. With a command to run it
 // takes a free port; on its own it serves on PORT (default 3000).
 const api = spawn(process.execPath, ["--import", "tsx", "local/server.ts"], {
-  env: { ...env, PORT: process.env.PORT ?? (command.length > 0 ? "0" : "3000") },
+  env: {
+    ...env,
+    PORT: process.env.PORT ?? (command.length > 0 ? "0" : "3000"),
+    // A test run makes hundreds of requests; only show their logs when something goes wrong.
+    LOG_LEVEL: process.env.LOG_LEVEL ?? (command.length > 0 ? "warn" : "info"),
+  },
   stdio: ["ignore", "pipe", "inherit"],
 });
 children.push(api);

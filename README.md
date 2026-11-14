@@ -84,8 +84,9 @@ and it talks to a DynamoDB table that the project's own Terraform created on
 Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 (Node, Task, Terraform, uv) from `mise.toml`.
 
-1. **Create your repo** from this template (*Use this template* on GitHub) and
-   run `mise install`.
+1. **Create your repo** from this template (*Use this template* on GitHub; see
+   [Using this repository as a template](#using-this-repository-as-a-template))
+   and run `mise install`.
 2. **Add your spec.**
    - Replace `specs/openapi.yaml` with your contract. Every operation needs an
      `operationId`. Document error responses with the `Problem` schema already
@@ -355,6 +356,43 @@ and role are changed or removed later, and it is not committed.
 The deploy job deploys; it does not yet run the features against the deployed
 API. They reset data through the local harness, which a real stack does not
 have.
+
+## Logging and CORS
+
+- **Logging.** The router writes one JSON line per request - `request_id`,
+  `route_key`, `operation_id`, `status`, `duration_ms` - and logs any
+  unexpected error with the same `request_id`. Operations get the same logger
+  as `context.log`, so their lines can be joined to the request in CloudWatch
+  Logs Insights. `LOG_LEVEL` (`debug`, `info`, `warn`, `error`; default `info`)
+  sets what is written; test runs use `warn` to keep their output readable.
+- **CORS.** Off by default. To let browsers on other origins call the API,
+  deploy with `-- -var 'cors_allowed_origins=["https://app.example.com"]'`.
+  API Gateway answers the preflight requests itself; the local stand-in does
+  not emulate CORS.
+
+## Keeping dependencies current
+
+`renovate.json` covers npm, GitHub Actions, Terraform providers and mise
+tools, and raises the AWS Emulator and Prism versions pinned in
+`Taskfile.yml`. Install the [Renovate app](https://github.com/apps/renovate)
+on your repository to switch it on.
+
+## Using this repository as a template
+
+Create your repository with **Use this template** on GitHub. You only need
+`main`: leave "Include all branches" unticked. The example branches are for
+reading, not for building on.
+
+Then, in your new repository:
+
+- Delete `.github/rulesets/` and the "Branches" section of `CLAUDE.md`. Both
+  describe how *this* repository keeps its example branches, not your API.
+- Replace this README's top section with a description of your API. The rest
+  is a working manual for the tooling and can stay.
+- Change the copyright line in `LICENSE` if the code is not MIT or not yours
+  to license that way.
+- Add your spec and carry on from [Use it](#use-it). CI is red until the spec
+  is implemented, and green from then on.
 
 ## Conventions the template assumes
 
