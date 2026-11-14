@@ -86,7 +86,7 @@ tasks:
     env:
       NODE_OPTIONS: ''
     cmds:
-      - npx httpyac send "http/*.http" --env {{.ENV | default "local"}} {{.CLI_ARGS}}
+      - npx httpyac send http/*.http --env {{.ENV | default "local"}} {{.CLI_ARGS}}
 
   typecheck:
     desc: Gate - the code agrees with the types generated from the contract
