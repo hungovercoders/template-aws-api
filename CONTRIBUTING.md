@@ -94,6 +94,9 @@ skeleton every API shares.
 - **When the starter `specs/openapi.yaml` changes on `main`,** the example
   branches keep their own contract: restore it from before the merge and
   re-apply the idea by hand. Never resolve with `-X ours` or `-X theirs`.
+- **When `README.md` changes on `main`,** the merge conflicts, because the
+  example branches' READMEs are generated from their contract. Keep theirs
+  (`git checkout --ours README.md`).
 - **Never rewrite what is pushed.** `main` and `example/*` are protected
   (`.github/rulesets/protect-demo-branches.json`); only add commits or merges.
 - `renovate.json` keeps npm, GitHub Actions, Terraform, mise and the
