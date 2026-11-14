@@ -1,14 +1,19 @@
-// Gate: a change to the contract is deliberate, visible and versioned.
-// Compares specs/openapi.yaml with the last published contract and holds
-// info.version to semantic versioning:
-//   - a breaking change needs a new MAJOR version (while the major is 0, a new minor)
-//   - any other change to the API needs at least a new MINOR version
+// Gate: a change to the spec is deliberate, visible and versioned.
+// Compares the contract AND the feature files with the last published spec
+// and holds info.version to semantic versioning:
+//   - a breaking contract change needs a new MAJOR version (while the major is 0, a new minor)
+//   - any other change to the contract, and any existing scenario that was
+//     changed or removed, needs at least a new MINOR version
 //   - any edit at all needs a new version
+// A contract diff cannot see a rule that changed while its shape stayed the
+// same, so changed and removed scenarios are listed too: they are behaviour
+// consumers may rely on, and whether that makes the change breaking - a new
+// major - is a decision for a person, which this gate makes visible.
 // The baseline is the contract on the default branch (for a branch), or in
 // the previous commit (on the default branch). Override with SPEC_BASELINE=<git ref>.
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const CONTRACT = "specs/openapi.yaml";
 const git = (...args: string[]) => {
@@ -51,7 +56,38 @@ const changes = (JSON.parse(diff.stdout.trim() || "[]") as Change[]).filter((cha
 const describe = (change: Change) => `    ${[change.operation, change.path].filter(Boolean).join(" ")}: ${change.text}  [${change.id}]`;
 const breaking = changes.filter((change) => change.level >= 3);
 const risky = changes.filter((change) => change.level === 2);
-const edited = before.trim() !== readFileSync(CONTRACT, "utf8").trim();
+// --- Behaviour: scenarios that existed before and are now different or gone ---
+const FEATURES = "specs/features";
+/** Each scenario's steps, by "file: name". Names, tags, comments and layout are not behaviour. */
+function scenarios(file: string, text: string): Map<string, string> {
+  const found = new Map<string, string>();
+  let name: string | undefined;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim().replace(/\s+/g, " ");
+    const heading = /^(Background|Scenario Outline|Scenario Template|Scenario|Example):\s*(.*)$/.exec(line);
+    if (heading) {
+      name = `${file}: ${heading[1] === "Background" ? "Background" : heading[2]}`;
+      found.set(name, "");
+    } else if (name && line && !line.startsWith("#") && !line.startsWith("@") && !/^(Feature|Rule):/.test(line)) {
+      found.set(name, found.get(name) + line + "\n");
+    }
+  }
+  return found;
+}
+const collect = (files: string[], read: (file: string) => string | undefined) =>
+  new Map(files.filter((file) => file.endsWith(".feature")).flatMap((file) => [...scenarios(file.replace(`${FEATURES}/`, ""), read(file) ?? "")]));
+const scenariosBefore = collect((git("ls-tree", "-r", "--name-only", ref, "--", FEATURES) ?? "").split("\n"), (file) => git("show", `${ref}:${file}`));
+const scenariosNow = collect(
+  existsSync(FEATURES) ? readdirSync(FEATURES, { recursive: true, encoding: "utf8" }).map((file) => `${FEATURES}/${file}`) : [],
+  (file) => readFileSync(file, "utf8"),
+);
+const behaviour = [
+  ...[...scenariosBefore].filter(([name, steps]) => scenariosNow.has(name) && scenariosNow.get(name) !== steps).map(([name]) => `changed: ${name}`),
+  ...[...scenariosBefore.keys()].filter((name) => !scenariosNow.has(name)).map((name) => `removed: ${name}`),
+];
+const added = [...scenariosNow.keys()].filter((name) => !scenariosBefore.has(name)).length;
+
+const edited = before.trim() !== readFileSync(CONTRACT, "utf8").trim() || behaviour.length > 0 || added > 0;
 
 const parse = (version: string | undefined) => /^(\d+)\.(\d+)\.(\d+)$/.exec(version ?? "")?.slice(1).map(Number);
 const [was, now] = [parse(old.info?.version), parse(current.info?.version)];
@@ -75,12 +111,25 @@ if (breaking.length > 0 && !(bumped.major || (oldMajor === 0 && bumped.minor))) 
   );
 } else if (changes.length > 0 && !bumped.minor) {
   problems.push(`the API changed but info.version went from ${from} to ${current.info?.version}; a change to the API needs at least a new minor version`);
+} else if (behaviour.length > 0 && !bumped.minor) {
+  problems.push(
+    `existing scenarios were changed or removed but info.version went from ${from} to ${current.info?.version}; changed behaviour needs at least a new minor version, and a new major if consumers can observe it`,
+  );
 } else if (edited && !bumped.any) {
-  problems.push(`the contract was edited but info.version is still ${current.info?.version}; every published edit needs a new version`);
+  problems.push(`the spec was edited but info.version is still ${current.info?.version}; every published edit needs a new version`);
 }
 
 const section = (title: string, list: Change[]) => (list.length > 0 ? [`  ${title}`, ...list.map(describe)] : []);
 const report = [
+  ...(behaviour.length > 0 && !bumped.major
+    ? [
+        "  Existing behaviour changed - the contract's shape may be the same, but what consumers get is not.",
+        "  If a consumer can observe this, it is breaking and needs a new major version. That is a person's decision:",
+        ...behaviour.map((line) => `    ${line}`),
+      ]
+    : behaviour.length > 0
+      ? ["  Existing behaviour changed:", ...behaviour.map((line) => `    ${line}`)]
+      : []),
   ...section("Breaking changes - existing consumers will fail:", breaking),
   ...section("Possibly breaking - check with consumers:", risky),
   ...section("Other changes:", changes.filter((change) => change.level < 2)),
@@ -93,8 +142,8 @@ if (problems.length > 0) {
 console.log(
   [
     !edited
-      ? `spec:compat ok - the contract is unchanged since ${ref.slice(0, 12)}`
-      : `spec:compat ok - ${from} -> ${current.info?.version}: ${breaking.length} breaking, ${risky.length} possibly breaking, ${changes.length - breaking.length - risky.length} other changes`,
+      ? `spec:compat ok - the spec is unchanged since ${ref.slice(0, 12)}`
+      : `spec:compat ok - ${from} -> ${current.info?.version}: ${breaking.length} breaking, ${risky.length} possibly breaking, ${changes.length - breaking.length - risky.length} other contract changes; ${behaviour.length} existing scenarios changed or removed, ${added} added`,
     ...report,
   ].join("\n"),
 );

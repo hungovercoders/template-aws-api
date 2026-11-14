@@ -70,7 +70,7 @@ you assumed something, say so and get a yes.
    - `task spec:compat` - for a change: what it breaks, and whether
      `info.version` says so.
    - `task http:generate`, then `task http:check` - the requests for
-     exploring match the contract.
+     exploring match the contract. Commit the regenerated file.
    - `task readme:generate`, then `task readme:check` - the README describes
      this API; see [The repository becomes the API](#the-repository-becomes-the-api).
 6. **Let the user try it.** `task mock` serves the contract; `ENV=mock task
@@ -184,14 +184,26 @@ kinds, and tell the user which theirs is before you make it:
 
 | Kind | Examples | `info.version` |
 | --- | --- | --- |
-| **Breaking** - an existing consumer can fail | removing or renaming an operation, property or enum value; a new required request property; a tighter limit; a different status | new **major** (while the API is `0.x`, a new minor) |
+| **Breaking** - an existing consumer can fail | removing or renaming an operation, property or enum value; a new required request property; a tighter limit; a different status; **a rule that now gives a different answer** | new **major** (while the API is `0.x`, a new minor) |
 | **Additive** - existing consumers are unaffected | a new operation; a new optional request property; a new response property | new **minor** |
 | **Clarifying** - the API behaves the same | descriptions, examples, summaries | new **patch** |
 
-- `task spec:compat` decides which it is, deterministically, by comparing
-  with the last published contract; it lists each breaking change and fails
-  until `info.version` matches. Run it after every edit to the contract. Do
-  not argue with its list - if it says breaking, it is.
+One change often holds several kinds; the version follows the most serious.
+
+- `task spec:compat` compares the spec with the last published one - on a
+  branch, the default branch; on the default branch, the previous commit;
+  `SPEC_BASELINE=<ref>` for anything else. If it reports "skipped" for an API
+  that has been released, the baseline is wrong: set it. Run it after every
+  edit.
+- **What it says is breaking, is.** Do not argue with its list of contract
+  changes.
+- **What it cannot see, you must.** A rule can change while the contract's
+  shape stays the same - the same field, a different answer. The gate lists
+  every existing scenario that was changed or removed under "Existing
+  behaviour changed". Each one is behaviour a consumer may rely on. Unless
+  only the wording moved, treat it as breaking, tell the user so, and let
+  them choose: a new major, or the additive alternative below. The gate only
+  demands a minor for these; the major is their decision, and you raise it.
 - **A breaking change is the user's decision, not yours.** Show them the
   list and the consumers it affects, and offer the additive alternative
   first: add the new thing beside the old, mark the old `deprecated: true`,
@@ -199,7 +211,12 @@ kinds, and tell the user which theirs is before you make it:
   choose to break.
 - Change the features with the contract: update the scenarios the change
   affects, add scenarios for new behaviour, and delete scenarios only for
-  behaviour the user has agreed to remove.
-- Regenerate and commit `http/contract.http` (`task http:generate`).
+  behaviour the user has agreed to remove. Word new sentences like the
+  existing ones - read `steps/` to see which sentences already have a step.
+- A scenario about several things happening at once is needed only where
+  the user has said what must still hold.
+- Regenerate and commit `http/contract.http` and the README
+  (`task http:generate`, `task readme:generate`), and re-read the README's
+  Notes with the user: a change can make them untrue.
 - After the spec changes, the implementation is behind: `task ci` fails
   until `/implement-api` catches it up.
