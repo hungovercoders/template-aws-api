@@ -6,6 +6,10 @@ test harness, CI, infrastructure, deployment - is solved here once. The only
 thing you bring is what makes your API *yours*: BDD feature files that say what
 it does and an OpenAPI contract that says what it looks like.
 
+> **CI on this branch is red on purpose.** `main` is the skeleton: no contract,
+> no features, no implemented Lambda. `task ci` fails until you add a spec and
+> implement it - that is the template working.
+
 ## Why a template, not a prompt
 
 The skeleton is the same for every API you will build, so it should be built
@@ -42,10 +46,6 @@ If you find yourself asking AI to write a router, a test harness, a pipeline
 or Terraform for an API built from this template, stop: it is already here.
 If something every API needs is missing, add it to the template once rather
 than to one API.
-
-> **CI on this branch is red on purpose.** `main` is the skeleton: no contract,
-> no features, no implemented Lambda. `task ci` fails until you add a spec and
-> implement it - that is the template working.
 
 | Branch | What it is | `task ci` |
 | --- | --- | --- |
