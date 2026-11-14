@@ -9,7 +9,7 @@ Each gate fails for one reason and says what it is:
 - **`skeleton:check`** - a skeleton file differs from `skeleton.lock`. The
   skeleton is the same for every API, so implementing a spec should never
   change it; see [Changing the skeleton](../CONTRIBUTING.md#changing-the-skeleton).
-- **`docs:check`** - `CLAUDE.md`, a skill, the README or a guide is over its
+- **`docs:check`** - `AGENTS.md`, a skill, the README or a guide is over its
   line budget, a guide does not say who it is for, or a link is broken; see
   [What gets documented](../CONTRIBUTING.md#what-gets-documented).
 - **`spec:check`** - no operations, an operation without an `operationId`, an

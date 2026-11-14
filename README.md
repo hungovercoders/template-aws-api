@@ -166,6 +166,7 @@ local/                  AWS Emulator runner, Terraform apply, API Gateway stand-
 infra/                  Terraform: Lambda, HTTP API, DynamoDB
 infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 docs/                   guides, each for one reader at one moment; runbook.md for alarms
+AGENTS.md               instructions for coding agents; CLAUDE.md imports it
 CONTRIBUTING.md         how the template itself is changed
 SECURITY.md             how to report a vulnerability
 skeleton.lock           what the skeleton is; skeleton:check fails if it changes

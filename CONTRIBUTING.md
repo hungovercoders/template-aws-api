@@ -75,7 +75,7 @@ Context is hard to manage, so a document exists only where it is necessary:
 3. **One home per fact.** State it once and link to it.
 
 `task docs:check`, a gate in `task ci`, holds this in place: it fails when
-`CLAUDE.md`, a skill, the README or a guide outgrows its line budget, when a
+`AGENTS.md`, a skill, the README or a guide outgrows its line budget, when a
 guide does not say who it is for and when, and when a link between documents
 does not resolve. The budgets are at the top of `scripts/docs-check.ts`.
 Raising one is allowed, and is a decision: first ask what could be cut, or
