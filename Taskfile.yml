@@ -102,6 +102,12 @@ tasks:
     cmds:
       - npx httpyac send http/*.http --env {{.ENV | default "local"}} {{.CLI_ARGS}}
 
+  spec:compat:
+    desc: Gate - changes to the contract since the last published one are listed, and info.version is bumped to match (breaking needs a major)
+    deps: [install]
+    cmds:
+      - node scripts/spec-compat.ts
+
   typecheck:
     desc: Gate - the code agrees with the types generated from the contract
     deps: [generate]
@@ -224,6 +230,7 @@ tasks:
     cmds:
       - task: spec:check
       - task: spec:lint
+      - task: spec:compat
       - task: http:check
       - task: test:unit
       - task: typecheck

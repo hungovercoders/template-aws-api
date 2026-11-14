@@ -12,8 +12,12 @@ files) is the requirement; `task ci` is the definition of done.
   produced by `task generate`, `task scaffold` or `task http:generate`, never
   written by hand. Use judgement only where no deterministic tool exists.
 - Tools come from `mise.toml`; every command is a task - run `task` to list them.
+- To write or change the spec with the user, use the `write-spec` skill. The
+  user owns the requirements: ask, propose and confirm; never invent them.
 - To implement or change the API from the specs, use the `implement-api` skill.
 - `specs/` is read-only unless the user asks for a spec change.
+- A contract change is versioned: `task spec:compat` lists what breaks and
+  holds `info.version` to it. A breaking change is the user's decision.
 - Never weaken a gate (Taskfile, cucumber config, spec/route checks, lint rules, CI) to get green.
 - Contract standards are lower snake_case (`rules/house.yaml`); rules for one
   API go in `.spectral.yaml`.

@@ -108,7 +108,9 @@ it tells you exactly what is missing.
    scenario, an unknown tag, an invalid document); if `spec:lint` fails the
    contract breaks a standard in `rules/house.yaml` or `.spectral.yaml`.
    Either way report the output to the user - do not fix the spec yourself,
-   and never relax or disable a rule. If `task http:check` fails, the
+   and never relax or disable a rule. The same goes for `task spec:compat`:
+   a failure there is a contract change that is not versioned, which is the
+   user's to resolve (the `write-spec` skill covers it). If `task http:check` fails, the
    committed `http/contract.http` is out of date with the contract: run
    `task http:generate` and commit the file - it is generated, not spec.
 3. **`task scaffold`** - generates the types, runtime contract and route
@@ -273,6 +275,7 @@ leave them to CI.
 | --- | --- |
 | `spec:check` | The contract is valid; every operation has a tagged scenario |
 | `spec:lint` | The contract meets the house standards and this API's own rules |
+| `spec:compat` | Contract changes since the last published one are listed and versioned |
 | `typecheck` | Operations agree with the types generated from the contract |
 | `test:unit` | Every contract operation has a file and none is still a stub; domain rules |
 | `features` | The behaviour in the feature files, with every response held to the contract |
