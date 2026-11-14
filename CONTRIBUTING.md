@@ -24,6 +24,7 @@ removal alike. Nothing is changed in the code alone.
 | Fix a bug | A bug is a scenario that is missing or wrong. Write the scenario that fails first, then fix the code |
 | Remove something | Delete its scenarios and its part of the contract (breaking: a new major version); delete the code and steps the gates then call unused |
 | Rename or reshape data | Change the contract; the generated types make the compiler find every use |
+| Use a capability the API removed | `task component:add -- <name>` restores it from the template, with what it needs; then the spec first, as for any change |
 | Update a dependency | Renovate proposes it; `task ci` decides. When it moves a skill source in `skills.json`, run `task skills:fetch` on its branch and push |
 | Work with a service the API integrates with | Ask whether a skill for it should be added; with the owner's agreement, `task skills:add`. A skill every API needs is a change to the template instead |
 
@@ -98,6 +99,9 @@ skeleton every API shares.
 - **When `README.md` changes on `main`,** the merge conflicts, because the
   example branches' READMEs are generated from their contract. Keep theirs
   (`git checkout --ours README.md`).
+- **An optional part of the skeleton is a component:** declared in
+  `components.json`, its sections of shared files marked, so an API can
+  remove it and restore it. `test/components.test.ts` proves the mechanism.
 - **Never rewrite what is pushed.** `main` and `example/*` are protected
   (`.github/rulesets/protect-demo-branches.json`); only add commits or merges.
 - `renovate.json` keeps npm, GitHub Actions, Terraform, mise, the emulator,

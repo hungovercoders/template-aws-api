@@ -70,6 +70,30 @@ tasks:
     cmds:
       - node scripts/docs-check.ts
 
+  component:list:
+    desc: The template's optional components, and whether this repository has each
+    deps: [install]
+    cmds:
+      - node scripts/components.ts list
+
+  component:remove:
+    desc: Remove an optional component this API does not need - its files, sections, skills and Renovate rules (task component:remove -- <name>); refused while another that needs it remains
+    deps: [install]
+    cmds:
+      - node scripts/components.ts remove {{.CLI_ARGS}}
+
+  component:add:
+    desc: Bring back a removed component, and what it needs, as the template has it now (task component:add -- <name>); no skeleton:lock needed
+    deps: [install]
+    cmds:
+      - node scripts/components.ts add {{.CLI_ARGS}}
+
+  component:gates:
+    desc: Gate - the gates the optional components still in this repository add to task ci
+    deps: [install]
+    cmds:
+      - node scripts/components.ts run ci
+
   skills:check:
     desc: Gate - every skill listed in skills.json is in .claude/skills/, unedited, and at the commit its source is pinned to
     deps: [install]
@@ -320,6 +344,7 @@ tasks:
       - task: typecheck
       - task: steps:check
       - task: infra:validate
+      - task: component:gates
       - task: acceptance
 
   check:

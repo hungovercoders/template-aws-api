@@ -1,14 +1,22 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, the AWS Emulator, Prism and schemathesis versions in Taskfile.yml, and the commits skills are copied from (skills.json). One-time setup: install the Renovate app on the repository.",
-  "extends": ["config:recommended"],
-  "baseBranchPatterns": ["main"],
+  "extends": [
+    "config:recommended"
+  ],
+  "baseBranchPatterns": [
+    "main"
+  ],
   "customManagers": [
     {
       "customType": "regex",
       "description": "AWS Emulator - AWS ships security fixes only in the latest release",
-      "managerFilePatterns": ["/^Taskfile\\.yml$/"],
-      "matchStrings": ["EMULATOR_VERSION: (?<currentValue>[0-9.]+)"],
+      "managerFilePatterns": [
+        "/^Taskfile\\.yml$/"
+      ],
+      "matchStrings": [
+        "EMULATOR_VERSION: (?<currentValue>[0-9.]+)"
+      ],
       "depNameTemplate": "aws/aws-emulator",
       "datasourceTemplate": "github-tags",
       "extractVersionTemplate": "^v(?<version>.+)$"
@@ -16,24 +24,36 @@
     {
       "customType": "regex",
       "description": "The repositories skills are copied from (skills.json). After the commit moves, run task skills:fetch and commit: skills:check fails until the copies match",
-      "managerFilePatterns": ["/^skills\\.json$/"],
-      "matchStrings": ["\"repository\": \"(?<packageName>[^\"]+)\",\\s*\"branch\": \"(?<currentValue>[^\"]+)\",\\s*\"commit\": \"(?<currentDigest>[a-f0-9]{40})\""],
+      "managerFilePatterns": [
+        "/^skills\\.json$/"
+      ],
+      "matchStrings": [
+        "\"repository\": \"(?<packageName>[^\"]+)\",\\s*\"branch\": \"(?<currentValue>[^\"]+)\",\\s*\"commit\": \"(?<currentDigest>[a-f0-9]{40})\""
+      ],
       "depNameTemplate": "{{packageName}}",
       "datasourceTemplate": "git-refs"
     },
     {
       "customType": "regex",
       "description": "Prism, fetched on demand by task mock",
-      "managerFilePatterns": ["/^Taskfile\\.yml$/"],
-      "matchStrings": ["PRISM_VERSION: (?<currentValue>[0-9.]+)"],
+      "managerFilePatterns": [
+        "/^Taskfile\\.yml$/"
+      ],
+      "matchStrings": [
+        "PRISM_VERSION: (?<currentValue>[0-9.]+)"
+      ],
       "depNameTemplate": "@stoplight/prism-cli",
       "datasourceTemplate": "npm"
     },
     {
       "customType": "regex",
       "description": "schemathesis, run through uvx by task contract:fuzz",
-      "managerFilePatterns": ["/^Taskfile\\.yml$/"],
-      "matchStrings": ["SCHEMATHESIS_VERSION: (?<currentValue>[0-9.]+)"],
+      "managerFilePatterns": [
+        "/^Taskfile\\.yml$/"
+      ],
+      "matchStrings": [
+        "SCHEMATHESIS_VERSION: (?<currentValue>[0-9.]+)"
+      ],
       "depNameTemplate": "schemathesis",
       "datasourceTemplate": "pypi"
     }
@@ -41,7 +61,9 @@
   "packageRules": [
     {
       "description": "AWS Emulator: security fixes ship only in the latest release, so a new version merges itself once the required checks pass. A person is needed only when a release changes a result",
-      "matchDepNames": ["aws/aws-emulator"],
+      "matchDepNames": [
+        "aws/aws-emulator"
+      ],
       "automerge": true,
       "platformAutomerge": true,
       "prBodyNotes": [
@@ -50,13 +72,22 @@
     },
     {
       "description": "Skill sources move often and each update needs task skills:fetch run on its branch; once a week is enough",
-      "matchFileNames": ["skills.json"],
-      "schedule": ["before 6am on monday"]
+      "matchFileNames": [
+        "skills.json"
+      ],
+      "schedule": [
+        "before 6am on monday"
+      ]
     },
     {
       "description": "One pull request for routine npm updates",
-      "matchManagers": ["npm"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchManagers": [
+        "npm"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "groupName": "npm minor and patch"
     }
   ]

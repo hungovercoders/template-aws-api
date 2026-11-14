@@ -8,6 +8,7 @@
 // `task ci` is green. A repository with no .stage is checked in full.
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { gates as componentGates } from "./components-lib.ts";
 
 const STAGES = {
   template: ["skeleton:check", "docs:check", "skills:check"],
@@ -25,7 +26,8 @@ if (!isStage(wanted)) {
   process.exit(1);
 }
 
-const gates = order.slice(0, order.indexOf(wanted) + 1).flatMap((stage) => STAGES[stage]);
+// A component still in this repository adds its own fast gates to a stage.
+const gates = order.slice(0, order.indexOf(wanted) + 1).flatMap((stage) => [...STAGES[stage], ...componentGates(stage)]);
 for (const gate of gates) {
   const run = spawnSync("task", [gate], { stdio: "inherit" });
   if (run.status !== 0) {

@@ -37,6 +37,11 @@ files) is the requirement; `task ci` is the definition of done.
   the repository wins: the emulator version is pinned (`EMULATOR_VERSION`),
   so never upgrade it except through the pull request that moves the pin.
   Run the local stack with `EMULATOR_TELEMETRY=off`.
+- `components.json` declares the template's optional components;
+  `task component:list` says which this repository has. Never build a
+  removed one by hand, and never remove or restore one unasked: with the
+  user's agreement, `task component:remove -- <name>` or
+  `task component:add -- <name>`, which brings it back from the template.
 - `specs/` is read-only unless the user asks for a spec change.
 - A contract change is versioned: `task spec:compat` lists what breaks and
   holds `info.version` to it. A breaking change is the user's decision.
