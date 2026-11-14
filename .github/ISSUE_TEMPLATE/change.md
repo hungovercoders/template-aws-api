@@ -1,13 +1,13 @@
 ---
-name: Change to the template
-about: Something every API built from the template should get
+name: Change
+about: Something the API should do, stop doing, or do differently
 ---
 
-<!-- If only one API needs it, it belongs in that API, not here. -->
-
-**What is missing, and who it affects**
+**What should be different, and for whom**
 
 
 **Done when**
+
+<!-- As behaviour someone could check. These become scenarios in specs/features. -->
 
 - 

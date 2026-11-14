@@ -1,9 +1,9 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-856b5971a232fdeeca33bf6a6f5ccb44b82c5303dbab342b738503079aa354e0  .claude/skills/implement-api/SKILL.md
-5263d5156cf3a079071c53873385d43d3dcdda86741f6b415331428016e88c41  .claude/skills/write-spec/SKILL.md
+75a7c00fab533df7b88da5272ac5e4ebbdc7b36d641e57c048d73152ed1ae755  .claude/skills/implement-api/SKILL.md
+bfc308bc1434d85192e19f946163f699df113e05476eee3694c2e635dee6202f  .claude/skills/write-spec/SKILL.md
 f7b75286aecf4ae21904fe048844c21e76f42ad1fc9c68361dbee7a787b6eb05  .github/workflows/ci.yml
-bd2d0f8cefd32f6dbde4b27d7983109b27b17ae604f333104422675cb46e820d  Taskfile.yml
+e82c65f43fc26793ad436eb77fdcd0d4774a153ff4f9398d40279f5b7ca0828e  Taskfile.yml
 6cade406af2dc8c0d818e28e193903a87ecec74ad116b91178915289edbab5a6  cucumber.mjs
 67c594fc663bb8e459c948440a875581fb2107e17cc952e47bf244d3176297a0  infra/alarms.tf
 bb84eae682ebcfb132aa4360a73435f52587f3ac1746906afe1491807f4738ce  infra/bootstrap/main.tf
@@ -17,6 +17,7 @@ d5526bda8bf24c5f1242ae241a47b431a6048a29646f8f59f0b9be11c6878180  local/server.t
 02dade23cfbd6a34a548342679ce12df015934297f2679def1eece94cd97dfc4  local/stack.mjs
 049945c26d6a3838faf6ad0f1939472729c4ab68a6474b33d5f33999e80bb65e  local/table.ts
 5c62bd603951bb5b7268fd74e34632e27fdf91243464d278b96b38cddbb46e1a  rules/house.yaml
+462479d88f8186324cb52153be075d80a7a6270ad28cf8d1adac97ff3451f492  scripts/adopt.ts
 06d6bea2636fb4685657224c45f65fef7818c99f599312040e5f51487e28fe7b  scripts/docs-check.ts
 4e803e391343ab19c21c5baf094846afe15c9d15b5ba805ddffe14561ce96eb7  scripts/generate.ts
 cdb6f09a97935408e244b55ee6112cd2e69c6c9db565affb0bdb0d4328fa43bd  scripts/http-generate.ts
@@ -25,6 +26,7 @@ cdb6f09a97935408e244b55ee6112cd2e69c6c9db565affb0bdb0d4328fa43bd  scripts/http-g
 cc22737769c4d065aae45c5d1debf31e551203d01e01d7a8908c1cc9b625923d  scripts/skeleton.ts
 eb21bfe283393c716b95fef168c4bb682b2e8b4f3719921c86f4fb349004a170  scripts/spec-check.ts
 a3d62ef5fcfbdd076b0ecfe14546ed91abb3d6f0b4a18d0cdb893c656e38e087  scripts/spec-compat.ts
+5dc51478617b9bdfa1b273234bc603b79f7beb5581e9251d8e2b04a1697692d8  scripts/steps-check.ts
 cd31111b09d28a3c2fa6e122f1394d5ee03b9746e5cec93e4638a41db4917b36  src/handler.ts
 5d17a422c19f9d9470d7c4c70fd8c747e0dadb08e398b5263f60c2f65b8207fc  src/lib/contract.ts
 6db9736defffc312246ffc72bfb78fbccfd3d583cb805feb3a96f657fe95dd0d  src/lib/dynamo.ts

@@ -1,6 +1,6 @@
 ---
 name: write-spec
-description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/openapi.yaml and the BDD feature files in specs/features - or to change an existing spec safely. Use when asked to design, specify, define or change an API, its contract, its endpoints or its behaviour, before any implementation. Ends with a spec the gates accept and the user has approved; it does not implement.
+description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/openapi.yaml and the BDD feature files in specs/features - and to change that spec safely for the rest of the API's life. Use when asked to design, specify or define an API, and whenever an existing API should do something new, different or less, or has a bug - every such change starts here, before any code. Ends with a spec the gates accept and the user has approved; it does not implement.
 ---
 
 # Write the spec with the user
@@ -99,17 +99,17 @@ spec it is an API, and should say so. Most of that is generated:
   contract cannot say. Ask the user for it - why the API exists, who owns it,
   where it is deployed - and write only what they tell you.
 
-The first time a spec is written in a repository, also remove what is only
-about the template, after confirming with the user:
+The first time a spec is written in a repository created from the template,
+run **`task adopt`**, after confirming with the user. It removes what is only
+about the template - its self-test workflow, its branch ruleset, and the
+sections marked template-only in `CONTRIBUTING.md`, `SECURITY.md`,
+`AGENTS.md` and the pull request template - names `AGENTS.md` after the API,
+and writes the README. Do not do any of that by hand. Afterwards ask the user
+whether the `LICENSE` copyright line is right.
 
-- delete `.github/workflows/template.yml` and `.github/rulesets/`;
-- replace `CONTRIBUTING.md` and `SECURITY.md` with the user's own, or delete
-  them if they have none yet - do not leave the template's in place;
-- change the title of `AGENTS.md` to the API's name, and the `LICENSE`
-  copyright line if the user says the code is not theirs to license as MIT.
-
-Leave the guides in `docs/` alone: they describe the tooling the API is built
-on, and stay true.
+What remains is the API's own, and stays true for its whole life:
+`CONTRIBUTING.md` (every change goes spec first, then implementation), the
+guides in `docs/`, and these skills.
 
 ## Writing features
 
@@ -172,6 +172,12 @@ Do not ask the user about these; apply them.
 - A request that breaks the contract gets `400` from the router.
 
 ## Changing a spec
+
+Every change to the API for the rest of its life starts here: a new feature,
+a changed rule, a removal, and a bug fix alike. A **bug** is a scenario that
+is missing or wrong - write the scenario that shows the correct behaviour
+(it will fail against the current code), and change the contract only if its
+shape was wrong too.
 
 A published contract has consumers. Treat every change as one of three
 kinds, and tell the user which theirs is before you make it:
