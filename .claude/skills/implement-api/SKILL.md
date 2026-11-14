@@ -89,6 +89,11 @@ it tells you exactly what is missing.
      `context.path`, `context.query` and `context.body` are typed from the
      contract and already validated. Log with `context.log`, not `console`;
      the router already logs every request and any unexpected error.
+   - Authentication is already enforced for every operation the contract
+     secures: never check tokens yourself. `context.caller` is who is calling
+     (always set on a secured operation); use it for rules about *what* they
+     may do. In step definitions set `this.caller = "<subject>"` before a
+     call to make it as that caller, and leave it undefined to call anonymously.
    - Register it in `src/routes.ts` under its `operationId`.
    - Put rules that need no I/O in `src/domain/` with unit tests in `test/`,
      and DynamoDB access in `src/store/` using `dynamo` and `tableName` from

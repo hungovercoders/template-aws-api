@@ -3,8 +3,9 @@ info:
   title: Beer Catalogue API
   version: 1.0.0
   description: >
-    A brewery's beer catalogue. Staff add the beers they brew, keep the details
-    current and retire beers; drinkers rate them from 1 to 5.
+    A brewery's beer catalogue. Signed-in staff add the beers they brew, keep
+    the details current and retire beers. Anyone can browse the catalogue, and
+    drinkers rate beers from 1 to 5.
 
 tags:
   - name: beers
@@ -86,6 +87,8 @@ paths:
               name: Morning After
               style: ipa
               abv: 5.6
+      security:
+        - bearer_auth: []
       responses:
         "201":
           description: The beer was added.
@@ -98,6 +101,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Beer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "400":
           $ref: "#/components/responses/BadRequest"
         "409":
@@ -133,6 +138,8 @@ paths:
               $ref: "#/components/schemas/BeerChanges"
             example:
               abv: 5.8
+      security:
+        - bearer_auth: []
       responses:
         "200":
           description: The beer with the changes applied.
@@ -140,6 +147,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Beer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -150,9 +159,13 @@ paths:
       operationId: retire_beer
       summary: Retire a beer from the catalogue
       tags: [beers]
+      security:
+        - bearer_auth: []
       responses:
         "204":
           description: The beer was retired.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -186,6 +199,13 @@ paths:
           $ref: "#/components/responses/NotFound"
 
 components:
+  securitySchemes:
+    # Staff sign in; the token is verified by API Gateway before the API runs.
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   parameters:
     BeerId:
       name: beer_id
@@ -303,6 +323,18 @@ components:
                 type: string
 
   responses:
+    Unauthorized:
+      description: The caller is not signed in. Only staff may change the catalogue.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message:
+                type: string
+          example:
+            message: Unauthorized
     BadRequest:
       description: The request does not satisfy the contract.
       content:

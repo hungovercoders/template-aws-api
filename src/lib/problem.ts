@@ -19,6 +19,11 @@ export function problem(status: number, title: string, detail?: string, extra: R
   };
 }
 
+/** The answer API Gateway itself gives when a secured route is called without a valid token. */
+export function unauthorized(): Result {
+  return { statusCode: 401, headers: { "content-type": "application/json" }, body: JSON.stringify({ message: "Unauthorized" }) };
+}
+
 /** Throw from an operation to answer with a problem response. */
 export class HttpProblem extends Error {
   constructor(
