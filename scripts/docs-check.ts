@@ -17,13 +17,20 @@ const BUDGETS: [pattern: RegExp, lines: number, why: string][] = [
   [/^docs\/[^/]+\.md$/, 250, "a guide for one reader at one moment"],
 ];
 
+// A skill copied from its source (skills.json) is not ours to cut or to fix
+// links in, and `task skills:check` already holds it unedited. An agent reads
+// its SKILL.md only when the task calls for it, so it is not standing context.
+const copied = new Set<string>(
+  existsSync("skills.json") ? (JSON.parse(readFileSync("skills.json", "utf8")) as { skills: { name: string; source?: string }[] }).skills.filter((skill) => skill.source).map((skill) => skill.name) : [],
+);
+
 const files = [
   "AGENTS.md",
   "CLAUDE.md",
   "README.md",
   ...["CONTRIBUTING.md", "SECURITY.md"].filter(existsSync),
   ...(existsSync("docs") ? readdirSync("docs").filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`) : []),
-  ...(existsSync(".claude/skills") ? readdirSync(".claude/skills").map((skill) => `.claude/skills/${skill}/SKILL.md`).filter(existsSync) : []),
+  ...(existsSync(".claude/skills") ? readdirSync(".claude/skills").filter((skill) => !copied.has(skill)).map((skill) => `.claude/skills/${skill}/SKILL.md`).filter(existsSync) : []),
 ].sort();
 
 const slug = (heading: string) =>

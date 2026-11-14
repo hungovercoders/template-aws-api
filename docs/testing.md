@@ -12,6 +12,9 @@ Each gate fails for one reason and says what it is:
 - **`docs:check`** - `AGENTS.md`, a skill, the README or a guide is over its
   line budget, a guide does not say who it is for, or a link is broken; see
   [What gets documented](../CONTRIBUTING.md#what-gets-documented).
+- **`skills:check`** - a skill listed in `skills.json` is missing from
+  `.claude/skills/`, was edited after it was copied, or its source has moved
+  to a newer commit than the copy; run `task skills:fetch` and commit.
 - **`spec:check`** - no operations, an operation without an `operationId`, an
   operation no scenario is tagged for, or a tag naming an operation that does
   not exist.
@@ -104,16 +107,22 @@ task, and stops it. Emulated resources live in memory only.
   the pinned package, verifies AWS's signature and unpacks it into `.tools/` -
   nothing is installed system-wide.
 - **Version:** pinned as `EMULATOR_VERSION` in `Taskfile.yml`, so every run
-  tests against the same emulator. AWS publishes security fixes only in the
-  latest release, so raise the pin regularly; published versions are listed in
+  tests against the same emulator and a release that changes a result
+  arrives as a pull request, not a surprise. AWS publishes security fixes
+  only in the latest release, so Renovate proposes each new version and it
+  merges itself once the required checks pass. AWS's `aws-emulator` skill
+  says never to pin; here the pin wins. Published versions are listed in
   [versions.json](https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json).
+- **When it will not start, connect or sign:** the `aws-emulator` skill
+  (`.claude/skills/aws-emulator`) has the troubleshooting, and checks whether
+  an AWS operation is expected to work on the emulator.
 - **macOS / Windows:** AWS ships no native package; run `task emulator:docker`
   in one terminal and the other tasks in a second. A running emulator is
   picked up automatically.
 - **Port:** `EMULATOR_PORT` (default 9297).
 - **Telemetry:** the emulator reports anonymous usage data to AWS by default.
-  This template does not change that; set `EMULATOR_TELEMETRY=off` to turn it
-  off ([details](https://docs.aws.amazon.com/emulator/latest/userguide/telemetry.html)).
+  The local stack turns it off in CI and leaves it alone elsewhere; set
+  `EMULATOR_TELEMETRY=off` to turn it off ([details](https://docs.aws.amazon.com/emulator/latest/userguide/telemetry.html)).
 
 ### How close to production the tests are
 

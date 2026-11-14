@@ -177,6 +177,8 @@ http/                   .http requests for exploring by hand; contract.http is g
 scripts/                generate, scaffold, spec:check and http:generate
 .claude/skills/write-spec/      the skill that helps you write the spec
 .claude/skills/implement-api/   the skill that drives an implementation
+.claude/skills/aws-*/           AWS's own skills, copied in and kept current (task skills:fetch)
+skills.json             where each copied skill came from, and the ones offered ← you add
 ```
 
 ## Using this repository as a template

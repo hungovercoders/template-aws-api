@@ -1,0 +1,65 @@
+{
+  "$comment": "The skills copied into .claude/skills/ from somewhere else, and where each came from. `task skills:check` holds the copies to this file; `task skills:fetch` makes them match it; `task skills:add -- <name>` adds one. owner 'template' is in every API built on the template; owner 'api' was added for this API. integrations: what this API calls or is called by, each { name, skill (a name above, or null), note }, recorded by /write-spec so the question is asked once.",
+  "sources": {
+    "aws": {
+      "repository": "https://github.com/aws/agent-toolkit-for-aws",
+      "branch": "main",
+      "commit": "5955ad2e46d35e7615b036f4e8863f1975f0ab72"
+    }
+  },
+  "skills": [
+    {
+      "name": "aws-emulator",
+      "owner": "template",
+      "for": "The local stack: starting AWS Emulator, connection, certificate and signing errors, and whether an AWS operation is expected to work on it",
+      "source": "aws",
+      "path": "skills/core-skills/aws-emulator",
+      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
+      "sha256": "33d89f0c79cc82f4532b7fe6ae196d48bd2cb0bb5e8c2a3a1857468696ea02db"
+    },
+    {
+      "name": "aws-serverless",
+      "owner": "template",
+      "for": "Lambda and API Gateway: how the function and the HTTP API behave and are configured",
+      "source": "aws",
+      "path": "skills/core-skills/aws-serverless",
+      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
+      "sha256": "3bfbe751f0d5d0bc864b29755278c0e2b7487d08b4c04fcbfe3aa9a8e2bd13b5"
+    },
+    {
+      "name": "aws-sdk-js-v3-usage",
+      "owner": "template",
+      "for": "Calling AWS from the function with the AWS SDK for JavaScript v3",
+      "source": "aws",
+      "path": "skills/core-skills/aws-sdk-js-v3-usage",
+      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
+      "sha256": "ec53410e4ada81ba38094de439cd15eeff44cbf63a53328deb1a67d88a604ec9"
+    },
+    {
+      "name": "aws-iam",
+      "owner": "template",
+      "for": "The function's role and the deploy role: policies that grant what is used and no more",
+      "source": "aws",
+      "path": "skills/core-skills/aws-iam",
+      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
+      "sha256": "1dcca0bcce2e95a6f5bc91ed93573626be5db8b7d09f6611a1ce76a87c4ab70a"
+    }
+  ],
+  "offered": [
+    {
+      "name": "amazon-dynamodb",
+      "source": "aws",
+      "path": "skills/specialized-skills/database-skills/amazon-dynamodb",
+      "for": "Designing the data layer in src/store/: access patterns, keys and indexes",
+      "when": "The API stores its data in DynamoDB, the template's default, and has more than a few access patterns"
+    },
+    {
+      "name": "aws-observability",
+      "source": "aws",
+      "path": "skills/core-skills/aws-observability",
+      "for": "Alarms, dashboards, logs and tracing beyond the template's standard alarms",
+      "when": "The API is going to production and someone will be on call for it"
+    }
+  ],
+  "integrations": []
+}

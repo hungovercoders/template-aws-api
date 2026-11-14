@@ -70,6 +70,30 @@ tasks:
     cmds:
       - node scripts/docs-check.ts
 
+  skills:check:
+    desc: Gate - every skill listed in skills.json is in .claude/skills/, unedited, and at the commit its source is pinned to
+    deps: [install]
+    cmds:
+      - node scripts/skills.ts check
+
+  skills:fetch:
+    desc: Copy the skills listed in skills.json from their sources at the pinned commits - run it when skills:check says a source has moved, and commit the result
+    deps: [install]
+    cmds:
+      - node scripts/skills.ts fetch
+
+  skills:update:
+    desc: Move every skill source to the head of its branch and fetch - what Renovate proposes, done by hand
+    deps: [install]
+    cmds:
+      - node scripts/skills.ts update
+
+  skills:add:
+    desc: Add a skill for this API - one the template offers (task skills:add -- <name>), one from a git repository (-- <name> --repository <url> --path <dir>), or your own (-- <name> --manual)
+    deps: [install]
+    cmds:
+      - node scripts/skills.ts add {{.CLI_ARGS}}
+
   adopt:
     desc: Run once, after the first spec - turn a repository created from the template into the API's own (removes template-only files and sections, writes the README)
     deps: [generate]
@@ -286,6 +310,7 @@ tasks:
     cmds:
       - task: skeleton:check
       - task: docs:check
+      - task: skills:check
       - task: spec:check
       - task: spec:lint
       - task: spec:compat

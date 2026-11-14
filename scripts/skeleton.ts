@@ -12,7 +12,8 @@ const LOCK = "skeleton.lock";
 
 // What an API built on the template does not own. Not listed, because they
 // are yours: specs/, http/, steps/ (but world.ts), src/operations, src/domain,
-// src/store, your tests, .spectral.yaml, README.md, AGENTS.md, CLAUDE.md, package.json.
+// src/store, your tests, .spectral.yaml, README.md, AGENTS.md, CLAUDE.md, package.json,
+// skills.json and the skills it lists.
 const SKELETON = [
   "Taskfile.yml",
   "cucumber.mjs",
@@ -29,7 +30,10 @@ const SKELETON = [
   "test/routes.test.ts",
   "test/log.test.ts",
   "infra/",
-  ".claude/skills/",
+  // The template's own skills. Skills copied from elsewhere are held by
+  // `task skills:check` instead, so adding or updating one is not a skeleton change.
+  ".claude/skills/implement-api/",
+  ".claude/skills/write-spec/",
 ];
 const NOT_SOURCE = /(^|\/)\.terraform(\/|\.lock\.hcl$)|\.tfstate/;
 

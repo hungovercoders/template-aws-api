@@ -64,7 +64,10 @@ async function emulatorEnv() {
     const local = join(".tools", "aws-emulator", "opt", "aws-emulator", "bin", "aws-emulator");
     const bin = process.env.AWS_EMULATOR_BIN ?? (existsSync(local) ? local : "aws-emulator");
     const log = openSync(join(".local", "emulator.log"), "w");
-    const emulator = spawn(bin, ["-p", String(port)], { stdio: ["ignore", log, log] });
+    // AWS's own guidance: no usage telemetry from CI jobs. Anywhere else it is
+    // the emulator's default (on) unless EMULATOR_TELEMETRY=off is set.
+    const telemetry = process.env.CI ? ["-t", "off"] : [];
+    const emulator = spawn(bin, ["-p", String(port), ...telemetry], { stdio: ["ignore", log, log] });
     children.push(emulator);
     let failed = null;
     emulator.on("error", (error) => (failed = `could not start AWS Emulator (${bin}): ${error.message}. Run \`task emulator:install\`.`));
