@@ -1,0 +1,33 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, and the AWS Emulator and Prism versions in Taskfile.yml. One-time setup: install the Renovate app on the repository.",
+  "extends": ["config:recommended"],
+  "baseBranchPatterns": ["main"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "AWS Emulator - AWS ships security fixes only in the latest release",
+      "managerFilePatterns": ["/^Taskfile\\.yml$/"],
+      "matchStrings": ["EMULATOR_VERSION: (?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "aws/aws-emulator",
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Prism, fetched on demand by task mock",
+      "managerFilePatterns": ["/^Taskfile\\.yml$/"],
+      "matchStrings": ["PRISM_VERSION: (?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "@stoplight/prism-cli",
+      "datasourceTemplate": "npm"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "One pull request for routine npm updates",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm minor and patch"
+    }
+  ]
+}

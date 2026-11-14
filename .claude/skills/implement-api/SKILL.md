@@ -87,7 +87,8 @@ it tells you exactly what is missing.
    - `src/operations/<operationId>.ts` exporting
      `async function <operationId>(context: Context<"<operationId>">)` -
      `context.path`, `context.query` and `context.body` are typed from the
-     contract and already validated.
+     contract and already validated. Log with `context.log`, not `console`;
+     the router already logs every request and any unexpected error.
    - Register it in `src/routes.ts` under its `operationId`.
    - Put rules that need no I/O in `src/domain/` with unit tests in `test/`,
      and DynamoDB access in `src/store/` using `dynamo` and `tableName` from
