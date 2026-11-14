@@ -166,24 +166,36 @@ it tells you exactly what is missing.
 
 ## When the spec has changed
 
-The same workflow serves every change after the first build; the gates tell
-you what kind it is. Behaviour never changes in the code alone - if a change
-has no scenario, stop: it needs the spec changed first (`write-spec`).
+The same workflow serves every change after the first build. Behaviour never
+changes in the code alone - if a change has no scenario, stop: it needs the
+spec changed first (`write-spec`).
+
+**Start by reading what changed:** `git diff <the commit the code was last
+green at> -- specs`. The gates find most of it, but not all without the local
+stack: a rule that changed while the contract's shape stayed the same, or a
+new row in a scenario outline, shows only when `task features` runs.
 
 - **Something new** - `task scaffold` adds a stub for each new operation and
   a pending step for each new sentence, and touches nothing you have written.
-  The backlog gate lists the new stubs. Implement them as in steps 5 and 6.
-- **Something changed** - nothing is scaffolded; `task features` goes red on
+  Implement them as in steps 5 and 6. Put new steps in your existing step
+  files; where a new sentence is an existing one plus a clause, extend the
+  existing pattern rather than adding a near-duplicate.
+- **Something changed** - nothing is scaffolded. `task features` goes red on
   the scenarios whose behaviour moved, and `task typecheck` on every use of a
-  type the contract reshaped. Fix the code until both pass. Do not edit a
-  scenario or the contract to match the code.
-- **A bug** - the spec should now hold the scenario that reproduces it,
-  failing. If it does not, that is the missing piece: ask for it. Then fix
-  the code; do not fix a bug no scenario demonstrates.
+  type the contract reshaped. Fix the code until both pass, and update any
+  unit test in `test/` that states the old rule. Do not edit a scenario or
+  the contract to match the code.
+- **A bug** - the spec should now hold a scenario for it. If that scenario
+  fails, fix the code. If it passes once its steps exist, the bug is not
+  reproduced: change no code and say so in your report. Never fix a bug no
+  scenario demonstrates.
 - **Something removed** - `task typecheck` fails on the operation file whose
   `operationId` has left the contract, and `task steps:check` lists step
   definitions no sentence uses. Delete both, and any domain or store code
   only they used.
+- **Data that is already stored** - scenarios start from an empty table, so
+  no gate sees old items. When the contract gains a required response field,
+  give items stored before it a value when they are read.
 
 Afterwards the whole of `task ci` must pass, not only the gates you touched:
 `http:check` and `readme:check` if the contract changed (regenerate and
@@ -311,24 +323,15 @@ All come from `mise install`.
 If the local stack cannot run where you are working, you can still run
 `task skeleton:check`, `task spec:check`, `task spec:lint`,
 `task spec:compat`, `task http:check`, `task test:unit`, `task typecheck`,
-`task build`, `task infra:validate` and the cucumber dry run, and you can call
-`handler` from `dist/handler.mjs` directly with an API Gateway event to try
-requests that are refused before they reach DynamoDB. That is not done: say
+`task build`, `task infra:validate`, `task docs:check` and the cucumber dry
+run. You can also call `handler` from `dist/handler.mjs` directly to try
+requests that are refused before they reach DynamoDB: pass an event with
+`routeKey` (`"PATCH /things/{thing_id}"`), `pathParameters`, `body` and, for
+a secured operation, `requestContext.authorizer.jwt.claims.sub`. That is not done: say
 plainly in your report that the features and fuzz gates have not run, and
 leave them to CI.
 
 ## What the gates prove
 
-| Gate | Proves |
-| --- | --- |
-| `skeleton:check` | No skeleton file has been changed |
-| `spec:check` | The contract is valid; every operation has a tagged scenario |
-| `spec:lint` | The contract meets the house standards and this API's own rules |
-| `spec:compat` | Contract changes since the last published one are listed and versioned |
-| `typecheck` | Operations agree with the types generated from the contract |
-| `test:unit` | Every contract operation has a file and none is still a stub; domain rules |
-| `steps:check` | No step definition is left over from behaviour the spec no longer has |
-| `features` | The behaviour in the feature files, with every response held to the contract |
-| `contract:fuzz` | Inputs nobody wrote a scenario for still get contract-conforming answers |
-| `infra:validate` | The Terraform is formatted and valid |
-| `acceptance` | `features` and `contract:fuzz` together, against the built bundle on `infra/` applied to AWS Emulator - what `task ci` runs |
+Each gate fails for one reason and says what it is; `docs/testing.md` lists
+them all under "The gates".
