@@ -39,6 +39,9 @@ jobs:
       # Only needed when the contract secures operations.
       TF_VAR_jwt_issuer: ${{ vars.JWT_ISSUER }}
       TF_VAR_jwt_audience: ${{ vars.JWT_AUDIENCE }}
+      # Optional: who is told when an alarm fires.
+      TF_VAR_alarm_email: ${{ vars.ALARM_EMAIL }}
+      TF_VAR_alarm_topic_arn: ${{ vars.ALARM_TOPIC_ARN }}
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5

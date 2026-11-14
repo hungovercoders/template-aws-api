@@ -26,3 +26,15 @@ variable "jwt_audience" {
   type        = string
   default     = ""
 }
+
+variable "alarm_email" {
+  description = "Address to email when an alarm fires or recovers. It must confirm the subscription AWS sends it."
+  type        = string
+  default     = ""
+}
+
+variable "alarm_topic_arn" {
+  description = "An existing SNS topic to notify instead of creating one - for example one wired to your on-call tool."
+  type        = string
+  default     = ""
+}

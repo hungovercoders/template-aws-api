@@ -169,6 +169,25 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-lambda"]
   }
 
+  statement {
+    sid       = "Alarms"
+    actions   = ["cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:ListTagsForResource", "cloudwatch:TagResource", "cloudwatch:UntagResource"]
+    resources = ["arn:${local.partition}:cloudwatch:${var.region}:${local.account}:alarm:${var.name}-*"]
+  }
+
+  # Describing alarms cannot be limited to named alarms.
+  statement {
+    sid       = "AlarmsList"
+    actions   = ["cloudwatch:DescribeAlarms"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "AlarmTopic"
+    actions   = ["sns:*"]
+    resources = ["arn:${local.partition}:sns:${var.region}:${local.account}:${var.name}-alarms"]
+  }
+
   # API Gateway HTTP APIs cannot be scoped by name before they exist.
   statement {
     sid     = "HttpApi"
