@@ -22,6 +22,9 @@ Each gate fails for one reason and says what it is:
   version, an API change without a new minor, or an edit without a new version.
 - **`http:check`** - `http/contract.http` no longer matches the contract; run
   `task http:generate` and commit it.
+- **`readme:check`** - the contract describes an API but `README.md` still
+  describes the template, or its API section is out of date; run
+  `task readme:generate` and commit it.
 - **`test:unit`** (`test/routes.test.ts`) - an operation in the contract with
   no file in `src/operations/`, or one that is still the stub `task scaffold`
   wrote.

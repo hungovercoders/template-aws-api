@@ -71,6 +71,8 @@ you assumed something, say so and get a yes.
      `info.version` says so.
    - `task http:generate`, then `task http:check` - the requests for
      exploring match the contract.
+   - `task readme:generate`, then `task readme:check` - the README describes
+     this API; see [The repository becomes the API](#the-repository-becomes-the-api).
 6. **Let the user try it.** `task mock` serves the contract; `ENV=mock task
    http` sends a request for each operation. Ask the user to try it, or walk
    them through the responses. This is where missing requirements surface.
@@ -80,6 +82,34 @@ you assumed something, say so and get a yes.
 8. **Get the user's approval** of the final spec, with a summary: the
    operations, who may call each, the rules, and every assumption you made.
    Then stop. Tell them `/implement-api` builds it.
+
+## The repository becomes the API
+
+A repository created from the template describes the template. Once it has a
+spec it is an API, and should say so. Most of that is generated:
+
+- **`task readme:generate`** writes the README's API section from the
+  contract - title, description, version, every operation and who may call
+  it. The first time, it replaces the template's README entirely. Run it
+  whenever the contract changes and commit the result; never edit the
+  generated block. This is why `info.title`, `info.description` and each
+  operation's `summary` matter: they are the API's front page. Write them for
+  someone who has never heard of it.
+- **The `## Notes` section** under the generated block is for what the
+  contract cannot say. Ask the user for it - why the API exists, who owns it,
+  where it is deployed - and write only what they tell you.
+
+The first time a spec is written in a repository, also remove what is only
+about the template, after confirming with the user:
+
+- delete `.github/workflows/template.yml` and `.github/rulesets/`;
+- replace `CONTRIBUTING.md` and `SECURITY.md` with the user's own, or delete
+  them if they have none yet - do not leave the template's in place;
+- change the title of `AGENTS.md` to the API's name, and the `LICENSE`
+  copyright line if the user says the code is not theirs to license as MIT.
+
+Leave the guides in `docs/` alone: they describe the tooling the API is built
+on, and stay true.
 
 ## Writing features
 

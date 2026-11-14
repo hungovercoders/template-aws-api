@@ -30,7 +30,7 @@ jobs:
         run: |
           git fetch origin example/implementation
           # Everything an API owns comes from the example...
-          git checkout origin/example/implementation -- specs http/contract.http src/operations src/domain src/store steps test
+          git checkout origin/example/implementation -- README.md specs http/contract.http src/operations src/domain src/store steps test
           # ...and everything the skeleton owns stays as proposed here.
           git checkout HEAD -- steps/world.ts test/routes.test.ts test/log.test.ts
       - run: task ci
