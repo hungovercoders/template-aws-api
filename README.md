@@ -171,6 +171,7 @@ AGENTS.md               instructions for coding agents; CLAUDE.md imports it
 CONTRIBUTING.md         how the API is changed: spec first, then implementation
 SECURITY.md             how to report a vulnerability
 skeleton.lock           what the skeleton is; skeleton:check fails if it changes
+components.json         the optional parts an API can remove and restore (task component:list)
 rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
 http/                   .http requests for exploring by hand; contract.http is generated

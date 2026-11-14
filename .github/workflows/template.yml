@@ -26,13 +26,24 @@ jobs:
         with:
           fetch-depth: 0
       - uses: jdx/mise-action@v5
+      - name: Every optional component can be removed and restored
+        run: |
+          # Remove them all, check what is left is still the skeleton, bring
+          # them back from this very commit, and expect no difference at all.
+          task install
+          names=$(node --import tsx scripts/components.ts order)
+          for name in $names; do task component:remove -- "$name"; done
+          task skeleton:check docs:check skills:check
+          for name in $(echo "$names" | tac); do task component:add -- "$name" --from "$PWD"; done
+          git diff --exit-code
+          task skeleton:check
       - name: Lay the example over this skeleton
         run: |
           git fetch origin example/implementation
           # Everything an API owns comes from the example...
           git checkout origin/example/implementation -- README.md specs http/contract.http src/operations src/domain src/store steps test
           # ...and everything the skeleton owns stays as proposed here.
-          git checkout HEAD -- steps/world.ts test/routes.test.ts test/log.test.ts
+          git checkout HEAD -- steps/world.ts test/routes.test.ts test/log.test.ts test/components.test.ts
       - run: task ci
       - name: AWS Emulator log
         if: failure()

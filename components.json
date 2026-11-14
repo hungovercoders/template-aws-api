@@ -1,0 +1,8 @@
+{
+  "$comment": "The template's optional components: what an API may remove (task component:remove -- <name>) and bring back (task component:add -- <name>). Each has a title, the components it needs, the files and directories (ending in /) it owns, and the gates it adds to a stage of task check (spec, implemented) and to task ci. Its sections of shared files are marked component:<name>:start and component:<name>:end; its Renovate rules have a description starting [component:<name>]; its entries in skills.json have \"component\": \"<name>\". template is where a removed component is restored from: point it at your own copy if you forked the template.",
+  "template": {
+    "repository": "https://github.com/hungovercoders/template-aws-api",
+    "branch": "main"
+  },
+  "components": {}
+}

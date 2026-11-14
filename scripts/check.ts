@@ -25,7 +25,12 @@ if (!isStage(wanted)) {
   process.exit(1);
 }
 
-const gates = order.slice(0, order.indexOf(wanted) + 1).flatMap((stage) => STAGES[stage]);
+// A component still in this repository adds its own fast gates to a stage.
+const added = (stage: Stage): string[] => {
+  const run = spawnSync(process.execPath, ["--import", "tsx", "scripts/components.ts", "gates", stage], { encoding: "utf8" });
+  return run.status === 0 ? run.stdout.split("\n").filter(Boolean) : [];
+};
+const gates = order.slice(0, order.indexOf(wanted) + 1).flatMap((stage) => [...STAGES[stage], ...added(stage)]);
 for (const gate of gates) {
   const run = spawnSync("task", [gate], { stdio: "inherit" });
   if (run.status !== 0) {
