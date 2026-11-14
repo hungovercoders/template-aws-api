@@ -9,6 +9,7 @@
 //     # component:<name>:end
 // Removing a component deletes its files and replaces each section with one
 // line, `component:<name>:removed`, which is where restoring puts it back.
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 
 export const DECLARATIONS = "components.json";
@@ -35,6 +36,9 @@ export function removed(path = RECORD): Set<string> {
 }
 
 const MARKER = /component:([a-z0-9][a-z0-9-]*):(start|end|removed)\b/;
+// A marker is a comment on a line of its own, so nothing else can ride on one
+// and be left out of what skeleton.lock holds.
+const ALONE = /^\s*(#|\/\/|<!--)\s*component:[a-z0-9][a-z0-9-]*:(start|end|removed)\s*(-->)?\s*$/;
 
 export type Parts = {
   // The file without any component's sections or placeholders.
@@ -53,6 +57,7 @@ export function split(text: string): Parts {
   let open: { name: string; lines: string[] } | null = null;
   for (const line of text.split("\n")) {
     const marker = MARKER.exec(line);
+    if (marker && !ALONE.test(line)) parts.problems.push(`component:${marker[1]}:${marker[2]} shares its line with something else; a marker is a comment on its own line`);
     if (open) {
       open.lines.push(line);
       if (marker?.[2] === "end" && marker[1] === open.name) {
@@ -116,4 +121,33 @@ export function withSections(text: string, name: string, sections: string[]): st
 // Whether a path is one of the files or directories the component owns.
 export function owns(component: Component, path: string): boolean {
   return (component.files ?? []).some((owned) => (owned.endsWith("/") ? path.startsWith(owned) : path === owned));
+}
+
+// The lines of a skeleton.lock as a map from "path" or "path#component" to hash.
+export function lock(path = "skeleton.lock"): Map<string, string> {
+  if (!existsSync(path)) return new Map();
+  return new Map(
+    readFileSync(path, "utf8")
+      .split("\n")
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => line.split("  ") as [string, string])
+      .map(([hash, entry]) => [entry, hash]),
+  );
+}
+
+// The gates the components still in this repository add to a stage.
+export function gates(stage: string): string[] {
+  const gone = removed();
+  return Object.entries(declarations().components)
+    .filter(([name]) => !gone.has(name))
+    .flatMap(([, component]) => component.gates?.[stage] ?? []);
+}
+
+// git, away from whatever repository a hook or a caller exported: these
+// scripts run git in temporary directories, which must never be read as the
+// developer's own.
+export function git(args: string[], cwd?: string): { status: number | null; stdout: string; stderr: string } {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^GIT_(DIR|WORK_TREE|INDEX_FILE|OBJECT_DIRECTORY|COMMON_DIR|PREFIX)$/.test(name)));
+  const run = spawnSync("git", args, { cwd, encoding: "utf8", env });
+  return { status: run.status, stdout: run.stdout ?? "", stderr: run.stderr ?? "" };
 }

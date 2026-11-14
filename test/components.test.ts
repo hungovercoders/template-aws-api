@@ -14,13 +14,22 @@ const tsx = import.meta.resolve("tsx");
 const root = mkdtempSync(join(tmpdir(), "components-test-"));
 const template = join(root, "template");
 
+// The fixtures are repositories of their own. When this runs from a git hook,
+// git has exported which repository it is in; nothing here may act on that one.
+const env = { ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_"))), NODE_OPTIONS: "" };
 const run = (cwd: string, script: string, ...args: string[]) => {
-  const result = spawnSync(process.execPath, ["--import", tsx, join(scripts, script), ...args], { cwd, encoding: "utf8", env: { ...process.env, NODE_OPTIONS: "" } });
+  const result = spawnSync(process.execPath, ["--import", tsx, join(scripts, script), ...args], { cwd, encoding: "utf8", env });
   return { status: result.status, output: result.stdout + result.stderr };
 };
-const git = (cwd: string, ...args: string[]) => spawnSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", ...args], { cwd, encoding: "utf8" });
+const git = (cwd: string, ...args: string[]) => {
+  const result = spawnSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8", env });
+  if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed in ${cwd}: ${result.stderr}`);
+  return result.stdout.trim();
+};
 const commit = (cwd: string) => {
   git(cwd, "init", "-q");
+  // Whatever happens, never the repository these tests live in.
+  expect(resolve(git(cwd, "rev-parse", "--show-toplevel"))).not.toBe(resolve("."));
   git(cwd, "add", "-A");
   git(cwd, "commit", "-q", "-m", "fixture");
 };
@@ -163,6 +172,54 @@ test("a component is not restored into a skeleton that has fallen behind the tem
   expect(restore.output).toContain("behind the template");
   expect(restore.output).toContain("Taskfile.yml");
   expect(tree(dir)).toEqual(before);
+});
+
+test("a component the template has changed since is not restored, and nothing changes", () => {
+  const dir = api("changed-upstream");
+  run(dir, "components.ts", "remove", "demo-data");
+  const before = tree(dir);
+  // A later template: the component's own file is different there.
+  const later = join(root, "later-template");
+  cpSync(template, later, { recursive: true, filter: (path) => !path.endsWith(".git") });
+  write(later, "infra/demo-data.tf", "# demo data, improved\n");
+  git(later, "init", "-q");
+  run(later, "skeleton.ts", "lock");
+  commit(later);
+
+  const restore = run(dir, "components.ts", "add", "demo-data", "--from", later);
+  expect(restore.status).toBe(1);
+  expect(restore.output).toContain("infra/demo-data.tf");
+  expect(restore.output).toContain("Nothing was changed");
+  expect(tree(dir)).toEqual(before);
+});
+
+test("a placeholder that stands for nothing removed does not hide a line from the skeleton gate", () => {
+  const dir = api("smuggled");
+  writeFileSync(join(dir, "Taskfile.yml"), readFileSync(join(dir, "Taskfile.yml"), "utf8").replace("tasks: {}", "  # component:x:removed\ntasks: {}"));
+  expect(run(dir, "skeleton.ts", "check").output).toContain("component:x:removed is not a section this repository removed");
+  writeFileSync(join(dir, "Taskfile.yml"), readFileSync(join(dir, "Taskfile.yml"), "utf8").replace("  # component:x:removed", "  EXTRA: 1 # component:demo:removed"));
+  const check = run(dir, "skeleton.ts", "check");
+  expect(check.status).toBe(1);
+  expect(check.output).toContain("shares its line with something else");
+});
+
+test("a section whose end marker is missing is not removed, and nothing changes", () => {
+  const dir = api("unpaired");
+  writeFileSync(join(dir, "AGENTS.md"), readFileSync(join(dir, "AGENTS.md"), "utf8").replace("<!-- component:demo-data:end -->\n", ""));
+  const before = tree(dir);
+  const removal = run(dir, "components.ts", "remove", "demo-data");
+  expect(removal.status).toBe(1);
+  expect(removal.output).toContain("do not pair up");
+  expect(tree(dir)).toEqual(before);
+});
+
+test("the template to restore from can be given as a path relative to the repository", () => {
+  const dir = api("relative");
+  run(dir, "components.ts", "remove", "demo-data");
+  const restore = run(dir, "components.ts", "add", "demo-data", "--from", "../template");
+  expect(restore.output).toContain("demo-data restored");
+  expect(restore.status).toBe(0);
+  expect(run(dir, "components.ts", "add", "demo-data", "--from").output).toContain("--from needs a value");
 });
 
 test("an unknown component is named as such", () => {

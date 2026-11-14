@@ -7,7 +7,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { declarations, owns, removed, split } from "./components-lib.ts";
+import { declarations, lock, owns, removed, split } from "./components-lib.ts";
 
 const LOCK = "skeleton.lock";
 
@@ -53,6 +53,7 @@ function normalised(path: string, text: string): string {
 // them, and each component's sections as "path#component". So removing a
 // component, or restoring it from the template, never needs a new lock.
 const markers: string[] = [];
+const placeholders: [path: string, component: string][] = [];
 function current(): Map<string, string> {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", ...SKELETON], { encoding: "utf8" });
   const files = listed.stdout.split("\n").filter((path) => path && !NOT_SOURCE.test(path) && existsSync(path));
@@ -63,6 +64,7 @@ function current(): Map<string, string> {
     // The scripts that implement the markers, and their test, name them without being marked.
     const parts = path.startsWith("scripts/components") || path === "test/components.test.ts" ? { core: text, sections: new Map<string, string[]>(), placeholders: new Map(), problems: [] } : split(text);
     markers.push(...parts.problems.map((problem) => `${path}: ${problem}`));
+    for (const name of parts.placeholders.keys()) placeholders.push([path, name]);
     entries.set(path, hash(parts.core));
     for (const [name, sections] of parts.sections) entries.set(`${path}#${name}`, hash(sections.join("\n")));
   }
@@ -89,13 +91,7 @@ if (!existsSync(LOCK)) {
   console.error(`skeleton:check failed\n  - ${LOCK} is missing; restore it from the template`);
   process.exit(1);
 }
-const locked = new Map(
-  readFileSync(LOCK, "utf8")
-    .split("\n")
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => line.split("  ") as [string, string])
-    .map(([hash, path]) => [path, hash]),
-);
+const locked = lock(LOCK);
 
 // What a removed component took with it is expected to be missing, and
 // nothing of it may remain.
@@ -108,6 +104,8 @@ const taken = (entry: string) => {
 
 const problems = [
   ...markers,
+  // A placeholder stands for a section this repository removed, and nothing else.
+  ...placeholders.filter(([path, name]) => !gone.has(name) || !locked.has(`${path}#${name}`)).map(([path, name]) => `${path}: component:${name}:removed is not a section this repository removed`),
   ...[...locked].filter(([entry, hash]) => now.has(entry) && !taken(entry) && now.get(entry) !== hash).map(([entry]) => `changed: ${entry}`),
   ...[...locked.keys()].filter((entry) => !now.has(entry) && !taken(entry)).map((entry) => `removed: ${entry}`),
   ...[...now.keys()].filter((entry) => !locked.has(entry)).map((entry) => `added:   ${entry}`),
