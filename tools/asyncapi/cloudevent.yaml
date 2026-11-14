@@ -1,0 +1,56 @@
+# The CloudEvents 1.0 envelope, in structured JSON mode: what every message
+# this API receives and every event it publishes is wrapped in. It is the
+# skeleton's; a message in specs/asyncapi.yaml extends it and adds only what
+# is its own - the `type` it fixes and the shape of `data`:
+#
+#   payload:
+#     allOf:
+#       - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
+#       - type: object
+#         required: [data]
+#         properties:
+#           type: { const: com.example.beer_catalogue.beer.created.v1 }
+#           data: { ... }
+#
+# The skeleton sets id, source, time and specversion when it publishes, and
+# checks them on what it receives (src/lib/cloudevents.ts).
+CloudEvent:
+  type: object
+  required: [specversion, id, source, type, time]
+  properties:
+    specversion:
+      description: The version of CloudEvents the event follows.
+      type: string
+      const: "1.0"
+    id:
+      description: Identifies the event; with source, unique. A consumer that sees one twice has seen the same event.
+      type: string
+      minLength: 1
+    source:
+      description: Where the event came from - the API that published it.
+      type: string
+      format: uri-reference
+      minLength: 1
+    type:
+      description: What happened - com.<org>.<api>.<thing>.<happened>.v<major>.
+      type: string
+      minLength: 1
+    time:
+      description: When it happened.
+      type: string
+      format: date-time
+    subject:
+      description: What it happened to - the identifier of the thing.
+      type: string
+      minLength: 1
+    datacontenttype:
+      description: The media type of data.
+      type: string
+    dataschema:
+      description: Where the schema of data is published.
+      type: string
+      format: uri
+    traceparent:
+      description: The W3C trace context of the request or message that caused the event.
+      type: string
+      pattern: "^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$"

@@ -6,11 +6,13 @@
   },
   "components": {
     "asyncapi": {
-      "title": "The AsyncAPI contract (specs/asyncapi.yaml) and its gates: the messages an API receives and the events it publishes",
+      "title": "The AsyncAPI contract (specs/asyncapi.yaml), its gates and the CloudEvents envelope: the messages an API receives and the events it publishes",
       "files": [
         "tools/asyncapi/",
         "rules/asyncapi.yaml",
-        "test/asyncapi.test.ts"
+        "test/asyncapi.test.ts",
+        "src/lib/cloudevents.ts",
+        "test/cloudevents.test.ts"
       ],
       "gates": {
         "install": [
