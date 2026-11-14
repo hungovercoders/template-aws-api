@@ -91,9 +91,10 @@ export function matchRoute(method: string, path: string): { operation: Operation
 }
 
 // Bodies are validated as sent; path and query values arrive as strings, so
-// those are coerced to the types the contract declares.
+// those are coerced to the types the contract declares, and a parameter the
+// caller left out takes the default the contract gives it.
 const strict = addFormats(new Ajv2020({ allErrors: true, strict: false }));
-const coercing = addFormats(new Ajv2020({ allErrors: true, strict: false, coerceTypes: true }));
+const coercing = addFormats(new Ajv2020({ allErrors: true, strict: false, coerceTypes: true, useDefaults: true }));
 const compiled = new Map<string, ValidateFunction>();
 
 function validator(key: string, ajv: Ajv2020, schema: Schema): ValidateFunction {
