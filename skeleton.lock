@@ -1,9 +1,9 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-7d7a69873d0dfc0af7866c8c62c3415f8bc3fd7ff7268fbb7167a3bb1b53ca04  .claude/skills/implement-api/SKILL.md
-663968b724a1211830f4622d318c980a97aeffe3db22dcaf8890a79561bc3c80  .claude/skills/write-spec/SKILL.md
+d892a3e86ccd635ae07bc30aedef56f19a5e3ed2d37faf16f01a81eadf8a8ea8  .claude/skills/implement-api/SKILL.md
+72d4b19f577c68ada987c2bd82031c43af061c6418e83af305878e9454ad263d  .claude/skills/write-spec/SKILL.md
 f7b75286aecf4ae21904fe048844c21e76f42ad1fc9c68361dbee7a787b6eb05  .github/workflows/ci.yml
-6e04c89b294b40ba3cb75ad21e08464c852c67422ef92ceebe0f73638fd3ede9  Taskfile.yml
+c1bd9e4c49639e5290cd63a7ca46d839fd31b9ce89d07a84fb6537e0681d237b  Taskfile.yml
 6cade406af2dc8c0d818e28e193903a87ecec74ad116b91178915289edbab5a6  cucumber.mjs
 67c594fc663bb8e459c948440a875581fb2107e17cc952e47bf244d3176297a0  infra/alarms.tf
 bb84eae682ebcfb132aa4360a73435f52587f3ac1746906afe1491807f4738ce  infra/bootstrap/main.tf
@@ -22,6 +22,7 @@ d5526bda8bf24c5f1242ae241a47b431a6048a29646f8f59f0b9be11c6878180  local/server.t
 4e803e391343ab19c21c5baf094846afe15c9d15b5ba805ddffe14561ce96eb7  scripts/generate.ts
 cf7bb52423c40059260a64eb2c5e5b936dfab6d277504f21a7736bbb8251847c  scripts/http-generate.ts
 9f38b300c7be81153dd18e7b78b7c26e247575c2e38ae10554a84d7a06101267  scripts/readme.ts
+64e984d919a1aab94fe2eed22cda48c5ce8514ea2217a7d42992a0fd7da71bfa  scripts/responses-check.ts
 57f443a1ded0a7ec53532c496569c22de49e90855c1658762c5af331cb666d53  scripts/scaffold.ts
 cc22737769c4d065aae45c5d1debf31e551203d01e01d7a8908c1cc9b625923d  scripts/skeleton.ts
 eb21bfe283393c716b95fef168c4bb682b2e8b4f3719921c86f4fb349004a170  scripts/spec-check.ts
@@ -33,7 +34,7 @@ cd31111b09d28a3c2fa6e122f1394d5ee03b9746e5cec93e4638a41db4917b36  src/handler.ts
 0228f3a8e1876a6a7360fa1c146bff49c5fec2496ef77894ab77097720eab9ed  src/lib/log.ts
 4e670142ed3266b3f204f29b97ef7ac0cbf13874ca9e2ee2c4a4278da2d3b560  src/lib/problem.ts
 11201b59b731fa14364891ea99e639b8d398ff6160b79ffd86f57be8b322aad3  src/lib/router.ts
-1fa32783d2615e6ec7cbc295bf1cc898fad10acce566b6f57ae834ea97fae154  steps/world.ts
+678a8f73a610cf90ea3f3e6af8f82145a7bfc2654bff3ee37f02bc8572dc7a31  steps/world.ts
 6092719307749ad48cc4f7c2fcc1ff30202690d87cb2a27ec0de6159b05df90e  test/log.test.ts
 c5ca3e0ec5be2af1f409b106aa8e48e763718ecbdba1cc157771833929da1f96  test/routes.test.ts
 499e16eb3d0496233efeb83928a55e051758e30a65ffb6c730e1247bff534de2  tsconfig.json
