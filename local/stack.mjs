@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Bring up the local stack - AWS Emulator, then the Lambda behind a local
-// API Gateway stand-in - and either keep it running or run a command against it.
+// Bring up the local stack and either keep it running or run a command against it:
+//   1. AWS Emulator
+//   2. infra/ applied to it with Terraform - the same definitions that deploy to AWS
+//   3. the built Lambda bundle (dist/handler.mjs) behind a local API Gateway stand-in
 //   node local/stack.mjs                      keep running (task dev)
 //   node local/stack.mjs -- npx cucumber-js   run the command with BASE_URL set, then stop
 //
@@ -8,11 +10,11 @@
 //   1. AWS_ENDPOINT_URL already set  - use that endpoint and the ambient AWS settings as they are
 //   2. one already serving on EMULATOR_PORT (e.g. the Docker container from `task emulator:docker`)
 //   3. start one: AWS_EMULATOR_BIN, then .tools/ (from `task emulator:install`), then PATH
-import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
 import { request } from "node:https";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 const args = process.argv.slice(2);
 const sep = args.indexOf("--");
@@ -54,7 +56,6 @@ async function emulatorEnv() {
   } else {
     const local = join(".tools", "aws-emulator", "opt", "aws-emulator", "bin", "aws-emulator");
     const bin = process.env.AWS_EMULATOR_BIN ?? (existsSync(local) ? local : "aws-emulator");
-    mkdirSync(".local", { recursive: true });
     const log = openSync(join(".local", "emulator.log"), "w");
     const emulator = spawn(bin, ["-p", String(port)], { stdio: ["ignore", log, log] });
     children.push(emulator);
@@ -84,6 +85,36 @@ async function emulatorEnv() {
   };
 }
 
+// Apply infra/ to the emulator. Its state lives in .local/ and is discarded
+// each run, because the emulator starts empty each run.
+function deploy(env) {
+  const state = resolve(".local", "emulator.tfstate");
+  for (const file of [state, `${state}.backup`]) rmSync(file, { force: true });
+  const log = join(".local", "terraform.log");
+  const terraform = (...args) => {
+    const out = openSync(log, "a");
+    const result = spawnSync("terraform", ["-chdir=infra", ...args], { env, stdio: ["ignore", "pipe", out], encoding: "utf8" });
+    if (result.error || result.status !== 0) {
+      console.error(result.error ? `could not run terraform: ${result.error.message}` : `terraform ${args[0]} failed against the emulator:`);
+      console.error((result.stdout ?? "") + readFileSync(log, "utf8"));
+      stop(1);
+    }
+    return result.stdout;
+  };
+  rmSync(log, { force: true });
+  if (!existsSync(join("infra", ".terraform", "providers"))) terraform("init", "-input=false", "-no-color");
+  const region = env.AWS_REGION ?? "us-east-1";
+  terraform("apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`);
+  const outputs = JSON.parse(terraform("output", "-json", `-state=${state}`));
+  console.log("infra/ applied to AWS Emulator");
+  return { TABLE_NAME: outputs.table_name.value };
+}
+
+mkdirSync(".local", { recursive: true });
+if (!existsSync(join("dist", "handler.mjs"))) {
+  console.error("dist/handler.mjs is missing - run `task build` first (the tasks that use the stack do)");
+  process.exit(1);
+}
 const overrides = await emulatorEnv();
 const env = { ...process.env, ...overrides };
 if (overrides.AWS_ENDPOINT_URL) {
@@ -91,7 +122,9 @@ if (overrides.AWS_ENDPOINT_URL) {
   for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"]) delete env[name];
 }
 
-// The Lambda, behind the local API Gateway stand-in. With a command to run it
+Object.assign(env, deploy(env));
+
+// The built Lambda, behind the local API Gateway stand-in. With a command to run it
 // takes a free port; on its own it serves on PORT (default 3000).
 const api = spawn(process.execPath, ["--import", "tsx", "local/server.ts"], {
   env: { ...env, PORT: process.env.PORT ?? (command.length > 0 ? "0" : "3000") },
