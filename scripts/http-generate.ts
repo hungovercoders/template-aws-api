@@ -1,6 +1,8 @@
 // Write http/contract.http: one ready-to-send request for every operation in
-// the contract, for exploring the API by hand (task http). Regenerated from
-// the contract each time, so keep requests of your own in other files in http/.
+// the contract, for exploring the API by hand (task http). It is committed, so
+// it can be read and run without generating anything, and `task http:check`
+// fails when it no longer matches the contract. Keep requests of your own in
+// other files in http/.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 type Schema = {
@@ -83,7 +85,7 @@ for (const [path, item] of Object.entries(contract.paths ?? {})) {
 }
 
 const header = [
-  "# Generated from specs/openapi.yaml by `task http:generate` - do not edit; it is overwritten.",
+  "# Generated from specs/openapi.yaml by `task http:generate` - do not edit; commit it when the contract changes.",
   "# Send with `task http`, or open in an editor with an HTTP client (httpYac, JetBrains).",
   "# Environments (mock, local, aws) are in http/http-client.env.json.",
   "",
