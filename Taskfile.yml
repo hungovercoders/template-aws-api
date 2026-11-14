@@ -103,27 +103,45 @@ tasks:
           -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" aws-emulator -p {{.EMULATOR_PORT}}
 
   dev:
-    desc: Run the API locally on http://127.0.0.1:3000 against AWS Emulator
-    deps: [generate, emulator:install]
+    desc: Run the built API locally on http://127.0.0.1:3000 against AWS Emulator
+    deps: [build, emulator:install]
     env:
       NODE_OPTIONS: ''
     cmds:
       - node local/stack.mjs
 
   features:
-    desc: Gate - the feature files, strict, against the Lambda running on AWS Emulator; every response is held to the contract
-    deps: [generate, emulator:install]
+    desc: Gate - the feature files, strict, against the built Lambda on AWS Emulator; every response is held to the contract
+    deps: [build, emulator:install]
     cmds:
-      - node local/stack.mjs -- npx cucumber-js {{.CLI_ARGS}}
+      - node local/stack.mjs -- task features:run -- {{.CLI_ARGS}}
 
   contract:fuzz:
     desc: Gate - schemathesis generates requests from the contract (fixed seed) and checks every response conforms
-    deps: [generate, emulator:install]
+    deps: [build, emulator:install]
     cmds:
+      - node local/stack.mjs -- task contract:fuzz:run
+
+  acceptance:
+    desc: Gate - features then fuzz against one stack - infra/ applied to AWS Emulator, the built Lambda in front of it
+    deps: [build, emulator:install]
+    cmds:
+      - node local/stack.mjs -- task features:run contract:fuzz:run
+
+  features:run:
+    desc: The feature files against a stack that is already up (BASE_URL); used by features and acceptance
+    cmds:
+      - npx cucumber-js {{.CLI_ARGS}}
+
+  contract:fuzz:run:
+    desc: The fuzz run against a stack that is already up (BASE_URL); used by contract:fuzz and acceptance
+    cmds:
+      # Start from an empty table whatever ran before.
+      - curl -fsS -X POST "$BASE_URL/__local/reset"
       - >-
-        node local/stack.mjs -- sh -c 'uvx --from "schemathesis>=4,<5" schemathesis run specs/openapi.yaml
+        uvx --from "schemathesis>=4,<5" schemathesis run specs/openapi.yaml
         --url "$BASE_URL" --seed 1 --max-examples 25 --request-timeout 10
-        --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance'
+        --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance
 
   build:
     desc: Bundle the Lambda into dist/ for infra/ to package
@@ -151,10 +169,8 @@ tasks:
       - task: spec:lint
       - task: typecheck
       - task: test:unit
-      - task: features
-      - task: contract:fuzz
-      - task: build
       - task: infra:validate
+      - task: acceptance
 
   deploy:
     desc: Build and deploy to AWS with Terraform (uses your AWS credentials; NAME=<stack name>)
