@@ -62,7 +62,7 @@ tasks:
       - node scripts/skeleton.ts lock
 
   docs:check:
-    desc: Gate - CLAUDE.md, the skills, the README and the guides are within their line budgets, and their links resolve
+    desc: Gate - AGENTS.md, the skills, the README and the guides are within their line budgets, and their links resolve
     deps: [install]
     cmds:
       - node scripts/docs-check.ts
