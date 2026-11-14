@@ -22,21 +22,45 @@ paths:
           description: Only return beers of this style.
           schema:
             $ref: "#/components/schemas/Style"
+        - name: limit
+          in: query
+          description: The most beers to return in one page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          description: >
+            The next_cursor of the previous page, to continue from where it
+            ended. Use it with the same style as the page it came from.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 1024
       responses:
         "200":
-          description: The beers, ordered by name.
+          description: >
+            A page of beers in name order, ignoring case and accents. Follow
+            next_cursor until it is null to read the whole catalogue.
           content:
             application/json:
               schema:
                 type: object
-                required: [items]
+                required: [items, next_cursor]
                 additionalProperties: false
                 properties:
                   items:
                     type: array
+                    maxItems: 100
                     items:
                       $ref: "#/components/schemas/Beer"
+                  next_cursor:
+                    description: Pass as cursor to get the next page; null on the last page.
+                    type: [string, "null"]
               example:
+                next_cursor: null
                 items:
                   - id: 3f6c1c2e-6a53-4d5e-9d0b-0a0f6d2a9d11
                     name: Morning After
