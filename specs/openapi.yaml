@@ -309,6 +309,16 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+          # Examples make `task mock` answer with something realistic.
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: The request does not satisfy the contract.
+            errors:
+              - in: body
+                pointer: /name
+                message: must be string
     NotFound:
       description: There is no such beer in the catalogue.
       content:
@@ -321,3 +331,8 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+          example:
+            type: about:blank
+            title: Not Found
+            status: 404
+            detail: The resource does not exist.
