@@ -18,6 +18,6 @@ jobs:
       # Every gate, exactly as you run it locally. Red by design until the
       # contract and feature files in specs/ are implemented.
       - run: task ci
-      - name: AWS Emulator log
+      - name: Local stack logs
         if: failure()
-        run: cat .local/emulator.log 2>/dev/null || true
+        run: tail -n 200 .local/terraform.log .local/emulator.log 2>/dev/null || true

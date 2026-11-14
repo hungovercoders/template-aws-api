@@ -1,12 +1,15 @@
 // A local stand-in for API Gateway HTTP API: turns each HTTP request into the
-// payload-format-2.0 event the Lambda receives on AWS and invokes the real
-// handler. Routes come from the contract, exactly as infra/main.tf builds them.
-import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2, Context } from "aws-lambda";
+// payload-format-2.0 event the Lambda receives on AWS and invokes the handler
+// from dist/handler.mjs - the same bundle that is deployed, not the source.
+// Routes come from the contract, exactly as infra/main.tf builds them.
+import type { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2, APIGatewayProxyStructuredResultV2, Context } from "aws-lambda";
 import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage } from "node:http";
-import { handler } from "../src/handler.ts";
 import { matchRoute } from "../src/lib/contract.ts";
-import { ensureTable, resetTable } from "./table.ts";
+import { resetTable } from "./table.ts";
+
+const bundle = new URL("../dist/handler.mjs", import.meta.url).href;
+const { handler } = (await import(bundle)) as { handler: APIGatewayProxyHandlerV2 };
 
 async function read(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -82,7 +85,6 @@ const server = createServer(async (req, res) => {
   }
 });
 
-await ensureTable();
 server.listen(Number(process.env.PORT ?? 3000), "127.0.0.1", () => {
   const address = server.address() as { port: number };
   console.log(`listening http://127.0.0.1:${address.port}`);
