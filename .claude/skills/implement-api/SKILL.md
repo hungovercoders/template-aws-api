@@ -34,8 +34,10 @@ operation and each step.
 | A typed pending step for every sentence in the feature files | `task scaffold` |
 | A request for every operation, for exploring by hand | `task http:generate` |
 
-So: never write or edit a route table, a type that mirrors the contract, an
-operation's signature, or a step's pattern and arguments by hand. Use the
+So: never write or edit a route table, a type that mirrors the contract or an
+operation's signature by hand, and never write a step definition from
+scratch - start from the one `task scaffold` generated. (Merging and renaming
+generated steps is expected; see workflow step 5.) Use the
 types from `src/generated/api.d.ts` (`components["schemas"]["Thing"]`) rather
 than declaring your own, and re-run the command when the specs change. Before
 creating any file, ask whether a command already produces it. If you find
@@ -129,10 +131,16 @@ it tells you exactly what is missing.
    leaves it when you implement it and delete its `@scaffold` line.
 5. **Implement the steps** `task scaffold` wrote. Each is one sentence from
    the feature files with its pattern and typed arguments; replace
-   `return "pending"` with the calls and assertions. Sentences that differ
-   only in wording ("a stout" / "an ipa") arrive as separate stubs - merge
-   them into one pattern. Split `steps/scaffold.ts` into files of your own
-   naming if you like. `NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run`
+   `return "pending"` with the calls and assertions, and give the arguments
+   real names. The generator cannot tell that two sentences are one step, so:
+   - sentences that differ only in wording ("a stout" / "an ipa", "1 rating" /
+     "2 ratings") arrive as separate stubs - merge them into one pattern;
+   - a sentence with a variable number of values ("rated 5, 4 and 4") needs a
+     regular expression instead of a cucumber expression;
+   - check for ambiguity after merging - two patterns that both match a
+     sentence fail the run.
+   Move the steps into files of your own naming and delete
+   `steps/scaffold.ts` when it is empty; commit your step files. `NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run`
    must report no undefined and no ambiguous steps. See
    [Writing steps](#writing-steps).
 6. **Implement the operations, in dependency order.** Scenarios rarely use
@@ -161,12 +169,15 @@ it tells you exactly what is missing.
 - **`context`** - `path`, `query` and `body` are typed from the contract and
   already validated. Path and query values are converted to the types the
   contract declares, and a `default` in the contract is filled in when the
-  caller omits the parameter. `context.caller` is who is calling (see below);
+  caller omits the parameter. The generated type still marks such a parameter
+  optional; assert it (`context.query.limit!`) rather than restating the
+  default in code. `context.caller` is who is calling (see below);
   `context.log` writes structured lines - use it, not `console`. The router
   already logs every request and any unexpected error.
 - **Answering** - return `json(status, body, headers?)` or `noContent()` from
   `src/lib/problem.ts`; the return type is `Result`. Set response headers such
-  as `location` through `headers`. Throw `HttpProblem` for errors (rule 5).
+  as `location` through `headers`; a `location` is a path from the API's root
+  (`/things/<id>`), which a step can pass straight to `this.call`. Throw `HttpProblem` for errors (rule 5).
 - **Authentication** is already enforced for every operation the contract
   secures: never check tokens yourself. `context.caller` is always set on a
   secured operation and undefined otherwise; use it for rules about *what* a
@@ -203,7 +214,7 @@ breaks the contract gets `application/problem+json`:
   sets `this.last` - which a later call overwrites, so when a step makes
   several calls, or several at once with `Promise.all`, use the returned
   replies rather than `this.last`.
-- **`this.remembered`** is a `Map` for anything a later step needs: a record a
+- **`this.remembered`** is a `Map<string, any>` for anything a later step needs: a record a
   Given created (by name), the replies of concurrent calls, the query a "next
   page" step must repeat. Do not edit `steps/world.ts`.
 - **Callers** - set `this.caller = "<subject>"` before a call to make it as
@@ -226,7 +237,9 @@ so a Query on an index returns whole items.
 - **Listing** - Query a key or an index; never Scan. To page, ask for one
   more item than the page size: its presence tells you there is a next page.
   A cursor should be opaque to callers and validated when it comes back
-  (rule 4) - reject anything you could not have issued, with 400.
+  (rule 4): check its structure and reject, with 400, anything that is not
+  the shape you issue. It does not need signing - a caller who forges a
+  well-formed cursor only gets a different page of data they may already read.
 - **Consistency** - reads of the table can be strongly consistent
   (`ConsistentRead: true`); reads of an index cannot, on AWS. The emulator's
   indexes have behaved as immediately consistent, so list-after-write
@@ -240,8 +253,11 @@ so a Query on an index returns whole items.
 - **Concurrency** - any write, in or out of a transaction, can be refused
   because another transaction is touching the same item
   (`TransactionConflictException`, or the reason code `TransactionConflict`).
-  Retry it. A write planned from a value you read earlier should carry a
-  condition that the value is unchanged, and re-read and retry when it is not.
+  Retry it, a bounded number of times (five is plenty) with a short, jittered
+  pause. A write planned from a value you read earlier should carry a
+  condition that the value is unchanged, and re-read and retry when it is
+  not. If the retries run out, let the error through: the router logs it and
+  answers 500, which is the truth.
 - **Expressions** - many attribute names are reserved words (`name`, `status`,
   `type`...). Always use `ExpressionAttributeNames`.
 
@@ -268,8 +284,9 @@ network, `dpkg-deb` and `gpgv`) and need `terraform`; the fuzzer needs `uvx`.
 All come from `mise install`.
 
 If the local stack cannot run where you are working, you can still run
-`task spec:check`, `task spec:lint`, `task http:check`, `task typecheck`,
-`task test:unit`, `task build` and the cucumber dry run, and you can call
+`task skeleton:check`, `task spec:check`, `task spec:lint`,
+`task spec:compat`, `task http:check`, `task test:unit`, `task typecheck`,
+`task build`, `task infra:validate` and the cucumber dry run, and you can call
 `handler` from `dist/handler.mjs` directly with an API Gateway event to try
 requests that are refused before they reach DynamoDB. That is not done: say
 plainly in your report that the features and fuzz gates have not run, and
