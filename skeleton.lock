@@ -1,9 +1,9 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-b967a47b20360ee3f0ac99e88dae20e40fd201aa1b141b59032a0a58414b60f3  .claude/skills/implement-api/SKILL.md
-47343efe055a44402af35e8ef126dda1e9bb01b860e092d208aa377c2b5954fa  .claude/skills/write-spec/SKILL.md
+856b5971a232fdeeca33bf6a6f5ccb44b82c5303dbab342b738503079aa354e0  .claude/skills/implement-api/SKILL.md
+5263d5156cf3a079071c53873385d43d3dcdda86741f6b415331428016e88c41  .claude/skills/write-spec/SKILL.md
 f7b75286aecf4ae21904fe048844c21e76f42ad1fc9c68361dbee7a787b6eb05  .github/workflows/ci.yml
-3a1b28558acfbf5f3f1ad2fb7fcfad2b2aec6e161aac163fbe07991872d9d501  Taskfile.yml
+bd2d0f8cefd32f6dbde4b27d7983109b27b17ae604f333104422675cb46e820d  Taskfile.yml
 6cade406af2dc8c0d818e28e193903a87ecec74ad116b91178915289edbab5a6  cucumber.mjs
 67c594fc663bb8e459c948440a875581fb2107e17cc952e47bf244d3176297a0  infra/alarms.tf
 bb84eae682ebcfb132aa4360a73435f52587f3ac1746906afe1491807f4738ce  infra/bootstrap/main.tf
@@ -20,6 +20,7 @@ d5526bda8bf24c5f1242ae241a47b431a6048a29646f8f59f0b9be11c6878180  local/server.t
 06d6bea2636fb4685657224c45f65fef7818c99f599312040e5f51487e28fe7b  scripts/docs-check.ts
 4e803e391343ab19c21c5baf094846afe15c9d15b5ba805ddffe14561ce96eb7  scripts/generate.ts
 cdb6f09a97935408e244b55ee6112cd2e69c6c9db565affb0bdb0d4328fa43bd  scripts/http-generate.ts
+9f38b300c7be81153dd18e7b78b7c26e247575c2e38ae10554a84d7a06101267  scripts/readme.ts
 57f443a1ded0a7ec53532c496569c22de49e90855c1658762c5af331cb666d53  scripts/scaffold.ts
 cc22737769c4d065aae45c5d1debf31e551203d01e01d7a8908c1cc9b625923d  scripts/skeleton.ts
 eb21bfe283393c716b95fef168c4bb682b2e8b4f3719921c86f4fb349004a170  scripts/spec-check.ts

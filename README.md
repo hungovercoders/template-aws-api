@@ -116,6 +116,9 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
      (see [Contract standards](docs/spec.md#contract-standards)).
    - `task spec:check` tells you when the spec is complete enough to build
      from, and `task spec:lint` that it meets the standards.
+   - `task readme:generate` then replaces this README with one that
+     describes your API, written from the contract. From here on the
+     repository is your API, not the template.
    - `task mock` serves the contract as a mock API, and `ENV=mock task http`
      sends it a request for each operation, so you and your consumers can
      call it and react to its shape before anything is built

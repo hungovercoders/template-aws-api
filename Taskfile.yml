@@ -112,6 +112,18 @@ tasks:
       - node scripts/http-generate.ts
       - git diff --exit-code -- http/contract.http
 
+  readme:generate:
+    desc: Write the README's API section from the contract - once there is a spec, the repository describes the API, not the template
+    deps: [generate]
+    cmds:
+      - node scripts/readme.ts generate
+
+  readme:check:
+    desc: Gate - the README's API section matches the contract (run task readme:generate and commit if not)
+    deps: [generate]
+    cmds:
+      - node scripts/readme.ts check
+
   http:
     desc: Explore the API by hand - pick a request from http/*.http and send it (ENV=mock|local|aws, default local; -- --all sends every one)
     deps: [http:generate]
@@ -252,6 +264,7 @@ tasks:
       - task: spec:lint
       - task: spec:compat
       - task: http:check
+      - task: readme:check
       - task: test:unit
       - task: typecheck
       - task: infra:validate
