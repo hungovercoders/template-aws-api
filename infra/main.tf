@@ -174,6 +174,17 @@ resource "aws_lambda_function" "api" {
 resource "aws_apigatewayv2_api" "this" {
   name          = var.name
   protocol_type = "HTTP"
+
+  # Browsers on other origins may call the API only when you name them.
+  dynamic "cors_configuration" {
+    for_each = length(var.cors_allowed_origins) > 0 ? [1] : []
+    content {
+      allow_origins = var.cors_allowed_origins
+      allow_methods = ["*"]
+      allow_headers = ["authorization", "content-type"]
+      max_age       = 300
+    }
+  }
 }
 
 resource "aws_apigatewayv2_integration" "lambda" {
