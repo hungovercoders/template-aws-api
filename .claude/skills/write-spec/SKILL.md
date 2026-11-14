@@ -41,7 +41,8 @@ you assumed something, say so and get a yes.
 
 ## Workflow
 
-1. **Understand what exists.** Read `specs/openapi.yaml` and
+1. **Understand what exists.** Run `task component:list` and see
+   [Optional components](#optional-components). Read `specs/openapi.yaml` and
    `specs/features/`. If the contract has operations, this is a *change* to a
    published spec: read [Changing a spec](#changing-a-spec) before anything
    else. If it is the starter (`paths: {}`), this is a new API.
@@ -115,6 +116,24 @@ whether the `LICENSE` copyright line is right.
 What remains is the API's own, and stays true for its whole life:
 `CONTRIBUTING.md` (every change goes spec first, then implementation), the
 guides in `docs/`, and these skills.
+
+## Optional components
+
+The template carries parts not every API needs. `task component:list` names
+them and says which this repository has; a component removed is restored
+from the template, so removing one closes no door.
+
+- **A new API.** Once the requirements are confirmed (step 2), tell the user
+  which components they call for and which they do not, and ask which to
+  keep. Remove the rest, each with `task component:remove -- <name>`, before
+  writing the spec. The task refuses to remove one another still needs.
+- **A change that needs one the repository removed** - "tell other teams when
+  a beer is retired", in an API that kept only HTTP. Say so, and with the
+  user's agreement run `task component:add -- <name>` first. If it reports the
+  skeleton is behind the template, that is the user's to resolve; stop.
+
+Never remove or restore a component the user has not agreed to, and never
+write by hand what a removed component would have provided.
 
 ## Skills for this API
 
