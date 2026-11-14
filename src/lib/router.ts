@@ -60,7 +60,7 @@ export function createHandler(routes: Routes): APIGatewayProxyHandlerV2 {
     if (!operation) return problem(404, "Not Found", `No operation in the contract for ${event.routeKey}.`);
 
     const handle = handlers[operation.operationId];
-    if (!handle) return problem(501, "Not Implemented", `${operation.operationId} is in the contract but has no handler in src/routes.ts.`);
+    if (!handle) return problem(501, "Not Implemented", `${operation.operationId} is in the contract but has no handler; run task generate.`);
 
     // API Gateway's authorizer has already refused callers without a valid
     // token; this holds the line if a secured route is ever wired up without one.
