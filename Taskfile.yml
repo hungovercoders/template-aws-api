@@ -80,6 +80,13 @@ tasks:
     generates:
       - http/contract.http
 
+  http:check:
+    desc: Gate - the committed http/contract.http matches the contract (run task http:generate and commit if not)
+    deps: [generate]
+    cmds:
+      - node scripts/http-generate.ts
+      - git diff --exit-code -- http/contract.http
+
   http:
     desc: Explore the API by hand - pick a request from http/*.http and send it (ENV=mock|local|aws, default local; -- --all sends every one)
     deps: [http:generate]
@@ -210,6 +217,7 @@ tasks:
     cmds:
       - task: spec:check
       - task: spec:lint
+      - task: http:check
       - task: typecheck
       - task: test:unit
       - task: infra:validate

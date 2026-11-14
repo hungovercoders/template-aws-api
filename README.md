@@ -177,6 +177,8 @@ Each gate fails for one reason and says what it is:
   not exist.
 - **`spec:lint`** - the contract breaks a rule in `rules/house.yaml` or
   `.spectral.yaml`. Warnings fail as well as errors.
+- **`http:check`** - `http/contract.http` no longer matches the contract; run
+  `task http:generate` and commit it.
 - **`test:unit`** (`test/routes.test.ts`) - an operation in the contract with
   no handler in `src/routes.ts`, or a handler for an operation that is not in
   the contract.
@@ -289,8 +291,10 @@ never committed:
 { "aws": { "base_url": "https://abc123.execute-api.eu-west-2.amazonaws.com", "token": "eyJ..." } }
 ```
 
-`http/contract.http` is rewritten whenever the contract changes and is not
-committed. Keep requests of your own - a sequence that reproduces a bug, a
+`http/contract.http` is committed, so the requests can be read on GitHub and
+run straight after cloning. When the contract changes, run
+`task http:generate` and commit the result; `task ci` fails (`http:check`)
+if the two have drifted. Keep requests of your own - a sequence that reproduces a bug, a
 demo - in other files in `http/`; `task http` offers those too. These files
 are for exploring. What the API must do belongs in a feature file, where it
 is checked on every run.
