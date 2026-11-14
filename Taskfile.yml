@@ -9,6 +9,10 @@ vars:
   # The AWS publishing key that signs the emulator packages (from its user guide).
   EMULATOR_KEY_FINGERPRINT: 98BCF336A3BE53B734E967C52E5BF49BD940F624
   EMULATOR_PORT: '{{.EMULATOR_PORT | default "9297"}}'
+  # Prism serves a mock of the contract. Only `task mock` uses it, so it is
+  # fetched on demand at this version rather than installed with the project.
+  PRISM_VERSION: 5.14.2
+  MOCK_PORT: '{{.MOCK_PORT | default "4010"}}'
 
 env:
   # cucumber and the scripts load TypeScript directly.
@@ -57,6 +61,13 @@ tasks:
       NODE_OPTIONS: ''
     cmds:
       - npx spectral lint specs/openapi.yaml --fail-severity warn
+
+  mock:
+    desc: Spec phase - serve a mock of the contract on http://127.0.0.1:4010 before anything is implemented (-- --dynamic for generated data)
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - npx --yes @stoplight/prism-cli@{{.PRISM_VERSION}} mock specs/openapi.yaml --port {{.MOCK_PORT}} {{.CLI_ARGS}}
 
   typecheck:
     desc: Gate - the code agrees with the types generated from the contract
