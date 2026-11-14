@@ -53,7 +53,10 @@ you assumed something, say so and get a yes.
      ("staff retire a beer");
    - the **rules** - what must hold (uniqueness, limits, states, ordering),
      and what is refused and why;
-   - the **edges** - empty, missing, duplicate, too many, at the same time.
+   - the **edges** - empty, missing, duplicate, too many, at the same time;
+   - the **integrations** - what else the API calls or is called by: a
+     payment provider, an identity provider, another team's service. See
+     [Skills for this API](#skills-for-this-api).
    Play these back to the user as a short list before writing anything.
 3. **Write the features first.** Behaviour in the user's words is what they
    can check; the contract's shape follows from it. See
@@ -112,6 +115,29 @@ whether the `LICENSE` copyright line is right.
 What remains is the API's own, and stays true for its whole life:
 `CONTRIBUTING.md` (every change goes spec first, then implementation), the
 guides in `docs/`, and these skills.
+
+## Skills for this API
+
+`skills.json` lists the skills in this repository. The template brings the
+ones every API needs. What this API needs beyond them is the user's choice,
+made once you know what the API does - settle it before step 8:
+
+- **Offered by the template** (`offered` in `skills.json`). Each says when it
+  earns its place. Tell the user which apply to this API and why, and add the
+  ones they want: `task skills:add -- <name>`.
+- **For what the API integrates with.** For each integration from step 2, ask
+  the user whether a skill or tool for it exists and should be added - the
+  provider's own, their organisation's, or none. From a git repository:
+  `task skills:add -- <name> --repository <url> --path <dir>`. One of their
+  own, written into `.claude/skills/<name>/`: `task skills:add -- <name> --manual`.
+- **Record every integration** in `integrations` in `skills.json`, with the
+  skill chosen, or `null` and why. `/implement-api` reads it and does not ask
+  again, and a later reader sees it was considered:
+  `{ "name": "Stripe", "skill": null, "note": "none wanted; uses the REST API" }`.
+
+Never add a skill the user has not agreed to: it is context every later
+session carries. Never edit a copied skill - `task skills:check` fails if one
+is. Ask the user to check a skill's licence allows the copy.
 
 ## Writing features
 

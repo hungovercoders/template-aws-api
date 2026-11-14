@@ -110,7 +110,10 @@ it tells you exactly what is missing.
 
 1. **Read the specs.** Read `specs/openapi.yaml` and every feature file in
    full. List the operations (by `operationId`) and, for each, the scenarios
-   tagged `@operation:<operationId>`.
+   tagged `@operation:<operationId>`. Read `skills.json` too: use the skills it
+   lists where they fit. Before writing code for an integration it records with
+   no skill, or one the specs imply that it does not record, ask the user
+   whether a skill for it should be added (`task skills:add`). Never add one unasked.
 2. **`task spec:check` and `task spec:lint`** must pass before you write code.
    If `spec:check` fails the spec is incomplete (an operation with no
    scenario, an unknown tag, an invalid document); if `spec:lint` fails the
@@ -320,10 +323,9 @@ not. Before `task contract:fuzz`, check your code against:
 
 ## Running the gates
 
-`task` installs what it needs the first time: `task features`,
-`task contract:fuzz` and `task acceptance` download AWS Emulator (Linux; needs
-network, `dpkg-deb` and `gpgv`) and need `terraform`; the fuzzer needs `uvx`.
-All come from `mise install`.
+`task` installs what it needs the first time, AWS Emulator included; the other
+tools come from `mise install`. If the emulator will not start, connect or
+sign, use the `aws-emulator` skill - but never upgrade it; its version is pinned.
 
 The scenarios and the fuzz run call the API through AWS Emulator's API
 Gateway, authorizer and Lambda - the built bundle is the function. Its Node
