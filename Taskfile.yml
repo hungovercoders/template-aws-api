@@ -37,7 +37,7 @@ tasks:
       - node_modules/.package-lock.json
 
   generate:
-    desc: Generate the runtime contract and its types from specs/openapi.yaml
+    desc: Generate the runtime contract, its types and the route table from specs/openapi.yaml
     deps: [install]
     cmds:
       - node scripts/generate.ts
@@ -47,6 +47,13 @@ tasks:
     generates:
       - src/generated/openapi.json
       - src/generated/api.d.ts
+      - src/generated/routes.ts
+
+  scaffold:
+    desc: Write what follows from the specs - a typed stub for every operation without a file, a pending step for every unbound sentence
+    deps: [generate]
+    cmds:
+      - node scripts/scaffold.ts
 
   spec:check:
     desc: Gate - the contract is valid and every operation is covered by a tagged scenario
@@ -102,7 +109,7 @@ tasks:
       - npx tsc --noEmit
 
   test:unit:
-    desc: Gate - unit tests, including that every contract operation has a handler
+    desc: Gate - unit tests, including that every contract operation has a file and none is still a stub
     deps: [generate]
     cmds:
       - npx vitest run
@@ -218,8 +225,8 @@ tasks:
       - task: spec:check
       - task: spec:lint
       - task: http:check
-      - task: typecheck
       - task: test:unit
+      - task: typecheck
       - task: infra:validate
       - task: acceptance
 
