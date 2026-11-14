@@ -92,7 +92,7 @@ it tells you exactly what is missing.
    - Put rules that need no I/O in `src/domain/` with unit tests in `test/`,
      and DynamoDB access in `src/store/` using `dynamo` and `tableName` from
      `src/lib/dynamo.ts`. The table has string keys `pk` and `sk`; if you need
-     an index, add it to both `infra/main.tf` and `local/table.ts`.
+     an index, add it to `infra/main.tf` - the local stack is built from it.
    - Run `task features -- --tags @operation:<operationId>` until its
      scenarios pass, then move on.
 7. **`task features`** - every scenario green, strict.
@@ -113,4 +113,5 @@ it tells you exactly what is missing.
 | `test:unit` | Every contract operation has a handler, and no extras; domain rules |
 | `features` | The behaviour in the feature files, with every response held to the contract |
 | `contract:fuzz` | Inputs nobody wrote a scenario for still get contract-conforming answers |
-| `build`, `infra:validate` | The Lambda bundles and the Terraform is valid |
+| `infra:validate` | The Terraform is formatted and valid |
+| `acceptance` | `features` and `contract:fuzz` together, against the built bundle on `infra/` applied to AWS Emulator - what `task ci` runs |
