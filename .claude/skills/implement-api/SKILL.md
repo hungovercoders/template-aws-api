@@ -328,7 +328,10 @@ All come from `mise install`.
 The scenarios and the fuzz run call the API through AWS Emulator's API
 Gateway, authorizer and Lambda - the built bundle is the function. Its Node
 runtime lacks `node:http`, `node:https` and `node:module`: a dependency that
-needs one fails every request with `Runtime.ImportModuleError`.
+needs one fails every request with `Runtime.ImportModuleError`. The function
+runs on the AWS SDK its runtime provides, so tell SDK errors by `error.name`,
+not `instanceof`, and do not rely on a cancelled transaction's
+`CancellationReasons`: the codes are also at the end of its message.
 
 If the local stack cannot run where you are working, you can still run
 `task check` (every gate that needs nothing running), `task build`,

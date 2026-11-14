@@ -137,8 +137,8 @@ emulator gets wrong. The emulator's Node runtime is not the whole of Node -
 `node:http`, `node:https` and `node:module` are missing in 1.0.365 - so a
 dependency that needs them fails there as a `Runtime.ImportModuleError`.
 
-A request takes tens of milliseconds, so a full run is slower than calling
-the code directly would be. When a run fails, `local/stack.mjs` prints the
+A request takes tens of milliseconds, so the scenarios and the fuzz run take
+tens of seconds each. When a run fails, `local/stack.mjs` prints the
 function's log if the AWS CLI is installed.
 
 A new emulator release can change a response to match AWS more closely, which
