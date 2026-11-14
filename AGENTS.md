@@ -15,6 +15,10 @@ files) is the requirement; `task ci` is the definition of done.
   produced by `task generate`, `task scaffold` or `task http:generate`, never
   written by hand. Use judgement only where no deterministic tool exists.
 - Tools come from `mise.toml`; every command is a task - run `task` to list them.
+- Every change to what the API does goes spec first, then implementation -
+  a new feature, a changed rule, a bug fix (a bug is a missing or wrong
+  scenario) and a removal alike. Never change behaviour in the code alone.
+  `CONTRIBUTING.md` has the route for each kind of change.
 - To write or change the spec with the user, follow the `write-spec` skill.
   The user owns the requirements: ask, propose and confirm; never invent them.
 - To implement or change the API from the specs, follow the `implement-api`
@@ -34,11 +38,12 @@ files) is the requirement; `task ci` is the definition of done.
   regenerate and commit them whenever the contract changes. Once there is a
   spec, the repository describes the API, not the template.
 
+<!-- template-only:start - removed by `task adopt` when a repository becomes an API -->
 ## Changing the template itself
 
-Before changing the skeleton, the branches or the documentation, read
-`CONTRIBUTING.md` and follow it. It is the one home for that process. The
-rules that prevent damage, so they are always in view:
+This repository is the template. Before changing the skeleton or the
+branches, read "Changing the template itself" in `CONTRIBUTING.md` and
+follow it. The rules that prevent damage, so they are always in view:
 
 - Skeleton changes go on `main`, then merge down: `main` → `example/spec` →
   `example/implementation`. Run `task skeleton:lock` on `main` in the same
@@ -49,3 +54,4 @@ rules that prevent damage, so they are always in view:
 - Write a document only when no gate, generator or task description can
   carry it; give it one reader and one home. Do not raise a `task docs:check`
   budget to fit new text - cut, or ask the user.
+<!-- template-only:end -->
