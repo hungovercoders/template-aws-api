@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { git as runGit } from "./components-lib.ts";
 
 const LIST = "skills.json";
 const DIR = ".claude/skills";
@@ -26,8 +27,8 @@ const LICENCE_FILES = ["LICENSE", "LICENSE.md", "LICENSE.txt", "NOTICE", "NOTICE
 const NAME = /^[a-z0-9][a-z0-9-]*$/;
 
 type Source = { repository: string; branch: string; commit: string };
-type Skill = { name: string; owner: "template" | "api"; for: string; source?: string; path?: string; fetched?: string; sha256?: string };
-type Offered = { name: string; source: string; path: string; for: string; when: string };
+type Skill = { name: string; owner: "template" | "api"; for: string; source?: string; path?: string; fetched?: string; sha256?: string; component?: string };
+type Offered = { name: string; source: string; path: string; for: string; when: string; component?: string };
 type List = { sources: Record<string, Source>; skills: Skill[]; offered: Offered[]; integrations: unknown[] } & Record<string, unknown>;
 
 class Problem extends Error {}
@@ -39,7 +40,7 @@ const list = JSON.parse(readFileSync(LIST, "utf8")) as List;
 const save = () => writeFileSync(LIST, JSON.stringify(list, null, 2) + "\n");
 
 function git(args: string[], cwd?: string): string {
-  const run = spawnSync("git", args, { cwd, encoding: "utf8" });
+  const run = runGit(args, cwd);
   if (run.status !== 0) stop(`skills: git ${args.join(" ")} failed\n${run.stderr.trim()}`);
   return run.stdout.trim();
 }
@@ -192,7 +193,8 @@ function add(args: string[]): void {
   const offered = list.offered.find((skill) => skill.name === name);
   if (offered) {
     list.offered = list.offered.filter((skill) => skill.name !== name);
-    list.skills.push({ name, owner: "api", for: offered.for, source: offered.source, path: offered.path });
+    // A skill offered with an optional component stays that component's, so it leaves with it.
+    list.skills.push({ name, owner: "api", for: offered.for, source: offered.source, path: offered.path, ...(offered.component ? { component: offered.component } : {}) });
   } else {
     const repository = option("--repository");
     const path = option("--path");
