@@ -66,6 +66,10 @@ than to one API.
 | [`example/spec`](../../tree/example/spec) | Template + a complete spec (Beer Catalogue API) | Red - spec not implemented |
 | [`example/implementation`](../../tree/example/implementation) | The spec delivered with the `implement-api` skill | Green |
 
+Because `main` is red by design, skeleton changes get their green signal
+from a separate check, `template`: it lays the example over the proposed
+skeleton and runs every gate (`.github/workflows/template.yml`).
+
 Compare the branches to see each step:
 [`main...example/spec`](../../compare/main...example/spec) is what a spec looks
 like, and
@@ -138,6 +142,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | --- | --- |
 | `task ci` | Every gate, in order. The definition of done; what CI runs. |
 | `task scaffold` | Write what follows from the spec: a typed stub per operation, a pending step per sentence |
+| `task skeleton:check` | No skeleton file has changed since it was last accepted |
 | `task spec:check` | The contract is valid and every operation has a tagged scenario |
 | `task spec:lint` | The contract meets the house rules and your own (Spectral) |
 | `task spec:compat` | Changes since the last published contract are listed and `info.version` is bumped to match |
@@ -171,6 +176,7 @@ steps/
 local/                  AWS Emulator runner, Terraform apply, API Gateway stand-in
 infra/                  Terraform: Lambda, HTTP API, DynamoDB
 infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
+skeleton.lock           what the skeleton is; skeleton:check fails if it changes
 rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
 http/                   .http requests for exploring by hand; contract.http is generated
@@ -183,6 +189,9 @@ scripts/                generate, scaffold, spec:check and http:generate
 
 Each gate fails for one reason and says what it is:
 
+- **`skeleton:check`** - a skeleton file differs from `skeleton.lock`. The
+  skeleton is the same for every API, so implementing a spec should never
+  change it; see [Changing the skeleton](#changing-the-skeleton).
 - **`spec:check`** - no operations, an operation without an `operationId`, an
   operation no scenario is tagged for, or a tag naming an operation that does
   not exist.
@@ -242,6 +251,53 @@ Prefer not to break: add the new thing beside the old, mark the old
 `deprecated: true`, and remove it in a later major version. The gate checks
 the contract's version; how you serve two major versions side by side, if
 you need to, is a deployment decision the template leaves to you.
+
+### Running two major versions
+
+A breaking change needs a new major version, but consumers of the old one do
+not move the same day. Every response carries an `api-version` header with
+the contract version that produced it, and the request log records it, so
+you can always tell which is being served and who is still calling the old
+one.
+
+To run both until consumers have moved, deploy each major as its own stack
+from its own branch - the template already supports any number of stacks:
+
+1. Before merging the breaking change, branch the current contract and
+   implementation: `git branch release/v1`.
+2. `main` moves to `2.0.0` and deploys as before, under a new stack name:
+   `task deploy NAME=my-api-v2`.
+3. `release/v1` keeps serving the old contract: `task deploy NAME=my-api-v1`
+   from that branch. It accepts fixes; `spec:compat` there still refuses
+   breaking changes.
+4. When the logs show no more `api_version` 1 traffic, `task destroy
+   NAME=my-api-v1` and delete the branch.
+
+Each stack has its own URL, table and alarms. Putting them behind one domain
+(`/v1`, `/v2`) and moving data between tables are decisions for your API;
+the template does not make them for you. The CI deploy job deploys `main`
+only, so the older major is deployed by hand or by a copy of that job.
+
+## Changing the skeleton
+
+`skeleton.lock` records every skeleton file - the router and contract
+library, the local stack, the gates, CI, the Terraform, the skills.
+`task skeleton:check`, the first gate in `task ci`, fails if any of them
+differs. That makes "do not rebuild the skeleton" a check rather than a
+request: an agent cannot quietly weaken a gate or rewrite the router to get
+green.
+
+Changing the skeleton is still possible - an index, a new alarm, an upgrade -
+but it is a deliberate step by a person:
+
+```sh
+task skeleton:lock      # accept the skeleton as it is now, then commit skeleton.lock
+```
+
+The changed lock shows in the diff, so a reviewer sees that the skeleton
+moved and asks why. Version pins (`*_VERSION` in `Taskfile.yml`, action
+versions in the workflow) are ignored, so Renovate's updates do not trip it.
+If a change would help every API, make it in the template instead.
 
 ## Contract standards
 
@@ -566,8 +622,9 @@ reading, not for building on.
 
 Then, in your new repository:
 
-- Delete `.github/rulesets/` and the "Branches" section of `CLAUDE.md`. Both
-  describe how *this* repository keeps its example branches, not your API.
+- Delete `.github/rulesets/`, `.github/workflows/template.yml` and the
+  "Branches" section of `CLAUDE.md`. They describe how *this* repository
+  keeps and tests its example branches, not your API.
 - Replace this README's top section with a description of your API. The rest
   is a working manual for the tooling and can stay.
 - Change the copyright line in `LICENSE` if the code is not MIT or not yours

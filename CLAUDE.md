@@ -7,6 +7,9 @@ files) is the requirement; `task ci` is the definition of done.
   every API and is already built. Do not rebuild or restructure it; write only
   the business logic the specs describe: `steps/`, `src/operations/`,
   `src/domain/`, `src/store/` and their tests.
+- `task skeleton:check` fails if a skeleton file differs from `skeleton.lock`.
+  Undo the change; do not run `task skeleton:lock` or edit the lock unless the
+  user has asked for a skeleton change.
 - Generate before you write: anything a command can derive from the specs
   (types, the route table, operation and step outlines, `.http` requests) is
   produced by `task generate`, `task scaffold` or `task http:generate`, never
@@ -46,4 +49,7 @@ files) is the requirement; `task ci` is the definition of done.
   (`.github/rulesets/protect-demo-branches.json`). Only ever add commits or
   merges to them; never rebase, amend or reset what has been pushed.
 - CI is red by design on `main` and `example/spec` and green on
-  `example/implementation`.
+  `example/implementation`. The `template` workflow is the green signal for
+  `main`: it runs every gate with the example laid over the skeleton.
+- After a skeleton change on `main`, run `task skeleton:lock` there and commit
+  it with the change; the lock is identical on all three branches.
