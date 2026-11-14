@@ -110,6 +110,40 @@ rules:
 Treat `rules/house.yaml` as part of the skeleton: change a house standard in
 the template, once, not in one API.
 
+<!-- component:asyncapi:start -->
+## Messages and events: the AsyncAPI contract
+
+An API that takes work from a queue, or publishes what happened, has a second
+contract: `specs/asyncapi.yaml`, an [AsyncAPI](https://www.asyncapi.com) 3.1
+document. A `receive` operation is a message the API accepts; a `send`
+operation is an event it publishes. An API with neither has no such file, and
+every task below then has nothing to do.
+
+It is held to the same standards as the OpenAPI contract, with AsyncAPI's own
+tools (`tools/asyncapi/`):
+
+| Task | What it holds |
+| --- | --- |
+| `task asyncapi:check` | The document is valid, and every operation has a scenario tagged `@operation:<name>` - the same tag as for HTTP, so a name is unique across both contracts |
+| `task asyncapi:lint` | The house rules in `rules/asyncapi.yaml` (lower snake_case names, a summary, a payload schema); this API's own go in `.spectral.asyncapi.yaml`, which extends it |
+| `task asyncapi:compat` | What changed since the last published contract, and that its own `info.version` says so. It is versioned apart from the OpenAPI contract: a breaking event does not make a new major version of the HTTP API |
+| `task asyncapi:examples:check` | `messages/<message>.json`, an example of every message, matches the contract; `task asyncapi:examples` writes them. They are what a sender or consumer builds against before the API exists |
+
+`task generate` also writes `src/generated/messages.d.ts` (a type for every
+payload, by Modelina) and `src/generated/async-operations.ts`.
+
+**What counts as breaking.** AsyncAPI's diff compares the two documents path
+by path, so it cannot tell a message the API sends from one it receives. The
+rules are the cautious ones for both: a property removed, retyped or made
+required is breaking, as is a constraint added to a schema already published,
+a removed operation or message, a changed channel address, and deleting the
+contract while it still has operations; a property or message added, and
+words reworded, are not.
+A change the rules cannot place is listed and treated as breaking until a
+person has looked. So the gate never passes a breaking change, and now and
+then asks for a major version where a minor one would have done.
+<!-- component:asyncapi:end -->
+
 ## Try the contract before it is built
 
 In the spec phase there is nothing to run yet, but a contract is easier to
