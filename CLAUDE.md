@@ -3,6 +3,10 @@
 BDD and contract driven AWS Lambda API. `specs/` (OpenAPI contract + feature
 files) is the requirement; `task ci` is the definition of done.
 
+- The skeleton (router, validation, harness, gates, CI, infra) is the same for
+  every API and is already built. Do not rebuild or restructure it; write only
+  the business logic the specs describe: `steps/`, `src/operations/`,
+  `src/routes.ts`, `src/domain/`, `src/store/` and their tests.
 - Tools come from `mise.toml`; every command is a task - run `task` to list them.
 - To implement or change the API from the specs, use the `implement-api` skill.
 - `specs/` is read-only unless the user asks for a spec change.
