@@ -1,0 +1,24 @@
+{
+  "name": "template-aws-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BDD and contract driven AWS Lambda API template.",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1169.0",
+    "@aws-sdk/lib-dynamodb": "^3.1169.0",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.1.0",
+    "@cucumber/cucumber": "^13.3.0",
+    "@types/aws-lambda": "^8.10.164",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
+    "openapi-typescript": "^7.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0",
+    "vitest": "^5.1.0"
+  }
+}

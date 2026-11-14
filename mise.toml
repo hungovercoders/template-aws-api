@@ -1,0 +1,6 @@
+[tools]
+node = "22"
+task = "3.52"
+terraform = "1.17"
+# schemathesis runs through uvx in `task contract:fuzz`.
+uv = "0.11"

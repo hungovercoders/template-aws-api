@@ -1,0 +1,55 @@
+openapi: 3.1.0
+info:
+  title: Replace me
+  version: 0.1.0
+  description: >
+    Replace this file with your API contract. Until it declares at least one
+    operation, `task ci` fails at `spec:check` - that is the template working
+    as intended.
+
+# Add your operations here. Every operation needs an operationId, and at
+# least one scenario in specs/features tagged @operation:<operationId>.
+paths: {}
+
+components:
+  schemas:
+    # The error body the template's router emits (RFC 9457). Reference it
+    # from every 4xx/5xx response you document.
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required: [in, pointer, message]
+            properties:
+              in:
+                type: string
+                enum: [path, query, body]
+              pointer:
+                type: string
+              message:
+                type: string
+  responses:
+    BadRequest:
+      description: The request does not satisfy the contract.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: The resource does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"

@@ -1,0 +1,164 @@
+version: '3'
+
+vars:
+  EMULATOR_BASE: https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/latest
+  # The AWS publishing key that signs the emulator packages (from its user guide).
+  EMULATOR_KEY_FINGERPRINT: 98BCF336A3BE53B734E967C52E5BF49BD940F624
+  EMULATOR_PORT: '{{.EMULATOR_PORT | default "9297"}}'
+
+env:
+  # cucumber and the scripts load TypeScript directly.
+  NODE_OPTIONS: --import tsx
+
+tasks:
+  default:
+    desc: List the tasks
+    silent: true
+    cmds:
+      - task --list
+
+  install:
+    desc: Install the npm dependencies
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - npm ci
+    sources:
+      - package-lock.json
+    generates:
+      - node_modules/.package-lock.json
+
+  generate:
+    desc: Generate the runtime contract and its types from specs/openapi.yaml
+    deps: [install]
+    cmds:
+      - node scripts/generate.ts
+    sources:
+      - specs/openapi.yaml
+      - scripts/generate.ts
+    generates:
+      - src/generated/openapi.json
+      - src/generated/api.d.ts
+
+  spec:check:
+    desc: Gate - the contract is valid and every operation is covered by a tagged scenario
+    deps: [install]
+    cmds:
+      - node scripts/spec-check.ts
+
+  typecheck:
+    desc: Gate - the code agrees with the types generated from the contract
+    deps: [generate]
+    cmds:
+      - npx tsc --noEmit
+
+  test:unit:
+    desc: Gate - unit tests, including that every contract operation has a handler
+    deps: [generate]
+    cmds:
+      - npx vitest run
+
+  emulator:install:
+    desc: Download AWS Emulator (Linux), verify AWS's signature and unpack it into .tools/ - no sudo
+    cmds:
+      - |
+        set -e
+        case "$(uname -s)-$(uname -m)" in
+          Linux-x86_64) arch=amd64 ;;
+          Linux-aarch64) arch=arm64 ;;
+          *) echo "AWS Emulator has native packages for Linux only. On macOS or Windows run 'task emulator:docker' in another terminal instead."; exit 1 ;;
+        esac
+        command -v dpkg-deb >/dev/null && command -v gpgv >/dev/null || { echo "emulator:install needs dpkg-deb and gpgv; otherwise install AWS Emulator yourself so that aws-emulator is on PATH"; exit 1; }
+        tmp=$(mktemp -d)
+        trap 'rm -rf "$tmp"' EXIT
+        curl -fsSLo "$tmp/aws-emulator.deb" "{{.EMULATOR_BASE}}/aws-emulator_$arch.deb"
+        curl -fsSLo "$tmp/aws-emulator.deb.sig" "{{.EMULATOR_BASE}}/aws-emulator_$arch.deb.sig"
+        curl -fsSLo "$tmp/key.asc" https://downloads.aws.com/keys/gpg/current.asc
+        gpg --show-keys --with-colons "$tmp/key.asc" | grep -q "^fpr:::::::::{{.EMULATOR_KEY_FINGERPRINT}}:" || { echo "the AWS publishing key does not have the expected fingerprint"; exit 1; }
+        gpg --dearmor < "$tmp/key.asc" > "$tmp/key.gpg"
+        gpgv --keyring "$tmp/key.gpg" "$tmp/aws-emulator.deb.sig" "$tmp/aws-emulator.deb"
+        rm -rf .tools/aws-emulator && mkdir -p .tools/aws-emulator
+        dpkg-deb -x "$tmp/aws-emulator.deb" .tools/aws-emulator
+        .tools/aws-emulator/opt/aws-emulator/bin/aws-emulator -v
+    status:
+      - test -x .tools/aws-emulator/opt/aws-emulator/bin/aws-emulator || command -v aws-emulator || test -n "$AWS_ENDPOINT_URL"
+
+  emulator:docker:
+    desc: Build and run AWS Emulator in Docker (macOS/Windows); leave it running and use the other tasks in a second terminal
+    cmds:
+      - |
+        set -e
+        case "$(uname -m)" in arm64|aarch64) package=aws-emulator-aarch64.rpm ;; *) package=aws-emulator-x86_64.rpm ;; esac
+        docker build -t aws-emulator --build-arg PACKAGE=$package -f local/emulator.Dockerfile local
+        mkdir -p "$HOME/.aws/emulator"
+        docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:{{.EMULATOR_PORT}}:{{.EMULATOR_PORT}} \
+          -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" aws-emulator -p {{.EMULATOR_PORT}}
+
+  dev:
+    desc: Run the API locally on http://127.0.0.1:3000 against AWS Emulator
+    deps: [generate, emulator:install]
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - node local/stack.mjs
+
+  features:
+    desc: Gate - the feature files, strict, against the Lambda running on AWS Emulator; every response is held to the contract
+    deps: [generate, emulator:install]
+    cmds:
+      - node local/stack.mjs -- npx cucumber-js {{.CLI_ARGS}}
+
+  contract:fuzz:
+    desc: Gate - schemathesis generates requests from the contract (fixed seed) and checks every response conforms
+    deps: [generate, emulator:install]
+    cmds:
+      - >-
+        node local/stack.mjs -- sh -c 'uvx --from "schemathesis>=4,<5" schemathesis run specs/openapi.yaml
+        --url "$BASE_URL" --seed 1 --max-examples 25 --request-timeout 10
+        --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance'
+
+  build:
+    desc: Bundle the Lambda into dist/ for infra/ to package
+    deps: [generate]
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - rm -rf dist
+      - >-
+        npx esbuild src/handler.ts --bundle --platform=node --target=node22 --format=esm
+        --outfile=dist/handler.mjs --external:@aws-sdk/* --log-level=warning
+        --banner:js="import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);"
+
+  infra:validate:
+    desc: Gate - the Terraform is formatted and valid
+    cmds:
+      - terraform -chdir=infra fmt -check -recursive
+      - terraform -chdir=infra init -backend=false -input=false
+      - terraform -chdir=infra validate
+
+  ci:
+    desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
+    cmds:
+      - task: spec:check
+      - task: typecheck
+      - task: test:unit
+      - task: features
+      - task: contract:fuzz
+      - task: build
+      - task: infra:validate
+
+  deploy:
+    desc: Build and deploy to AWS with Terraform (uses your AWS credentials; NAME=<stack name>)
+    deps: [build]
+    requires:
+      vars: [NAME]
+    cmds:
+      - terraform -chdir=infra init -input=false
+      - terraform -chdir=infra apply -var name={{.NAME}} {{.CLI_ARGS}}
+
+  destroy:
+    desc: Remove the deployed stack (NAME=<stack name>)
+    requires:
+      vars: [NAME]
+    cmds:
+      - terraform -chdir=infra destroy -var name={{.NAME}} {{.CLI_ARGS}}

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+src/generated/
+.tools/
+.local/
+.hypothesis/
+.task/
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
