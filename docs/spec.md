@@ -135,8 +135,10 @@ payload, by Modelina) and `src/generated/async-operations.ts`.
 **What counts as breaking.** AsyncAPI's diff compares the two documents path
 by path, so it cannot tell a message the API sends from one it receives. The
 rules are the cautious ones for both: a property removed, retyped or made
-required is breaking, as is a removed operation or message or a changed
-channel address; a property or message added, and words reworded, are not.
+required is breaking, as is a constraint added to a schema already published,
+a removed operation or message, a changed channel address, and deleting the
+contract while it still has operations; a property or message added, and
+words reworded, are not.
 A change the rules cannot place is listed and treated as breaking until a
 person has looked. So the gate never passes a breaking change, and now and
 then asks for a major version where a minor one would have done.

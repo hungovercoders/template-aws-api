@@ -81,6 +81,8 @@ tasks:
   # component:asyncapi:start
   asyncapi:install:
     desc: Install AsyncAPI's own tools (parser, diff, Modelina) - a package of their own in tools/asyncapi, so they leave with the component
+    # task install runs this (what a component installs for itself), so the
+    # tasks below depend on install alone and there are never two at once.
     env:
       NODE_OPTIONS: ''
     cmds:
@@ -92,7 +94,7 @@ tasks:
 
   asyncapi:check:
     desc: Gate - specs/asyncapi.yaml is a valid AsyncAPI 3 contract and every operation is covered by a tagged scenario (nothing to do without the file)
-    deps: [install, asyncapi:install]
+    deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts check
 
@@ -109,25 +111,25 @@ tasks:
 
   asyncapi:compat:
     desc: Gate - changes to the AsyncAPI contract since the last published one are listed, and its info.version is bumped to match (breaking needs a major)
-    deps: [install, asyncapi:install]
+    deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts compat
 
   asyncapi:generate:
     desc: Generate the resolved AsyncAPI contract, the message types and the table of operations into src/generated/ (task generate runs it)
-    deps: [install, asyncapi:install]
+    deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts generate
 
   asyncapi:examples:
     desc: Write messages/ - an example of every message in the AsyncAPI contract, for whoever sends or consumes one before the API exists
-    deps: [install, asyncapi:install]
+    deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts examples
 
   asyncapi:examples:check:
     desc: Gate - the committed messages/ match the AsyncAPI contract (run task asyncapi:examples and commit if not)
-    deps: [install, asyncapi:install]
+    deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts examples check
   # component:asyncapi:end

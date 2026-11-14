@@ -20,7 +20,9 @@ export type Schema = {
 function merged(schema: Schema): Schema {
   if (!schema.allOf) return schema;
   const { allOf, ...own } = schema;
-  return [...allOf.map(merged), own].reduce<Schema>(
+  // An example or a default on a part is of that part, not of the whole.
+  const parts = allOf.map(merged).map(({ example: _example, default: _default, ...part }) => part);
+  return [...parts, own].reduce<Schema>(
     (all, part) => ({
       ...all,
       ...part,
@@ -49,6 +51,5 @@ export function sample(given: Schema = {}, name = "value"): unknown {
   if (schema.format === "uuid") return "00000000-0000-4000-8000-000000000000";
   if (schema.format === "date-time") return "2026-01-01T00:00:00Z";
   if (schema.format === "date") return "2026-01-01";
-  if (schema.format === "uri" || schema.format === "uri-reference") return `/${name.replace(/_/g, "-")}`;
   return name.replace(/_/g, " ").padEnd(schema.minLength ?? 0, "x");
 }

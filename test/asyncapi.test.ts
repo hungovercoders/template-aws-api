@@ -130,6 +130,22 @@ test.each<[string, string, (document: Document) => void]>([
     expect(changes(before, d).some((change) => change.level === "breaking")).toBe(true);
     delete data(d).properties.abv;
   }],
+  ["required added to a payload that had none", "breaking", (d) => {
+    delete data(d).required;
+    const before = structuredClone(d);
+    data(d).required = ["beer_id"];
+    expect(changes(before, d).some((change) => change.level === "breaking")).toBe(true);
+    delete data(d).properties.abv;
+  }],
+  ["a constraint added to a property", "breaking", (d) => (data(d).properties.name.maxLength = 10)],
+  ["a payload closed to other properties", "breaking", (d) => (d.components.schemas.Envelope.additionalProperties = false)],
+  ["an operation called summary removed", "breaking", (d) => {
+    d.operations.summary = structuredClone(d.operations.publish_beer_created);
+    const before = structuredClone(d);
+    delete d.operations.summary;
+    expect(changes(before, d).some((change) => change.level === "breaking")).toBe(true);
+    delete d.operations.publish_beer_created;
+  }],
 ])("%s is %s", (_, expected, edit) => {
   expect(verdict(edited(edit))).toBe(expected);
 });
@@ -220,6 +236,63 @@ test("compat holds info.version to what changed", () => {
   expect(compat().status).toBe(0);
   write(dir, "specs/asyncapi.yaml", `${CONTRACT}# a comment\n`);
   expect(compat().output).toContain("every published edit needs a new version");
+});
+
+test("message names are one of a kind and never a path", () => {
+  const twice = edited((d) => (d.components.messages.beer_created.name = "brewery_closed"));
+  const dir = repository("names", stringify(twice));
+  const check = run(dir, "check");
+  expect(check.status).toBe(1);
+  expect(check.output).toContain('message name "brewery_closed" is used by more than one message');
+  expect(run(dir, "examples").status).toBe(1);
+
+  const path = repository("path", stringify(edited((d) => (d.components.messages.beer_created.name = "../../outside"))));
+  expect(run(path, "check").output).toContain('message name "../../outside" is not lower snake_case');
+  expect(run(path, "examples").status).toBe(1);
+  expect(existsSync(join(root, "outside.json"))).toBe(false);
+});
+
+test("a schema that refers to itself is reported, not crashed on", () => {
+  const recursive = edited((d) => {
+    d.components.schemas.Node = { type: "object", properties: { children: { type: "array", items: { $ref: "#/components/schemas/Node" } } } };
+    data(d).properties.tree = { $ref: "#/components/schemas/Node" };
+  });
+  const dir = repository("recursive", stringify(recursive));
+  expect(run(dir, "check").output).toContain("asyncapi:check ok");
+  expect(run(dir, "examples").status).toBe(0);
+  const generated = run(dir, "generate");
+  expect(generated.output).not.toContain("Maximum call stack");
+});
+
+test("two enums of the same name in different payloads keep their own values", () => {
+  const enums = edited((d) => {
+    data(d).properties.status = { type: "string", enum: ["draft", "live"] };
+    d.components.schemas.BreweryClosedEvent.allOf[1].properties.data.properties.status = { type: "string", enum: ["closed", "sold"] };
+  });
+  const dir = repository("enums", stringify(enums));
+  expect(run(dir, "generate").status).toBe(0);
+  const types = readFileSync(join(dir, "src/generated/messages.d.ts"), "utf8");
+  expect(types).toMatch(/"draft" \| "live"/);
+  expect(types).toMatch(/"closed" \| "sold"/);
+  expect(types).not.toMatch(/export enum/);
+});
+
+test("removing a published contract is breaking, and examples are not left behind", () => {
+  const dir = repository("removed");
+  run(dir, "examples");
+  rmSync(join(dir, "specs/asyncapi.yaml"));
+  const compat = run(dir, "compat");
+  expect(compat.status).toBe(1);
+  expect(compat.output).toContain("was removed, and with it 2 published operations");
+  expect(run(dir, "examples", "check").output).toContain("still has examples");
+  expect(run(dir, "check").status).toBe(0);
+});
+
+test("an example on a base schema is not taken for the whole message", () => {
+  const based = edited((d) => (d.components.schemas.Envelope.example = { id: "only-the-base" }));
+  const dir = repository("based", stringify(based));
+  run(dir, "examples");
+  expect(JSON.parse(readFileSync(join(dir, "messages/beer_created.json"), "utf8")).data).toEqual({ beer_id: "beer id", name: "name", abv: 0 });
 });
 
 test("generate writes the resolved contract, a type for every payload and the table of operations", () => {

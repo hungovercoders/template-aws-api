@@ -60,6 +60,16 @@ rules:
       functionOptions:
         match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
 
+  house-message-name-field-snake-case:
+    description: A message's name is lower snake_case; it is the file name of its example.
+    message: 'Message name "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$.components.messages[*].name"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
   house-enum-values-snake-case:
     description: String enum values are lower snake_case.
     message: 'Enum value "{{value}}" is not lower snake_case.'

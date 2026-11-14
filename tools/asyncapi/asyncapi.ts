@@ -38,17 +38,19 @@ async function load(path = CONTRACT): Promise<AsyncAPIDocumentInterface> {
   return document!;
 }
 
-// The parser annotates what it resolves; none of that is the contract.
-function plain<T>(value: T): T {
-  if (Array.isArray(value)) return value.map(plain) as T;
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key]) => !key.startsWith("x-parser-"))
-        .map(([key, inner]) => [key, plain(inner)]),
-    ) as T;
-  }
-  return value;
+// The parser annotates what it resolves; none of that is the contract. It
+// also resolves a schema that refers to itself into a loop, which no
+// generator here can follow: the loop is cut where it closes.
+function plain<T>(value: T, keep: (key: string) => boolean = (key) => !key.startsWith("x-parser-"), path: object[] = []): T {
+  if (!value || typeof value !== "object") return value;
+  if (path.includes(value)) return {} as T;
+  const inner = [...path, value];
+  if (Array.isArray(value)) return value.map((item) => plain(item, keep, inner)) as T;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => keep(key))
+      .map(([key, item]) => [key, plain(item, keep, inner)]),
+  ) as T;
 }
 
 type Operation = { id: string; action: "send" | "receive"; summary: string; channel: string; address: string; messages: { name: string; type?: string; payload: Schema }[] };
@@ -88,11 +90,28 @@ function operations(document: AsyncAPIDocumentInterface): Operation[] {
     })
     .sort((a, b) => a.id.localeCompare(b.id));
 }
+// Every message once, whichever operations use it.
+const messagesOf = (all: Operation[]) => [...new Map(all.flatMap((operation) => operation.messages).map((message) => [message.name, message])).values()];
+
+// A message's name is its example's file name and its type's name, so it is
+// one of a kind and never a path.
+const SNAKE = /^[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
+function nameProblems(all: Operation[]): string[] {
+  const names = all.flatMap((operation) => operation.messages.map((message) => message.name));
+  return [
+    ...[...new Set(names)].filter((name) => !SNAKE.test(name)).map((name) => `message name "${name}" is not lower snake_case`),
+    ...[...new Set(names.filter((name, index) => names.indexOf(name) !== index))].map((name) => `message name "${name}" is used by more than one message`),
+  ];
+}
+function named_or_stop(all: Operation[]): Operation[] {
+  const problems = nameProblems(all);
+  if (problems.length > 0) stop([`${CONTRACT} cannot be generated from:`, ...problems.map((problem) => `  - ${problem}`)].join("\n"));
+  return all;
+}
 
 async function check(): Promise<void> {
   const all = operations(await load());
-  const problems: string[] = [];
-  if (all.length === 0) problems.push(`${CONTRACT} declares no operations; remove the file if this API has no asynchronous side`);
+  const problems: string[] = nameProblems(all);
   const features = existsSync(FEATURES) ? readdirSync(FEATURES, { recursive: true, encoding: "utf8" }).filter((file) => file.endsWith(".feature")) : [];
   const tagged = new Set(features.flatMap((file) => [...readFileSync(join(FEATURES, file), "utf8").matchAll(/@operation:([\w.-]+)/g)].map(([, id]) => id!)));
   for (const operation of all) {
@@ -104,6 +123,7 @@ async function check(): Promise<void> {
   }
   if (problems.length > 0) stop(["asyncapi:check failed", ...problems.map((problem) => `  - ${problem}`)].join("\n"));
   const count = (action: string) => all.filter((operation) => operation.action === action).length;
+  if (all.length === 0) return console.log(`asyncapi:check ok - ${CONTRACT} declares no operations; remove the file if this API has no asynchronous side`);
   console.log(`asyncapi:check ok - ${all.length} operations (${count("receive")} received, ${count("send")} published), every one has a scenario`);
 }
 
@@ -131,14 +151,24 @@ function rules(): Record<string, Rule> {
   return table;
 }
 // Words about a schema are not the schema.
-const WORDS = new Set(["description", "title", "summary", "example", "examples", "$comment", "deprecated"]);
+const WORDS = new Set(["description", "title", "example", "examples", "$comment", "deprecated"]);
+// Keywords that narrow what a schema accepts. One added to a schema that was
+// already published refuses something that used to be allowed.
+const NARROWING = new Set([
+  ...["required", "enum", "const", "type", "format", "pattern", "additionalProperties", "propertyNames", "not", "allOf", "anyOf", "oneOf", "if", "then", "else"],
+  ...["minLength", "maxLength", "minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf", "minItems", "maxItems", "uniqueItems", "minProperties", "maxProperties"],
+]);
 type Change = { action: "add" | "remove" | "edit"; path: string; type: Level };
 function level(change: Change): Level {
   const parts = change.path.split("/");
   const last = parts.at(-1)!;
-  // "description" is a word about a schema unless it is the name of a property.
-  if (WORDS.has(last) && parts.at(-2) !== "properties") return "non-breaking";
-  if (change.action === "add" && parts.at(-2) === "required") return "breaking";
+  // Only inside a schema; elsewhere a path ends in the name of an operation or a message.
+  const inSchema = change.path.startsWith("/components/schemas/") || parts.includes("payload") || parts.includes("headers");
+  if (!inSchema) return change.type;
+  // A keyword is a keyword unless it is the name of a property.
+  const keyword = parts.at(-2) !== "properties";
+  if (keyword && WORDS.has(last)) return "non-breaking";
+  if (change.action === "add" && ((keyword && NARROWING.has(last)) || parts.at(-2) === "required" || parts.at(-2) === "allOf")) return "breaking";
   return change.type;
 }
 
@@ -217,7 +247,7 @@ function named(schema: Named, name: string): Named {
   const own = schemaName(schema) ?? name;
   return {
     ...rest,
-    ...(schema.type === "object" || schema.properties || schema.allOf ? { $id: own, title: schema.title ?? own } : {}),
+    ...(schema.type === "object" || schema.properties || schema.allOf || schema.enum ? { $id: own, title: schema.title ?? own } : {}),
     ...(schema.allOf ? { allOf: schema.allOf.map((part) => named(part as Named, own)) } : {}),
     ...(schema.properties ? { properties: Object.fromEntries(Object.entries(schema.properties).map(([key, value]) => [key, named(value as Named, own + pascal(key))])) } : {}),
     ...(schema.items ? { items: named(schema.items as Named, `${own}Item`) } : {}),
@@ -226,7 +256,7 @@ function named(schema: Named, name: string): Named {
 
 async function generate(): Promise<void> {
   const document = await load();
-  const all = operations(document);
+  const all = named_or_stop(operations(document));
   mkdirSync("src/generated", { recursive: true });
   writeFileSync("src/generated/asyncapi.json", JSON.stringify(plain(document.json()), null, 2) + "\n");
 
@@ -234,14 +264,24 @@ async function generate(): Promise<void> {
   // does not depend on which AsyncAPI version Modelina has caught up with
   // (5.10 reads a 3.1 document as nothing, and says so with `any`).
   // An open schema is not a property called "additionalProperties": leave that member out.
-  const generator = new TypeScriptGenerator({ modelType: "interface", rawPropertyNames: true, presets: [{ interface: { property: ({ content }) => (/^\s*'additionalProperties'\?: Map<string, any>;\s*$/.test(content) ? "" : content) } }] });
+  const generator = new TypeScriptGenerator({
+    modelType: "interface",
+    enumType: "union",
+    rawPropertyNames: true,
+    presets: [{ interface: { property: ({ content }) => (/^\s*'additionalProperties'\?: Map<string, any>;\s*$/.test(content) ? "" : content) } }],
+  });
   const types = new Map<string, string>();
   for (const message of document.allMessages().all()) {
-    const payload = message.payload()?.json();
-    if (!payload) continue;
-    const name = pascal(message.name() ?? message.id());
-    for (const model of await generator.generate(named(payload as Named, schemaName(payload as Named) ?? name))) {
-      if (/=\s*any;/.test(model.result)) stop(`asyncapi: Modelina could not make a type for the payload of ${message.name() ?? message.id()}`);
+    const raw = message.payload()?.json();
+    if (!raw) continue;
+    // Loops cut, the parser's notes dropped - but not the names it recorded.
+    const payload = plain(raw, (key) => key === "x-parser-schema-id" || !key.startsWith("x-parser-")) as Named;
+    const name = message.name() ?? message.id();
+    for (const model of await generator.generate(named(payload, schemaName(payload) ?? pascal(name)))) {
+      if (/=\s*any;/.test(model.result)) stop(`asyncapi: Modelina could not make a type for the payload of ${name} (a schema that refers to itself is not supported)`);
+      if (types.has(model.modelName) && types.get(model.modelName) !== model.result) {
+        stop(`asyncapi: two different schemas would both be the type ${model.modelName}; give one a name of its own in components.schemas`);
+      }
       types.set(model.modelName, model.result);
     }
   }
@@ -266,8 +306,8 @@ async function generate(): Promise<void> {
 }
 
 async function examples(mode: string | undefined): Promise<void> {
-  const all = operations(await load());
-  const wanted = new Map(all.flatMap((operation) => operation.messages.map((message) => [`${message.name}.json`, JSON.stringify(sample(message.payload, message.name), null, 2) + "\n"] as [string, string])));
+  const all = named_or_stop(operations(await load()));
+  const wanted = new Map(messagesOf(all).map((message) => [`${message.name}.json`, JSON.stringify(sample(message.payload, message.name), null, 2) + "\n"] as [string, string]));
   const have = existsSync(EXAMPLES) ? readdirSync(EXAMPLES).filter((file) => file.endsWith(".json")) : [];
   if (mode === "check") {
     const problems = [
@@ -283,11 +323,31 @@ async function examples(mode: string | undefined): Promise<void> {
   console.log(`asyncapi:examples - ${EXAMPLES}/ has an example of each of the ${wanted.size} messages`);
 }
 
+// With no contract there is nothing to hold - unless one was published and
+// has gone, or its examples were left behind.
+function absent(command: string | undefined, mode: string | undefined): void {
+  const ref = command === "compat" ? baseline() : undefined;
+  const before = ref ? show(ref, CONTRACT) : undefined;
+  const published = Object.keys((before ? (parseYaml(before) as { operations?: object } | null) : null)?.operations ?? {});
+  if (published.length > 0) {
+    stop(
+      [
+        "asyncapi:compat failed",
+        `  - ${CONTRACT} was removed, and with it ${published.length} published operations (${published.join(", ")}). Whoever sends or consumes them will fail.`,
+        "    Remove the operations first, in a new major version of the contract that is published; delete the file in a later change.",
+      ].join("\n"),
+    );
+  }
+  const left = command === "examples" && mode === "check" && existsSync(EXAMPLES) ? readdirSync(EXAMPLES).filter((file) => file.endsWith(".json")) : [];
+  if (left.length > 0) stop(`asyncapi:examples:check failed\n  - ${EXAMPLES}/ still has examples (${left.join(", ")}) but there is no ${CONTRACT}; remove them`);
+  console.log(`asyncapi:${command ?? "check"} - no ${CONTRACT}, so this API has no asynchronous side to check`);
+}
+
 // Run as a script, not when imported by a test.
 if (process.argv[1]?.endsWith("asyncapi.ts")) {
   const [command, mode] = process.argv.slice(2);
   try {
-    if (!existsSync(CONTRACT)) console.log(`asyncapi:${command ?? "check"} - no ${CONTRACT}, so this API has no asynchronous side to check`);
+    if (!existsSync(CONTRACT)) absent(command, mode);
     else if (command === "check") await check();
     else if (command === "compat") await compat();
     else if (command === "generate") await generate();
