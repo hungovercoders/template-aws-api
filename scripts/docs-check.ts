@@ -11,12 +11,15 @@ const BUDGETS: [pattern: RegExp, lines: number, why: string][] = [
   [/^CLAUDE\.md$/, 80, "read by every agent session"],
   [/^\.claude\/skills\/[^/]+\/SKILL\.md$/, 350, "read whenever the skill runs"],
   [/^README\.md$/, 220, "the front page: the pitch and how to start"],
+  [/^CONTRIBUTING\.md$/, 150, "how the template itself is changed"],
+  [/^SECURITY\.md$/, 60, "how to report a vulnerability, and what to rely on"],
   [/^docs\/[^/]+\.md$/, 250, "a guide for one reader at one moment"],
 ];
 
 const files = [
   "CLAUDE.md",
   "README.md",
+  ...["CONTRIBUTING.md", "SECURITY.md"].filter(existsSync),
   ...(existsSync("docs") ? readdirSync("docs").filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`) : []),
   ...(existsSync(".claude/skills") ? readdirSync(".claude/skills").map((skill) => `.claude/skills/${skill}/SKILL.md`).filter(existsSync) : []),
 ].sort();
