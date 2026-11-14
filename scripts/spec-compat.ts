@@ -14,6 +14,7 @@
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { baseline } from "./spec-baseline.ts";
 
 const CONTRACT = "specs/openapi.yaml";
 const git = (...args: string[]) => {
@@ -25,17 +26,7 @@ const skip = (why: string): never => {
   process.exit(0);
 };
 
-function baseline(): string {
-  if (process.env.SPEC_BASELINE) return process.env.SPEC_BASELINE;
-  const head = git("rev-parse", "HEAD");
-  const trunk = ["origin/HEAD", "origin/main", "origin/master"].find((ref) => git("rev-parse", "--verify", "--quiet", ref));
-  const fork = trunk && git("merge-base", "HEAD", trunk);
-  // On a branch: where it left the default branch. On the default branch: the commit before.
-  if (fork && fork !== head) return fork;
-  return git("rev-parse", "--verify", "--quiet", "HEAD~1") ?? skip("there is no earlier commit to compare with");
-}
-
-const ref = baseline();
+const ref = baseline() ?? skip("there is no earlier commit to compare with");
 const before = git("show", `${ref}:${CONTRACT}`) ?? skip(`${ref} has no ${CONTRACT}`);
 mkdirSync(".local", { recursive: true });
 const beforePath = ".local/baseline-openapi.yaml";
