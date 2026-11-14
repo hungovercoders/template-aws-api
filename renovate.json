@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, and the AWS Emulator and Prism versions in Taskfile.yml. One-time setup: install the Renovate app on the repository.",
+  "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, and the AWS Emulator, Prism and schemathesis versions in Taskfile.yml. One-time setup: install the Renovate app on the repository.",
   "extends": ["config:recommended"],
   "baseBranchPatterns": ["main"],
   "customManagers": [
@@ -20,6 +20,14 @@
       "matchStrings": ["PRISM_VERSION: (?<currentValue>[0-9.]+)"],
       "depNameTemplate": "@stoplight/prism-cli",
       "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "description": "schemathesis, run through uvx by task contract:fuzz",
+      "managerFilePatterns": ["/^Taskfile\\.yml$/"],
+      "matchStrings": ["SCHEMATHESIS_VERSION: (?<currentValue>[0-9.]+)"],
+      "depNameTemplate": "schemathesis",
+      "datasourceTemplate": "pypi"
     }
   ],
   "packageRules": [

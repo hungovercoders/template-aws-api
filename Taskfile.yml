@@ -12,6 +12,9 @@ vars:
   # Prism serves a mock of the contract. Only `task mock` uses it, so it is
   # fetched on demand at this version rather than installed with the project.
   PRISM_VERSION: 5.14.2
+  # schemathesis generates the fuzz requests. An exact version, so the fuzz gate
+  # only changes what it sends or checks in a commit; it runs through uvx.
+  SCHEMATHESIS_VERSION: 4.33.4
   MOCK_PORT: '{{.MOCK_PORT | default "4010"}}'
 
 env:
@@ -253,7 +256,7 @@ tasks:
       # Start from an empty table whatever ran before.
       - node local/table.ts reset
       - >-
-        uvx --from "schemathesis>=4,<5" schemathesis run specs/openapi.yaml
+        uvx --from "schemathesis=={{.SCHEMATHESIS_VERSION}}" schemathesis run specs/openapi.yaml
         --url "$BASE_URL" --seed 1 --max-examples 25 --request-timeout 10
         --tls-verify "$AWS_CA_BUNDLE" -H "Authorization: Bearer $(node local/token.ts fuzz)"
         --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance
