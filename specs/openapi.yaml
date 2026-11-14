@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Beer Catalogue API
-  version: 1.0.0
+  version: 2.0.0
   description: >
     A brewery's beer catalogue. Signed-in staff add the beers they brew, keep
     the details current and retire beers. Anyone can browse the catalogue, and
