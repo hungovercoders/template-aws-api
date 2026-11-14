@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, and the AWS Emulator, Prism and schemathesis versions in Taskfile.yml. One-time setup: install the Renovate app on the repository.",
+  "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, the AWS Emulator, Prism and schemathesis versions in Taskfile.yml, and the commits skills are copied from (skills.json). One-time setup: install the Renovate app on the repository.",
   "extends": ["config:recommended"],
   "baseBranchPatterns": ["main"],
   "customManagers": [
@@ -12,6 +12,14 @@
       "depNameTemplate": "aws/aws-emulator",
       "datasourceTemplate": "github-tags",
       "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "The repositories skills are copied from (skills.json). After the commit moves, run task skills:fetch and commit: skills:check fails until the copies match",
+      "managerFilePatterns": ["/^skills\\.json$/"],
+      "matchStrings": ["\"repository\": \"(?<packageName>[^\"]+)\",\\s*\"branch\": \"(?<currentValue>[^\"]+)\",\\s*\"commit\": \"(?<currentDigest>[a-f0-9]{40})\""],
+      "depNameTemplate": "{{packageName}}",
+      "datasourceTemplate": "git-refs"
     },
     {
       "customType": "regex",
@@ -31,6 +39,20 @@
     }
   ],
   "packageRules": [
+    {
+      "description": "AWS Emulator: security fixes ship only in the latest release, so a new version merges itself once the required checks pass. A person is needed only when a release changes a result",
+      "matchDepNames": ["aws/aws-emulator"],
+      "automerge": true,
+      "platformAutomerge": true,
+      "prBodyNotes": [
+        "**When this merges, or if a check fails:**\n- [ ] `task skills:update` so the `aws-emulator` skill is current\n- [ ] Re-run what `probe/emulator/` tests; a workaround whose gap has closed is removed in its own change\n- [ ] Bring the fidelity table in `docs/testing.md` up to date\n- [ ] A remaining difference from AWS is reported at https://github.com/aws/aws-emulator/issues if it is not already there"
+      ]
+    },
+    {
+      "description": "Skill sources move often and each update needs task skills:fetch run on its branch; once a week is enough",
+      "matchFileNames": ["skills.json"],
+      "schedule": ["before 6am on monday"]
+    },
     {
       "description": "One pull request for routine npm updates",
       "matchManagers": ["npm"],

@@ -10,7 +10,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const STAGES = {
-  template: ["skeleton:check", "docs:check"],
+  template: ["skeleton:check", "docs:check", "skills:check"],
   spec: ["spec:check", "spec:lint", "spec:compat", "http:check", "readme:check"],
   implemented: ["test:unit", "typecheck", "steps:check"],
 } as const;
