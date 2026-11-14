@@ -161,7 +161,8 @@ Nothing is lost yet, and nothing else is held up.
 3. A reason from a consumer (`Rejected`): the message named something that
    does not exist here. Decide with the sender whether it matters.
 4. No reason: the message failed every time it was offered. Find its
-   `event_id` in the query above; the `failed` lines carry the error.
+   `event_id` in the query above; the `failed` lines carry the error. A
+   message that was redriven keeps the reason from its earlier visit.
 5. Once the cause is fixed, `ENV=aws task dlq:redrive` sends them round again.
 
 **Usually** a sender and this API disagreeing about the contract. Compare
@@ -172,6 +173,7 @@ the message with `specs/asyncapi.yaml` and with `messages/`.
 **Means** messages are waiting much longer than it takes to handle one.
 
 1. `ENV=aws task queue:peek`: how many are waiting, how many being handled.
+   It shows counts only: reading a message would use up one of its tries.
 2. Check `consumer-errors` and `consumer-throttles`; either explains it.
 3. Neither: the consumer is slower than messages arrive. Its duration is in
    the `handled` lines.

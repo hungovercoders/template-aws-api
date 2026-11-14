@@ -39,7 +39,9 @@ export function messageFor(operationId: string, data: unknown, overrides: Partia
 /** Put a message on the queue. `body` is a CloudEvent, or anything at all for a message that should be refused. */
 export async function deliver(operationId: string, body: unknown): Promise<void> {
   assert.ok(receives.some((operation) => operation.id === operationId), `${operationId} is not a receive operation in specs/asyncapi.yaml`);
-  await sqs.send(new SendMessageCommand({ QueueUrl: queue(), MessageBody: typeof body === "string" ? body : JSON.stringify(body) }));
+  // A FIFO queue wants to know which messages are ordered together; here, all of them.
+  const fifo = queue().endsWith(".fifo") ? { MessageGroupId: "scenario", MessageDeduplicationId: randomUUID() } : {};
+  await sqs.send(new SendMessageCommand({ QueueUrl: queue(), MessageBody: typeof body === "string" ? body : JSON.stringify(body), ...fifo }));
   delivered.add(operationId);
 }
 
@@ -74,14 +76,17 @@ export async function settled(options?: { timeout?: number; every?: number }): P
 
 export type DeadLetter = { body: string; reason: string | undefined };
 
-/** What is on the dead-letter queue now. Messages stay there; reading them does not take them. */
+/** What is on the dead-letter queue now. Reading them neither takes nor hides them. */
 export async function deadLetters(): Promise<DeadLetter[]> {
-  const found: DeadLetter[] = [];
-  for (;;) {
-    const page = await sqs.send(new ReceiveMessageCommand({ QueueUrl: deadLetterQueue(), MaxNumberOfMessages: 10, VisibilityTimeout: 1, WaitTimeSeconds: 0, MessageAttributeNames: ["All"] }));
-    if (!page.Messages?.length) return found;
-    found.push(...page.Messages.map((message) => ({ body: message.Body ?? "", reason: message.MessageAttributes?.reason?.StringValue })));
+  const found = new Map<string, DeadLetter>();
+  // Nothing is hidden, so the same messages come back: stop when a read brings nothing new.
+  for (let reads = 0; reads < 20; reads++) {
+    const page = await sqs.send(new ReceiveMessageCommand({ QueueUrl: deadLetterQueue(), MaxNumberOfMessages: 10, VisibilityTimeout: 0, WaitTimeSeconds: 0, MessageAttributeNames: ["All"] }));
+    const fresh = (page.Messages ?? []).filter((message) => !found.has(message.MessageId ?? ""));
+    if (fresh.length === 0) break;
+    for (const message of fresh) found.set(message.MessageId ?? "", { body: message.Body ?? "", reason: message.MessageAttributes?.reason?.StringValue });
   }
+  return [...found.values()];
 }
 
 // Take everything off a queue, and wait for what cannot be seen yet: a
@@ -102,7 +107,9 @@ async function drain(url: string): Promise<void> {
 // Scenarios are independent: each starts with nothing waiting on either queue.
 Before(async function () {
   if (receives.length === 0) return;
-  await Promise.all([drain(queue()), drain(deadLetterQueue())]);
+  // The queue first: a message still on it may yet be dead-lettered.
+  await drain(queue());
+  await drain(deadLetterQueue());
 });
 
 AfterAll(function () {

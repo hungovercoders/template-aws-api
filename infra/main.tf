@@ -107,8 +107,9 @@ resource "aws_dynamodb_table" "this" {
 
   # component:consume:start
   # The record of each message handled removes itself (src/lib/consumer.ts).
+  # The attribute is the consumer's own, so no item of the API's can be caught by it.
   ttl {
-    attribute_name = "expires_at"
+    attribute_name = "message_claim_expires_at"
     enabled        = true
   }
   # component:consume:end

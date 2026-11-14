@@ -5,6 +5,7 @@
 // messages of a batch to offer again. What a message means is yours.
 import { DeleteCommand, GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { SendMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
+import { randomUUID } from "node:crypto";
 import type { SQSBatchResponse, SQSEvent, SQSHandler, SQSRecord } from "aws-lambda";
 import { asyncOperations } from "../generated/async-operations.ts";
 import { type CloudEvent, InvalidEvent, events } from "./cloudevents.ts";
@@ -62,47 +63,58 @@ const DAY = 24 * 60 * 60;
 /** How long a handled message is remembered. SQS keeps a message at most 14 days, so none can outlive it. */
 const REMEMBER = 14 * DAY;
 
-/** Claims kept in the table, under keys of their own. `lease` is how long one delivery may take, in seconds. */
-export function tableClaims(lease = Number(process.env.AWS_LAMBDA_FUNCTION_TIMEOUT ?? 30)): Claims {
+/**
+ * Claims kept in the table, under keys of their own. `lease` is how long one
+ * delivery may hold a claim, in seconds: the consumer's timeout, since no
+ * delivery can run longer. A claim left by one that died is free after that.
+ */
+export function tableClaims(lease = Number(process.env.CONSUME_TIMEOUT ?? 30)): Claims {
   const keyOf = (key: string) => ({ pk: `message#${key}`, sk: "message" });
   const now = () => Math.floor(Date.now() / 1000);
+  // Each claim this instance holds is its own: only its holder may keep or drop it.
+  const held = new Map<string, string>();
+  const mine = (key: string) => ({
+    ConditionExpression: "#state = :handling AND holder = :holder",
+    ExpressionAttributeNames: { "#state": "state" },
+    ExpressionAttributeValues: { ":handling": "handling", ":holder": held.get(key) ?? "" },
+  });
+  const unlessLost = (error: Error) => {
+    // By name: the function runs on the SDK its runtime provides.
+    if (error.name !== "ConditionalCheckFailedException") throw error;
+  };
   return {
     async claim(key) {
+      const holder = randomUUID();
       try {
         await dynamo.send(
           new PutCommand({
             TableName: tableName,
-            Item: { ...keyOf(key), state: "handling", lease_until: now() + lease, expires_at: now() + REMEMBER },
+            // Its own name for the expiry: an API's items may well have an expires_at.
+            Item: { ...keyOf(key), state: "handling", holder, lease_until: now() + lease, message_claim_expires_at: now() + REMEMBER },
             // Free, or left by a delivery that died before it could give it up.
             ConditionExpression: "attribute_not_exists(pk) OR (#state = :handling AND lease_until < :now)",
             ExpressionAttributeNames: { "#state": "state" },
             ExpressionAttributeValues: { ":handling": "handling", ":now": now() },
           }),
         );
+        held.set(key, holder);
         return "claimed";
       } catch (error) {
-        // By name: the function runs on the SDK its runtime provides.
         if ((error as Error).name !== "ConditionalCheckFailedException") throw error;
-        const held = await dynamo.send(new GetCommand({ TableName: tableName, Key: keyOf(key), ConsistentRead: true }));
-        return held.Item?.state === "done" ? "done" : "busy";
+        const existing = await dynamo.send(new GetCommand({ TableName: tableName, Key: keyOf(key), ConsistentRead: true }));
+        return existing.Item?.state === "done" ? "done" : "busy";
       }
     },
     async complete(key) {
-      await dynamo.send(
-        new UpdateCommand({
-          TableName: tableName,
-          Key: keyOf(key),
-          UpdateExpression: "SET #state = :done REMOVE lease_until",
-          ExpressionAttributeNames: { "#state": "state" },
-          ExpressionAttributeValues: { ":done": "done" },
-        }),
-      );
+      const { ExpressionAttributeValues, ...condition } = mine(key);
+      await dynamo
+        .send(new UpdateCommand({ TableName: tableName, Key: keyOf(key), UpdateExpression: "SET #state = :done REMOVE lease_until, holder", ...condition, ExpressionAttributeValues: { ...ExpressionAttributeValues, ":done": "done" } }))
+        .catch(unlessLost);
+      held.delete(key);
     },
     async release(key) {
-      const mine = { ConditionExpression: "#state = :handling", ExpressionAttributeNames: { "#state": "state" }, ExpressionAttributeValues: { ":handling": "handling" } };
-      await dynamo.send(new DeleteCommand({ TableName: tableName, Key: keyOf(key), ...mine })).catch((error: Error) => {
-        if (error.name !== "ConditionalCheckFailedException") throw error;
-      });
+      await dynamo.send(new DeleteCommand({ TableName: tableName, Key: keyOf(key), ...mine(key) })).catch(unlessLost);
+      held.delete(key);
     },
   };
 }
@@ -132,6 +144,17 @@ const defaults: Dependencies = {
   claims: tableClaims(),
   deadLetter: sendToDeadLetterQueue,
 };
+
+async function retried<T>(attempt: () => Promise<T>, tries = 3): Promise<T> {
+  for (let remaining = tries; ; remaining--) {
+    try {
+      return await attempt();
+    } catch (error) {
+      if (remaining <= 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
 
 export function createConsumer(consumers: Consumers, given: Partial<Dependencies> = {}): SQSHandler {
   const { parse, operationFor, claims, deadLetter } = { ...defaults, ...given };
@@ -168,9 +191,6 @@ export function createConsumer(consumers: Consumers, given: Partial<Dependencies
     }
     try {
       await consumer({ event, log });
-      await claims.complete(key);
-      log.info("message", { outcome: "handled", duration_ms: Date.now() - started });
-      return true;
     } catch (error) {
       if (error instanceof Rejected) {
         await deadLetter(record, error.reason);
@@ -183,12 +203,28 @@ export function createConsumer(consumers: Consumers, given: Partial<Dependencies
       log.error("message", { outcome: "failed", error, duration_ms: Date.now() - started });
       return false;
     }
+    // The message has taken effect. Whatever happens now it is not offered
+    // again: failing to record that must not make it take effect twice.
+    try {
+      await retried(() => claims.complete(key));
+    } catch (error) {
+      log.error("the message was handled but could not be recorded as handled; a later delivery of it would be handled again", { error });
+    }
+    log.info("message", { outcome: "handled", duration_ms: Date.now() - started });
+    return true;
   }
 
   return async (batch: SQSEvent): Promise<SQSBatchResponse> => {
     const batchItemFailures: SQSBatchResponse["batchItemFailures"] = [];
     // One at a time: the trace in force is one message's.
+    // A FIFO queue promises order: once one message fails, none after it in
+    // the batch is handled before it is tried again.
+    const ordered = batch.Records.some((record) => record.attributes?.MessageGroupId !== undefined);
     for (const record of batch.Records) {
+      if (ordered && batchItemFailures.length > 0) {
+        batchItemFailures.push({ itemIdentifier: record.messageId });
+        continue;
+      }
       const dealtWith = await handle(record).catch((error) => {
         createLogger({ message_id: record.messageId }).error("message", { outcome: "failed", error });
         return false;

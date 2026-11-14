@@ -124,6 +124,8 @@ resource "aws_lambda_function" "consumer" {
       TABLE_NAME            = aws_dynamodb_table.this.name
       EVENT_SOURCE          = "/${var.name}"
       DEAD_LETTER_QUEUE_URL = aws_sqs_queue.dead_letter.url
+      # How long one delivery may hold its claim on a message: no longer than it can run.
+      CONSUME_TIMEOUT = var.consume_timeout
     }
   }
 

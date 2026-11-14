@@ -162,17 +162,32 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-consumer"]
   }
 
-  # A mapping has no name to scope by before it exists; it can only be made for this stack's function.
+  # A mapping has no name before it exists, so making, changing and removing
+  # one is limited to this stack's function instead.
   statement {
     sid       = "ConsumerMapping"
-    actions   = ["lambda:CreateEventSourceMapping", "lambda:UpdateEventSourceMapping", "lambda:DeleteEventSourceMapping", "lambda:GetEventSourceMapping", "lambda:ListEventSourceMappings", "lambda:TagResource", "lambda:UntagResource", "lambda:ListTags"]
+    actions   = ["lambda:CreateEventSourceMapping", "lambda:UpdateEventSourceMapping", "lambda:DeleteEventSourceMapping"]
     resources = ["*"]
 
     condition {
-      test     = "StringLikeIfExists"
+      test     = "StringLike"
       variable = "lambda:FunctionArn"
       values   = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-consumer"]
     }
+  }
+
+  # Reading mappings cannot be limited to one function.
+  statement {
+    sid       = "ConsumerMappingRead"
+    actions   = ["lambda:GetEventSourceMapping", "lambda:ListEventSourceMappings"]
+    resources = ["*"]
+  }
+
+  # Tags on mappings only - not on any function in the account.
+  statement {
+    sid       = "ConsumerMappingTags"
+    actions   = ["lambda:TagResource", "lambda:UntagResource", "lambda:ListTags"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:event-source-mapping:*"]
   }
 
   statement {

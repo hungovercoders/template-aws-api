@@ -157,7 +157,7 @@ tasks:
       - node local/queue.ts send {{.CLI_ARGS}}
 
   queue:peek:
-    desc: Show what is waiting on the API's queue, without taking it (ENV=local|aws)
+    desc: Show how many messages are waiting on the queue and the dead-letter queue, and how many are being handled - counts only, so looking costs a message none of its tries (ENV=local|aws)
     deps: [install]
     cmds:
       - node local/queue.ts peek

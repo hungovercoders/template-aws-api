@@ -134,6 +134,26 @@ test("a message another delivery is still handling is offered again later", asyn
   expect(handled).toEqual([]);
 });
 
+test("a message that took effect is not offered again when recording that fails", async () => {
+  quiet();
+  const { run, handled, claims } = setup();
+  claims.complete = async () => {
+    throw new Error("the table was busy");
+  };
+  expect(await run(record("m1", event("e1")))).toEqual([]);
+  expect(handled.map((given) => given.id)).toEqual(["e1"]);
+});
+
+test("on a FIFO queue nothing after a failed message is handled before it is tried again", async () => {
+  quiet();
+  const { run, handled } = setup((given) => {
+    if (given.id === "bad") throw new Error("boom");
+  });
+  const inGroup = (id: string, body: unknown) => ({ ...record(id, body), attributes: { ApproximateReceiveCount: "1", MessageGroupId: "g" } }) as SQSRecord;
+  expect(await run(inGroup("m1", event("e1")), inGroup("m2", event("bad")), inGroup("m3", event("e3")))).toEqual(["m2", "m3"]);
+  expect(handled.map((given) => given.id)).toEqual(["e1"]);
+});
+
 test("every message is logged once, with what it was and what became of it", async () => {
   const lines: Record<string, unknown>[] = [];
   vi.spyOn(console, "log").mockImplementation((line: string) => void lines.push(JSON.parse(line)));
