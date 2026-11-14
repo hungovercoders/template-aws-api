@@ -13,6 +13,7 @@
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
     "@cucumber/cucumber": "^13.3.0",
+    "@stoplight/spectral-cli": "^6.17.1",
     "@types/aws-lambda": "^8.10.164",
     "@types/node": "^22.0.0",
     "esbuild": "^0.28.2",

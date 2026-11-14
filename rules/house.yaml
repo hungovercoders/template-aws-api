@@ -1,0 +1,126 @@
+# House rules for every API built from this template. They ship with the
+# template so each API is held to the same standard; add rules that are
+# specific to one API in .spectral.yaml, not here.
+#
+# Naming is lower snake_case wherever a name is yours to choose; schema names
+# are PascalCase because they become TypeScript type names.
+extends: ["spectral:oas"]
+
+rules:
+  # --- spectral:oas adjustments ---------------------------------------------
+  # Servers and contact details are deployment concerns, not contract ones.
+  oas3-api-servers: off
+  info-contact: off
+  # A summary is required (below); a long description is optional.
+  operation-description: off
+
+  # --- Naming: lower snake_case ---------------------------------------------
+  house-property-names-snake-case:
+    description: Property names are lower snake_case, e.g. created_at.
+    message: 'Property "{{property}}" is not lower snake_case.'
+    severity: error
+    given: "$..properties[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-parameter-names-snake-case:
+    description: Path and query parameter names are lower snake_case, e.g. beer_id.
+    message: 'Parameter "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$..parameters[?(@ && (@.in == 'path' || @.in == 'query'))].name"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-operation-id-snake-case:
+    description: operationIds are lower snake_case, e.g. create_beer.
+    message: 'operationId "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options].operationId"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-paths-snake-case:
+    description: Path segments are lower snake_case; parameters are {lower_snake_case}.
+    message: 'Path "{{property}}" has a segment that is not lower snake_case.'
+    severity: error
+    given: "$.paths[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^(/|(/([a-z][a-z0-9]*(_[a-z0-9]+)*|\\{[a-z][a-z0-9]*(_[a-z0-9]+)*\\}))+)$"
+
+  house-enum-values-snake-case:
+    description: String enum values are lower snake_case.
+    message: 'Enum value "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$..enum[?(@string())]"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-schema-names-pascal-case:
+    description: Schema names are PascalCase; they become TypeScript type names.
+    message: 'Schema name "{{property}}" is not PascalCase.'
+    severity: error
+    given: "$.components.schemas[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[A-Z][A-Za-z0-9]*$"
+
+  # --- What the template relies on ------------------------------------------
+  house-operation-id-required:
+    description: Every operation has an operationId; it names the handler and the @operation tag.
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options]"
+    then:
+      field: operationId
+      function: truthy
+
+  house-operation-summary-required:
+    description: Every operation has a one-line summary.
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options]"
+    then:
+      field: summary
+      function: truthy
+
+  house-errors-are-problems:
+    description: 4xx and 5xx responses are application/problem+json - the error body the router emits.
+    message: "Error responses must document application/problem+json content."
+    severity: error
+    given: "$.paths[*][*].responses[?(@property && @property.match(/^[45]/))]"
+    then:
+      field: content.application/problem+json
+      function: truthy
+
+  house-bad-request-documented:
+    description: Every operation documents 400 - the router answers 400 to any request that breaks the contract.
+    message: "The operation must document a 400 response."
+    severity: error
+    given: "$.paths[*][get,put,post,delete,patch,head,options].responses"
+    then:
+      field: "400"
+      function: truthy
+
+  house-request-bodies-are-closed:
+    description: Request body objects set additionalProperties false, so unknown fields are refused rather than ignored.
+    message: "Request body schemas must set additionalProperties: false."
+    severity: error
+    given: "$.paths[*][*].requestBody.content[*].schema"
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          required: [additionalProperties]
+          properties:
+            additionalProperties:
+              const: false

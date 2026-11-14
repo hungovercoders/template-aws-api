@@ -9,6 +9,8 @@ info:
 
 # Add your operations here. Every operation needs an operationId, and at
 # least one scenario in specs/features tagged @operation:<operationId>.
+# `task spec:lint` holds this file to rules/house.yaml (lower snake_case
+# names) and to your own rules in .spectral.yaml.
 paths: {}
 
 components:

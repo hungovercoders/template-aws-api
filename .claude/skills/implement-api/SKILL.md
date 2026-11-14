@@ -22,7 +22,8 @@ This repository is a template. Everything that is the same for every API was
 solved once and is already here: the Lambda entry point and router
 (`src/handler.ts`, `src/lib/`), request validation, error responses, the
 DynamoDB client, the local stack (`local/`), the test harness
-(`steps/world.ts`), the gates (`Taskfile.yml`, `scripts/`, `test/routes.test.ts`),
+(`steps/world.ts`), the gates (`Taskfile.yml`, `scripts/`, `rules/`,
+`test/routes.test.ts`),
 CI and the Terraform (`infra/`).
 
 You bring only the business logic the specs describe. That means you write:
@@ -44,7 +45,8 @@ why - it is probably something the template should gain for every API.
    satisfied, stop and ask the user with the exact scenario and operation.
 2. **Never weaken a gate.** The gates are how you find out whether you are
    right; they give the same answer every time. Do not edit `Taskfile.yml`, `cucumber.mjs`,
-   `scripts/spec-check.ts`, `test/routes.test.ts`, `.github/workflows/ci.yml`
+   `scripts/spec-check.ts`, `rules/house.yaml`, `.spectral.yaml`,
+   `test/routes.test.ts`, `.github/workflows/ci.yml`
    or the contract checks in `steps/world.ts` and `src/lib/contract.ts`; do not
    skip, tag out or mark scenarios pending.
 3. **Steps go through the front door.** Step definitions call the API with
@@ -67,9 +69,12 @@ it tells you exactly what is missing.
 1. **Read the specs.** Read `specs/openapi.yaml` and every feature file in
    full. List the operations (by `operationId`) and, for each, the scenarios
    tagged `@operation:<operationId>`.
-2. **`task spec:check`** must pass before you write code. If it fails, the spec
-   is incomplete (an operation with no scenario, an unknown tag, an invalid
-   document) - report it to the user; do not fix the spec yourself.
+2. **`task spec:check` and `task spec:lint`** must pass before you write code.
+   If `spec:check` fails the spec is incomplete (an operation with no
+   scenario, an unknown tag, an invalid document); if `spec:lint` fails the
+   contract breaks a standard in `rules/house.yaml` or `.spectral.yaml`.
+   Either way report the output to the user - do not fix the spec yourself,
+   and never relax or disable a rule.
 3. **`task generate`** - produces `src/generated/api.d.ts` (types for every
    operation) and `src/generated/openapi.json` (the runtime contract).
 4. **See it red.** Run `task test:unit`: `test/routes.test.ts` lists every
@@ -103,6 +108,7 @@ it tells you exactly what is missing.
 | Gate | Proves |
 | --- | --- |
 | `spec:check` | The contract is valid; every operation has a tagged scenario |
+| `spec:lint` | The contract meets the house standards and this API's own rules |
 | `typecheck` | Operations agree with the types generated from the contract |
 | `test:unit` | Every contract operation has a handler, and no extras; domain rules |
 | `features` | The behaviour in the feature files, with every response held to the contract |
