@@ -11,6 +11,7 @@ const BUDGETS: [pattern: RegExp, lines: number, why: string][] = [
   [/^AGENTS\.md$/, 80, "read by every agent session"],
   [/^CLAUDE\.md$/, 15, "imports AGENTS.md; holds only what is specific to Claude Code"],
   [/^\.claude\/skills\/[^/]+\/SKILL\.md$/, 350, "read whenever the skill runs"],
+  [/^\.claude\/skills\/[^/]+\/(?!SKILL\.md$)[^/]+\.md$/, 80, "read with the skill, when the part of the API it is about is present"],
   [/^README\.md$/, 220, "the front page: the pitch and how to start"],
   [/^CONTRIBUTING\.md$/, 150, "how the template itself is changed"],
   [/^SECURITY\.md$/, 60, "how to report a vulnerability, and what to rely on"],
@@ -30,7 +31,11 @@ const files = [
   "README.md",
   ...["CONTRIBUTING.md", "SECURITY.md"].filter(existsSync),
   ...(existsSync("docs") ? readdirSync("docs").filter((f) => f.endsWith(".md")).map((f) => `docs/${f}`) : []),
-  ...(existsSync(".claude/skills") ? readdirSync(".claude/skills").filter((skill) => !copied.has(skill)).map((skill) => `.claude/skills/${skill}/SKILL.md`).filter(existsSync) : []),
+  ...(existsSync(".claude/skills")
+    ? readdirSync(".claude/skills")
+        .filter((skill) => !copied.has(skill))
+        .flatMap((skill) => readdirSync(`.claude/skills/${skill}`).filter((file) => file.endsWith(".md")).map((file) => `.claude/skills/${skill}/${file}`))
+    : []),
 ].sort();
 
 const slug = (heading: string) =>

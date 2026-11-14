@@ -135,6 +135,31 @@ from the template, so removing one closes no door.
 Never remove or restore a component the user has not agreed to, and never
 write by hand what a removed component would have provided.
 
+<!-- component:consume:start -->
+## Messages the API receives
+
+Work that arrives on a queue is specified like a request: a scenario says
+what happens, and `specs/asyncapi.yaml` (see `docs/spec.md`) says what the
+message is, as a `receive` operation. Ask the user, and confirm:
+
+- **what arrives and from whom** - name the message for what happened where
+  it came from, in the past tense: "a rating was submitted";
+- **what it carries**, and which of the API's existing rules apply to it. A
+  message that does what a request does should follow the same rules;
+- **what happens to one that can never be accepted** - it names something
+  that does not exist. It is put aside on the dead-letter queue; say why;
+- **that it may arrive twice.** A queue delivers at least once. Write the
+  scenario: the same message twice takes effect once.
+
+Write a scenario for each: accepted, delivered twice, breaking the contract,
+and valid but never acceptable. Tag them `@operation:<operation>`. Then
+`task asyncapi:check`, `asyncapi:lint` and `asyncapi:compat`, and
+`task asyncapi:examples` for `messages/`; commit what it writes.
+
+Order is not promised: a scenario must not depend on which of two messages
+is handled first.
+<!-- component:consume:end -->
+
 ## Skills for this API
 
 `skills.json` lists the skills in this repository. The template brings the
