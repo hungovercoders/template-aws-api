@@ -6,7 +6,11 @@ files) is the requirement; `task ci` is the definition of done.
 - The skeleton (router, validation, harness, gates, CI, infra) is the same for
   every API and is already built. Do not rebuild or restructure it; write only
   the business logic the specs describe: `steps/`, `src/operations/`,
-  `src/routes.ts`, `src/domain/`, `src/store/` and their tests.
+  `src/domain/`, `src/store/` and their tests.
+- Generate before you write: anything a command can derive from the specs
+  (types, the route table, operation and step outlines, `.http` requests) is
+  produced by `task generate`, `task scaffold` or `task http:generate`, never
+  written by hand. Use judgement only where no deterministic tool exists.
 - Tools come from `mise.toml`; every command is a task - run `task` to list them.
 - To implement or change the API from the specs, use the `implement-api` skill.
 - `specs/` is read-only unless the user asks for a spec change.
@@ -26,7 +30,7 @@ files) is the requirement; `task ci` is the definition of done.
   `main` → `example/spec` → `example/implementation`. Never change a skeleton
   file on an example branch.
 - The only differences allowed are: `specs/`, `http/contract.http` (generated
-  from the contract) and the README's status banner (`example/spec`); plus `src/routes.ts`, `src/operations/`, `src/domain/`,
+  from the contract) and the README's status banner (`example/spec`); plus `src/operations/`, `src/domain/`,
   `src/store/`, `steps/*.ts` other than `world.ts`, and their tests
   (`example/implementation`). `git diff main example/spec --stat` and
   `git diff example/spec example/implementation --stat` should list nothing else.

@@ -17,6 +17,31 @@ user supplying the spec, and the one time you write to `specs/`.
 Your job is to make `task ci` green without changing what the specs say.
 `task ci` is the definition of done - not your reading of the code.
 
+## Generate before you write
+
+A principle, and it outranks convenience: **anything a command can derive
+from the specs is produced by that command, never written by you.** Generated
+output is the same every time, costs nothing and cannot drift from the spec.
+Your judgement is for what no tool can derive - the behaviour inside each
+operation and each step.
+
+| Derived from the specs by a command | Command |
+| --- | --- |
+| Types for every operation, request and response | `task generate` |
+| The runtime contract the router validates against | `task generate` |
+| The route table wiring each `operationId` to its function | `task generate` |
+| A typed file for every operation, answering 501 until implemented | `task scaffold` |
+| A typed pending step for every sentence in the feature files | `task scaffold` |
+| A request for every operation, for exploring by hand | `task http:generate` |
+
+So: never write or edit a route table, a type that mirrors the contract, an
+operation's signature, or a step's pattern and arguments by hand. Use the
+types from `src/generated/api.d.ts` (`components["schemas"]["Thing"]`) rather
+than declaring your own, and re-run the command when the specs change. Before
+creating any file, ask whether a command already produces it. If you find
+yourself writing something mechanical that no command covers, say so in your
+report - it is a gap in the template, to be closed with a generator.
+
 ## The skeleton is already built - do not build it again
 
 This repository is a template. Everything that is the same for every API was
@@ -28,8 +53,8 @@ test harness (`steps/world.ts`), the gates and generators (`Taskfile.yml`,
 
 You bring only the business logic the specs describe. That means you write:
 
-- `steps/<area>.ts` - step definitions
-- `src/operations/<operationId>.ts` and the entries in `src/routes.ts`
+- the body of each step in `steps/` (`task scaffold` writes the outlines)
+- the body of each operation in `src/operations/<operationId>.ts` (likewise)
 - `src/domain/`, `src/store/` and their unit tests in `test/`
 
 Do not regenerate, restructure, "improve" or replace anything else, and do not
@@ -86,21 +111,29 @@ it tells you exactly what is missing.
    and never relax or disable a rule. If `task http:check` fails, the
    committed `http/contract.http` is out of date with the contract: run
    `task http:generate` and commit the file - it is generated, not spec.
-3. **`task generate`** - produces `src/generated/api.d.ts` (types for every
-   operation) and `src/generated/openapi.json` (the runtime contract).
-4. **See it red.** Run `task test:unit`: `test/routes.test.ts` lists every
-   operation with no handler. That list is your backlog.
-5. **Write the step definitions** in `steps/<area>.ts`, binding every sentence
-   in the feature files (`NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run`
-   shows undefined and ambiguous steps and offers snippets; it must report
-   none). See [Writing steps](#writing-steps).
+3. **`task scaffold`** - generates the types, runtime contract and route
+   table (`src/generated/`), then writes a typed stub for every operation
+   that has no file (`src/operations/<operationId>.ts`) and a typed pending
+   step for every sentence with no step definition (`steps/scaffold.ts`).
+   It never overwrites, so re-run it whenever the specs change.
+4. **See it red.** Run `task test:unit`: `test/routes.test.ts` lists the
+   operations that are still stubs. That list is your backlog; an operation
+   leaves it when you implement it and delete its `@scaffold` line.
+5. **Implement the steps** `task scaffold` wrote. Each is one sentence from
+   the feature files with its pattern and typed arguments; replace
+   `return "pending"` with the calls and assertions. Sentences that differ
+   only in wording ("a stout" / "an ipa") arrive as separate stubs - merge
+   them into one pattern. Split `steps/scaffold.ts` into files of your own
+   naming if you like. `NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run`
+   must report no undefined and no ambiguous steps. See
+   [Writing steps](#writing-steps).
 6. **Implement the operations, in dependency order.** Scenarios rarely use
    one operation: most need a "create" in a Given and a "get" or "list" in a
    Then. Start with the operations other scenarios depend on, then the rest.
-   - `src/operations/<operationId>.ts` exporting
-     `async function <operationId>(context: Context<"<operationId>">)`; see
-     [Writing operations](#writing-operations).
-   - Register it in `src/routes.ts` under its `operationId`.
+   - Fill in the stub in `src/operations/<operationId>.ts` and delete its
+     `@scaffold` line; keep the generated signature. See
+     [Writing operations](#writing-operations). There is nothing to register:
+     the route table is generated.
    - Put rules that need no I/O in `src/domain/` and DynamoDB access in
      `src/store/`; see [Storing data](#storing-data).
    - `task features -- --tags @operation:<operationId>` runs the scenarios
@@ -131,8 +164,8 @@ it tells you exactly what is missing.
   secured operation and undefined otherwise; use it for rules about *what* a
   caller may do, and answer 403 with a problem when they may not.
 - **Helpers** - shared code may sit beside what uses it: `src/operations/` for
-  helpers shared by operations, `src/domain/` for rules. Only files named in
-  `src/routes.ts` are operations.
+  helpers shared by operations, `src/domain/` for rules. Only a file named
+  after an `operationId` is an operation.
 - **Unit tests** go in `test/<name>.test.ts` (vitest). Test `src/domain/`.
   Do not unit-test `src/store/` with mocks: the features exercise it against
   DynamoDB on AWS Emulator, which is the test that counts.
@@ -241,7 +274,7 @@ leave them to CI.
 | `spec:check` | The contract is valid; every operation has a tagged scenario |
 | `spec:lint` | The contract meets the house standards and this API's own rules |
 | `typecheck` | Operations agree with the types generated from the contract |
-| `test:unit` | Every contract operation has a handler, and no extras; domain rules |
+| `test:unit` | Every contract operation has a file and none is still a stub; domain rules |
 | `features` | The behaviour in the feature files, with every response held to the contract |
 | `contract:fuzz` | Inputs nobody wrote a scenario for still get contract-conforming answers |
 | `infra:validate` | The Terraform is formatted and valid |
