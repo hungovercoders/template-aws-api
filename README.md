@@ -10,7 +10,7 @@ it does and an OpenAPI contract that says what it looks like.
 > [`specs/openapi.yaml`](specs/openapi.yaml) is the contract for a Beer
 > Catalogue API and [`specs/features/`](specs/features) is its behaviour.
 > Nothing is implemented, so **CI is red on purpose** - `task ci` fails at
-> `test:unit`, listing the six operations that have no handler. Running
+> `test:unit`, listing the six operations that have no file yet. Running
 > `/implement-api` here produces
 > [`example/implementation`](../../tree/example/implementation).
 
