@@ -90,22 +90,25 @@ async function emulatorEnv() {
 function deploy(env) {
   const state = resolve(".local", "emulator.tfstate");
   for (const file of [state, `${state}.backup`]) rmSync(file, { force: true });
-  const log = join(".local", "terraform.log");
-  const terraform = (...args) => {
-    const out = openSync(log, "a");
-    const result = spawnSync("terraform", ["-chdir=infra", ...args], { env, stdio: ["ignore", "pipe", out], encoding: "utf8" });
+  // init and apply print straight to the console, so a CI log shows what was
+  // created; only `output` is captured.
+  const terraform = (args, capture = false) => {
+    const result = spawnSync("terraform", ["-chdir=infra", ...args], {
+      env,
+      stdio: ["ignore", capture ? "pipe" : "inherit", "inherit"],
+      encoding: "utf8",
+    });
     if (result.error || result.status !== 0) {
-      console.error(result.error ? `could not run terraform: ${result.error.message}` : `terraform ${args[0]} failed against the emulator:`);
-      console.error((result.stdout ?? "") + readFileSync(log, "utf8"));
+      console.error(result.error ? `could not run terraform: ${result.error.message}` : `terraform ${args[0]} failed against AWS Emulator`);
       stop(1);
     }
     return result.stdout;
   };
-  rmSync(log, { force: true });
-  if (!existsSync(join("infra", ".terraform", "providers"))) terraform("init", "-input=false", "-no-color");
+  if (!existsSync(join("infra", ".terraform", "providers"))) terraform(["init", "-input=false", "-no-color"]);
   const region = env.AWS_REGION ?? "us-east-1";
-  terraform("apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`);
-  const outputs = JSON.parse(terraform("output", "-json", `-state=${state}`));
+  console.log("applying infra/ to AWS Emulator");
+  terraform(["apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`]);
+  const outputs = JSON.parse(terraform(["output", "-json", `-state=${state}`], true));
   console.log("infra/ applied to AWS Emulator");
   return { TABLE_NAME: outputs.table_name.value };
 }
