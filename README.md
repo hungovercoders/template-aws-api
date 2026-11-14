@@ -100,8 +100,9 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
      (see [Contract standards](#contract-standards)).
    - `task spec:check` tells you when the spec is complete enough to build
      from, and `task spec:lint` that it meets the standards.
-   - `task mock` serves the contract as a mock API, so you and your consumers
-     can call it and react to its shape before anything is built
+   - `task mock` serves the contract as a mock API, and `ENV=mock task http`
+     sends it a request for each operation, so you and your consumers can
+     call it and react to its shape before anything is built
      (see [Try the contract before it is built](#try-the-contract-before-it-is-built)).
 3. **Implement it.** In [Claude Code](https://claude.com/claude-code), run:
 
@@ -126,6 +127,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | `task spec:check` | The contract is valid and every operation has a tagged scenario |
 | `task spec:lint` | The contract meets the house rules and your own (Spectral) |
 | `task mock` | Serve a mock of the contract on http://127.0.0.1:4010 - no implementation needed |
+| `task http` | Send requests from `http/*.http` to the mock, the local stack or a deployed API |
 | `task typecheck` | The code agrees with the types generated from the contract |
 | `task test:unit` | Unit tests, including "every contract operation has a handler" |
 | `task acceptance` | Features, then fuzz, against one stack - what `task ci` runs |
@@ -157,7 +159,8 @@ infra/                  Terraform: Lambda, HTTP API, DynamoDB
 infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
-scripts/                generate and spec:check
+http/                   .http requests for exploring by hand; contract.http is generated
+scripts/                generate, spec:check and http:generate
 .claude/skills/implement-api/   the skill that drives an implementation
 ```
 
@@ -246,6 +249,47 @@ examples in the contract make it far more useful.
 
 Prism is not a gate and is not installed with the project; the task fetches
 the version pinned in `Taskfile.yml` the first time you run it.
+
+## Exploring the API by hand
+
+For poking at the API - as opposed to testing it - the template uses plain
+`.http` files and [httpYac](https://httpyac.github.io) to send them. A
+`.http` file is just the request as text, so it diffs, reviews and lives in
+the repository like any other source, and the same file works from the
+command line, in VS Code (the httpYac extension) and in JetBrains IDEs (the
+built-in HTTP client).
+
+You do not have to write any to start: `http/contract.http` is generated from
+the contract, with one ready-to-send request per operation, filled in from
+the contract's examples.
+
+```sh
+task http                      # pick a request and send it to the local stack (run `task dev` first)
+ENV=mock task http             # ...to the mock instead (run `task mock` first) - works in the spec phase
+ENV=aws task http              # ...to a deployed stack
+task http -- --name create_thing     # one request, by operationId
+task http -- --all                   # every request in turn
+```
+
+| Environment | Sends to | Caller |
+| --- | --- | --- |
+| `mock` | Prism, `http://127.0.0.1:4010` | `test:explorer` |
+| `local` | the local stack, `http://127.0.0.1:3000` | `test:explorer` - the local stand-in for a signed-in caller |
+| `aws` | your deployed API | a real token |
+
+Environments are in `http/http-client.env.json`. For `aws`, put your stack's
+`base_url` and a `token` in `http/http-client.private.env.json`, which is
+never committed:
+
+```json
+{ "aws": { "base_url": "https://abc123.execute-api.eu-west-2.amazonaws.com", "token": "eyJ..." } }
+```
+
+`http/contract.http` is rewritten whenever the contract changes and is not
+committed. Keep requests of your own - a sequence that reproduces a bug, a
+demo - in other files in `http/`; `task http` offers those too. These files
+are for exploring. What the API must do belongs in a feature file, where it
+is checked on every run.
 
 ## AWS Emulator
 
