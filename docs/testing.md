@@ -26,6 +26,14 @@ Each gate fails for one reason and says what it is:
 - **`spec:compat`** - the contract changed since the last published one and
   `info.version` does not say so: a breaking change without a new major
   version, an API change without a new minor, or an edit without a new version.
+<!-- component:asyncapi:start -->
+- **`asyncapi:check`**, **`asyncapi:lint`**, **`asyncapi:compat`**,
+  **`asyncapi:examples:check`** - the same four failures for
+  `specs/asyncapi.yaml` as `spec:check`, `spec:lint`, `spec:compat` and
+  `http:check` have for the OpenAPI contract; see
+  [Messages and events](spec.md#messages-and-events-the-asyncapi-contract).
+  Without that file they have nothing to do.
+<!-- component:asyncapi:end -->
 - **`http:check`** - `http/contract.http` no longer matches the contract; run
   `task http:generate` and commit it.
 - **`readme:check`** - the contract describes an API but `README.md` still

@@ -7,6 +7,7 @@
 // Only the block between the api:start and api:end markers is generated.
 // Everything after it is yours and is never touched.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 
 const README = "README.md";
 const START = "<!-- api:start - generated from specs/openapi.yaml by `task readme:generate`. Change the contract, not this block. -->";
@@ -40,6 +41,26 @@ if (operations.length === 0) {
   process.exit(0);
 }
 
+// An API with an asynchronous side has a second contract, specs/asyncapi.yaml:
+// the messages it receives and the events it publishes are its front page too.
+type Async = {
+  info?: { version?: string };
+  channels?: Record<string, { address?: string }>;
+  operations?: Record<string, { action?: string; summary?: string; channel?: { $ref?: string } }>;
+};
+const ASYNC = "specs/asyncapi.yaml";
+const asyncContract = existsSync(ASYNC) ? (parseYaml(readFileSync(ASYNC, "utf8")) as Async) : undefined;
+const asyncOperations = Object.entries(asyncContract?.operations ?? {}).map(([id, operation]) => {
+  const channel = operation.channel?.$ref?.split("/").at(-1) ?? "";
+  return { id, received: operation.action === "receive", on: asyncContract?.channels?.[channel]?.address ?? channel, summary: operation.summary ?? "" };
+});
+const asyncSection = (title: string, received: boolean) => {
+  const list = asyncOperations.filter((operation) => operation.received === received);
+  return list.length === 0
+    ? []
+    : [`## ${title}`, "", "| Operation | On | What it does |", "| --- | --- | --- |", ...list.map((op) => `| \`${op.id}\` | \`${cell(op.on)}\` | ${cell(op.summary)} |`), ""];
+};
+
 const cell = (text: string) => text.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
 const block = [
   START,
@@ -55,6 +76,9 @@ const block = [
   "| --- | --- | --- | --- |",
   ...operations.map((op) => `| \`${op.id}\` | \`${cell(op.request)}\` | ${op.caller} | ${cell(op.summary)} |`),
   "",
+  ...(asyncOperations.length > 0 ? [`Messages and events are version ${asyncContract?.info?.version} of [their own contract](${ASYNC}), with an [example of each](messages).`, ""] : []),
+  ...asyncSection("Messages it receives", true),
+  ...asyncSection("Events it publishes", false),
   "## Working on it",
   "",
   "| Task | What it does |",

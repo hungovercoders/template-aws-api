@@ -1,0 +1,116 @@
+# House rules for the AsyncAPI contract (specs/asyncapi.yaml) of every API built
+# from this template: the same standards as rules/house.yaml holds the OpenAPI
+# contract to. `task asyncapi:lint` runs them; warnings fail. Rules for one
+# API go in .spectral.asyncapi.yaml, which extends this file.
+#
+# Naming is lower snake_case wherever a name is yours to choose; schema names
+# are PascalCase because they become TypeScript type names.
+extends: ["spectral:asyncapi"]
+
+rules:
+  # --- spectral:asyncapi adjustments ----------------------------------------
+  # Servers, contact, licence and tags are deployment or catalogue concerns.
+  asyncapi-servers: off
+  asyncapi-info-contact: off
+  asyncapi-info-license: off
+  asyncapi-3-tags: off
+  # A summary is required (below); a long description is optional.
+  asyncapi-3-operation-description: off
+
+  # --- Naming: lower snake_case ---------------------------------------------
+  house-property-names-snake-case:
+    description: Property names are lower snake_case, e.g. created_at.
+    message: 'Property "{{property}}" is not lower snake_case.'
+    severity: error
+    given: "$..properties[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-async-operation-names-snake-case:
+    description: Operation names are lower snake_case, e.g. publish_beer_created; they name the handler and the @operation tag.
+    message: 'Operation "{{property}}" is not lower snake_case.'
+    severity: error
+    given: "$.operations[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-channel-names-snake-case:
+    description: Channel names are lower snake_case.
+    message: 'Channel "{{property}}" is not lower snake_case.'
+    severity: error
+    given: "$.channels[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-message-names-snake-case:
+    description: Message names are lower snake_case, e.g. beer_created; they name the example in messages/.
+    message: 'Message "{{property}}" is not lower snake_case.'
+    severity: error
+    given:
+      - "$.components.messages[*]~"
+      - "$.channels[*].messages[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-message-name-field-snake-case:
+    description: A message's name is lower snake_case; it is the file name of its example.
+    message: 'Message name "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$.components.messages[*].name"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-enum-values-snake-case:
+    description: String enum values are lower snake_case.
+    message: 'Enum value "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$..enum[?(@string())]"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-schema-names-pascal-case:
+    description: Schema names are PascalCase; they become TypeScript type names.
+    message: 'Schema name "{{property}}" is not PascalCase.'
+    severity: error
+    given: "$.components.schemas[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[A-Z][A-Za-z0-9]*$"
+
+  # --- What the template relies on ------------------------------------------
+  house-async-operation-summary-required:
+    description: Every operation has a one-line summary.
+    severity: error
+    given: "$.operations[*]"
+    then:
+      field: summary
+      function: truthy
+
+  house-message-name-required:
+    description: Every message has a name; it names its example and its type.
+    severity: error
+    given: "$.components.messages[*]"
+    then:
+      field: name
+      function: truthy
+
+  house-message-payload-required:
+    description: Every message has a payload schema - what is validated and what the types are made from.
+    severity: error
+    given: "$.components.messages[*]"
+    then:
+      field: payload
+      function: truthy
