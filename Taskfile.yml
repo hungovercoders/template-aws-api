@@ -79,6 +79,11 @@ tasks:
     cmds:
       - node scripts/steps-check.ts
 
+  responses:check:
+    desc: Gate - every response the contract documents was returned to a scenario in the last full feature run
+    cmds:
+      - node scripts/responses-check.ts
+
   scaffold:
     desc: Write what follows from the specs - a typed stub for every operation without a file, a pending step for every unbound sentence
     deps: [generate]
@@ -224,10 +229,10 @@ tasks:
       - node local/stack.mjs -- task contract:fuzz:run
 
   acceptance:
-    desc: Gate - features then fuzz against one stack - infra/ applied to AWS Emulator, the built Lambda in front of it
+    desc: Gate - features, that they reach every documented response, then fuzz - one stack, infra/ applied to AWS Emulator, the built Lambda in front of it
     deps: [build, emulator:install]
     cmds:
-      - node local/stack.mjs -- task features:run contract:fuzz:run
+      - node local/stack.mjs -- task features:run responses:check contract:fuzz:run
 
   features:run:
     desc: The feature files against a stack that is already up (BASE_URL); used by features and acceptance

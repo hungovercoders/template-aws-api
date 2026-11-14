@@ -31,6 +31,11 @@ Each gate fails for one reason and says what it is:
 - **`features`** - an undefined step, a failed assertion, or *any* response
   whose status, content type or body is not what the contract documents for
   that operation.
+- **`responses:check`** - a response the contract documents that no scenario
+  was answered with, so the contract promises an outcome the behaviour spec
+  never shows. Add the scenario, or remove the response. Runs in `acceptance`,
+  after the features. Not required: 5XX, `default`, and a 400 on an operation
+  that takes no input.
 - **`steps:check`** - a step definition that no sentence in the feature
   files uses any more. Delete it: the behaviour it described has left the spec.
 - **`contract:fuzz`** - a generated request that produced a 5xx, an
