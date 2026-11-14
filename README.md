@@ -1,9 +1,47 @@
 # template-aws-api
 
-A template for AWS Lambda APIs that are **driven by their spec**: BDD feature
-files say what the API does, an OpenAPI contract says what it looks like, and
-a set of deterministic gates will not go green until the implementation
-delivers both.
+**Bring your own business logic.** Everything every Lambda API needs - routing,
+request validation, error responses, the DynamoDB client, local emulation, the
+test harness, CI, infrastructure, deployment - is solved here once. The only
+thing you bring is what makes your API *yours*: BDD feature files that say what
+it does and an OpenAPI contract that says what it looks like.
+
+## Why a template, not a prompt
+
+The skeleton is the same for every API you will build, so it should be built
+once - not regenerated, slightly differently, by AI each time.
+
+- **Known problems are solved up front.** How a Lambda is routed, validated,
+  tested, emulated and deployed is not a per-project question. Answering it
+  once, in a template, costs nothing to reuse. Asking an agent to answer it
+  again costs tokens and review time on every project, and returns a
+  different answer each time.
+- **AI works only on what is new.** The agent's whole job is the business
+  logic: the step definitions and one small function per operation. Less to
+  generate is less to pay for, less to review and less to go wrong.
+- **The spec is the prompt *and* the test.** The same feature files and
+  contract that tell the agent what to build are executed against what it
+  built. The agent is not asked whether it is finished - `task ci` tells it,
+  with the same answer every time, exactly which scenario or contract rule is
+  not yet met.
+- **Every API looks the same.** Same layout, same tasks, same gates, same
+  deployment. Anyone - or any agent - who has seen one has seen them all.
+
+| Solved once, in the template | You bring | AI resolves, checked by the gates |
+| --- | --- | --- |
+| Lambda entry point and router | `specs/openapi.yaml` - the contract | `steps/*.ts` - glue for your feature sentences |
+| Request validation against the contract | `specs/features/*.feature` - the behaviour | `src/operations/*.ts` - one function per operation |
+| RFC 9457 error responses | | `src/domain/`, `src/store/` - your rules and data access |
+| Types generated from the contract | | |
+| Local API Gateway stand-in + AWS Emulator | | |
+| Contract-checking test harness, fuzzing | | |
+| mise, Taskfile, GitHub Actions CI | | |
+| Terraform: Lambda, HTTP API, DynamoDB | | |
+
+If you find yourself asking AI to write a router, a test harness, a pipeline
+or Terraform for an API built from this template, stop: it is already here.
+If something every API needs is missing, add it to the template once rather
+than to one API.
 
 > **CI on this branch is red on purpose.** `main` is the skeleton: no contract,
 > no features, no implemented Lambda. `task ci` fails until you add a spec and
@@ -62,7 +100,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 
    The skill (`.claude/skills/implement-api`) reads the spec, writes the step
    definitions and operations, and works gate by gate until `task ci` is
-   green. It may not edit `specs/` or weaken a gate. You can follow the same
+   green. It may not edit `specs/`, weaken a gate or rebuild the skeleton. You can follow the same
    steps by hand - they are written out in the skill.
 4. **Deploy.** `task deploy NAME=my-api` (see [Deploy](#deploy)).
 
