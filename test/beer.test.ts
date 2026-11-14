@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { averageOf, byName, nameKey, oneDecimal } from "../src/domain/beer.ts";
+import { averageOf, nameKey, oneDecimal, orderKey } from "../src/domain/beer.ts";
 
 test("a beer with no ratings has no average", () => {
   expect(averageOf(0, 0)).toBeNull();
@@ -42,12 +42,16 @@ test("space that only appears once the name is normalised is still trimmed", () 
   expect(nameKey("\u3000Morning After\u2003")).toBe(nameKey("Morning After"));
 });
 
+const inCatalogueOrder = (names: string[]) => [...names].sort((a, b) => (orderKey(a) < orderKey(b) ? -1 : 1));
+
 test("the catalogue is ordered by name, ignoring case", () => {
-  const names = ["morning After", "Last Orders", "hair of the Dog"].map((name) => ({ name }));
-  expect(names.sort(byName).map((b) => b.name)).toEqual(["hair of the Dog", "Last Orders", "morning After"]);
+  expect(inCatalogueOrder(["morning After", "Last Orders", "hair of the Dog"])).toEqual(["hair of the Dog", "Last Orders", "morning After"]);
 });
 
 test("accented names sort alphabetically, not after Z", () => {
-  const names = ["Zebra Lager", "Éclair Stout", "Amber Ale"].map((name) => ({ name }));
-  expect(names.sort(byName).map((b) => b.name)).toEqual(["Amber Ale", "Éclair Stout", "Zebra Lager"]);
+  expect(inCatalogueOrder(["Zebra Lager", "Éclair Stout", "Amber Ale"])).toEqual(["Amber Ale", "Éclair Stout", "Zebra Lager"]);
+});
+
+test("names that differ only by accent have different places", () => {
+  expect(orderKey("Eclair")).not.toBe(orderKey("Éclair"));
 });

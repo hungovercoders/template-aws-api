@@ -214,3 +214,113 @@ Then("the request is refused as invalid", function (this: ApiWorld) {
 Then("the request is refused as invalid, pointing at {string}", function (this: ApiWorld, field: string) {
   expectInvalid(this, field);
 });
+
+// --- Paging -------------------------------------------------------------------
+
+/** List a page and remember how it was asked for, so "the next page" can continue it. */
+async function listPage(world: ApiWorld, query: string) {
+  world.remembered.set("page query", { query });
+  await world.call("GET", `/beers?${query}`);
+}
+
+Given("the catalogue has {int} more beers", async function (this: ApiWorld, count: number) {
+  for (let i = 1; i <= count; i++) await addBeer(this, `Guest Ale ${String(i).padStart(2, "0")}`, "ale", 4);
+});
+
+When("staff list the beers {int} at a time", async function (this: ApiWorld, size: number) {
+  await listPage(this, `limit=${size}`);
+});
+
+When("staff list the {word} beers {int} at a time", async function (this: ApiWorld, style: string, size: number) {
+  await listPage(this, `style=${style}&limit=${size}`);
+});
+
+When("staff list the next page", async function (this: ApiWorld) {
+  const cursor = this.last.body?.next_cursor;
+  assert.ok(cursor, "the previous page said there are more beers to list");
+  const { query } = this.remembered.get("page query")!;
+  await this.call("GET", `/beers?${query}&cursor=${encodeURIComponent(cursor)}`);
+});
+
+When("staff list the beers from the page marker {string}", async function (this: ApiWorld, cursor: string) {
+  await this.call("GET", `/beers?cursor=${encodeURIComponent(cursor)}`);
+});
+
+Then("the list holds {int} beers", function (this: ApiWorld, count: number) {
+  expectStatus(this, 200);
+  assert.equal(this.last.body.items.length, count);
+});
+
+Then("there are more beers to list", function (this: ApiWorld) {
+  assert.equal(typeof this.last.body.next_cursor, "string", "the page has a next_cursor");
+});
+
+Then("there are no more beers to list", function (this: ApiWorld) {
+  assert.equal(this.last.body.next_cursor, null);
+});
+
+Then("the page marker is refused", function (this: ApiWorld) {
+  expectStatus(this, 400);
+});
+
+// --- Changes that arrive together -----------------------------------------------
+
+/** The beer a scenario added under `name`, as the catalogue has it now; undefined once retired. */
+async function currently(world: ApiWorld, name: string): Promise<Json | undefined> {
+  const { status, body } = await world.call("GET", `/beers/${idOf(world, name)}`);
+  return status === 200 ? body : undefined;
+}
+
+When(/^staff add the beer "([^"]*)", an? (\w+) at ([\d.]+)% abv, twice at once$/, async function (this: ApiWorld, name: string, style: string, abv: string) {
+  const beer = { name, style, abv: Number(abv) };
+  const replies = await Promise.all([this.call("POST", "/beers", beer), this.call("POST", "/beers", beer)]);
+  this.remembered.set("replies", { statuses: replies.map((reply) => reply.status).sort() });
+});
+
+Then("one request adds the beer and the other is refused because the name is taken", function (this: ApiWorld) {
+  assert.deepEqual(this.remembered.get("replies")!.statuses, [201, 409]);
+});
+
+Then("the catalogue holds {int} beer(s)", async function (this: ApiWorld, count: number) {
+  const { status, body } = await this.call("GET", "/beers?limit=100");
+  assert.equal(status, 200);
+  assert.equal(body.items.length, count);
+});
+
+When("staff rename {string} to {string} and to {string} at once", async function (this: ApiWorld, name: string, first: string, second: string) {
+  const path = `/beers/${idOf(this, name)}`;
+  await Promise.all([this.call("PATCH", path, { name: first }), this.call("PATCH", path, { name: second })]);
+});
+
+When("staff retire {string} and rename it to {string} at once", async function (this: ApiWorld, name: string, newName: string) {
+  const path = `/beers/${idOf(this, name)}`;
+  await Promise.all([this.call("DELETE", path), this.call("PATCH", path, { name: newName })]);
+});
+
+When("{int} drinkers rate {string} {int} at once", async function (this: ApiWorld, drinkers: number, name: string, score: number) {
+  const replies = await Promise.all(Array.from({ length: drinkers }, () => rate(this, name, score)));
+  assert.deepEqual([...new Set(replies.map((reply) => reply.status))], [201], "every rating was recorded");
+});
+
+Then("{string} is now named either {string} or {string}", async function (this: ApiWorld, name: string, first: string, second: string) {
+  const beer = await currently(this, name);
+  assert.ok(beer, `"${name}" is still in the catalogue`);
+  assert.ok([first, second].includes(beer.name), `named "${beer.name}"`);
+});
+
+Then(/^whichever of (.+) it is not named can be given to a new beer$/, async function (this: ApiWorld, list: string) {
+  const names = [...list.matchAll(/"([^"]*)"/g)].map((match) => match[1]!);
+  // The first name is the one the scenario added the beer under.
+  const held = (await currently(this, names[0]!))?.name;
+  for (const name of names.filter((candidate) => candidate !== held)) {
+    const { status, body } = await this.call("POST", "/beers", { name, style: "ale", abv: 4 });
+    assert.equal(status, 201, `"${name}" is free to use: ${JSON.stringify(body)}`);
+  }
+});
+
+Then(/^"([^"]*)" has (\d+) ratings? averaging ([\d.]+)$/, async function (this: ApiWorld, name: string, count: string, average: string) {
+  const beer = await currently(this, name);
+  assert.ok(beer, `"${name}" is in the catalogue`);
+  assert.equal(beer.rating_count, Number(count));
+  assert.equal(beer.average_rating, Number(average));
+});

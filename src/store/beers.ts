@@ -1,13 +1,17 @@
 // Beers in the single table:
 //   beer       pk = BEER       sk = BEER#<id>
 //   name lock  pk = BEERNAME   sk = <nameKey>   - makes names unique
-// Beers share a partition so the catalogue is one Query that never reads a
-// lock. A beer and its name lock always change in one transaction, and every
+// Each beer is also in two indexes, both sorted by its place in name order:
+//   gsi1  gsi1pk = BEERS           - the whole catalogue
+//   gsi2  gsi2pk = STYLE#<style>   - one style
+// so a page of either is one Query that reads only the beers it returns.
+// A beer and its name lock always change in one transaction, and every
 // write that depends on a beer's name is conditioned on that name still being
 // current, so a concurrent rename or retire can never strand a lock.
 import { ConditionalCheckFailedException, TransactionCanceledException, TransactionConflictException } from "@aws-sdk/client-dynamodb";
 import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand, type TransactWriteCommandInput } from "@aws-sdk/lib-dynamodb";
-import { nameKey, type BeerChanges, type StoredBeer } from "../domain/beer.ts";
+import { nameKey, orderKey, type BeerChanges, type StoredBeer } from "../domain/beer.ts";
+import type { PageEnd } from "../domain/cursor.ts";
 import { dynamo, tableName } from "../lib/dynamo.ts";
 
 export class NameTaken extends Error {}
@@ -22,8 +26,17 @@ const lockKey = (name: string) => ({ pk: "BEERNAME", sk: nameKey(name) });
 /** The beer exists and still has the name this write was planned against. */
 const STILL_NAMED = "attribute_exists(pk) AND #name = :expected_name";
 
+const CATALOGUE = "BEERS";
+const stylePartition = (style: string) => `STYLE#${style}`;
+
+/** The attributes that place a beer in the two listing indexes. */
+function indexed(beer: { name: string; style: string }) {
+  const order = orderKey(beer.name);
+  return { gsi1pk: CATALOGUE, gsi1sk: order, gsi2pk: stylePartition(beer.style), gsi2sk: order };
+}
+
 function fromItem(item: Record<string, any>): StoredBeer {
-  const { pk, sk, ...beer } = item;
+  const { pk, sk, gsi1pk, gsi1sk, gsi2pk, gsi2sk, ...beer } = item;
   return beer as StoredBeer;
 }
 
@@ -74,7 +87,7 @@ export function putNewBeer(beer: StoredBeer): Promise<void> {
         item: { Put: { TableName: tableName, Item: { ...lockKey(beer.name), beer_id: beer.id }, ConditionExpression: "attribute_not_exists(pk)" } },
         onConditionFailed: new NameTaken(),
       },
-      { item: { Put: { TableName: tableName, Item: { ...beerKey(beer.id), ...beer }, ConditionExpression: "attribute_not_exists(pk)" } } },
+      { item: { Put: { TableName: tableName, Item: { ...beerKey(beer.id), ...indexed(beer), ...beer }, ConditionExpression: "attribute_not_exists(pk)" } } },
     ]),
   );
 }
@@ -84,26 +97,38 @@ export async function readBeer(id: string): Promise<StoredBeer | undefined> {
   return Item && fromItem(Item);
 }
 
-export async function readBeers(style?: string): Promise<StoredBeer[]> {
-  // One partition holds only beers, so this reads no locks. The style filter
-  // still reads every beer; give styles an index before the catalogue is large.
-  const beers: StoredBeer[] = [];
-  let start: Record<string, any> | undefined;
+/**
+ * One page of the catalogue, or of one style, in name order. `next` is where
+ * the page ended when there are more beers after it.
+ */
+export async function readPage(style: string | undefined, limit: number, after?: PageEnd): Promise<{ beers: StoredBeer[]; next?: PageEnd }> {
+  const index = style ? "gsi2" : "gsi1";
+  const partition = style ? stylePartition(style) : CATALOGUE;
+  const items: Record<string, any>[] = [];
+  let start: Record<string, any> | undefined = after && { ...beerKey(after.id), [`${index}pk`]: partition, [`${index}sk`]: after.order };
+  // Ask for one more than the page: its presence is how we know there is a next page.
   do {
     const page = await dynamo.send(
       new QueryCommand({
         TableName: tableName,
-        ConsistentRead: true,
+        IndexName: index,
+        KeyConditionExpression: "#pk = :pk",
+        ExpressionAttributeNames: { "#pk": `${index}pk` },
+        ExpressionAttributeValues: { ":pk": partition },
+        Limit: limit + 1 - items.length,
         ExclusiveStartKey: start,
-        KeyConditionExpression: "pk = :pk",
-        ExpressionAttributeValues: { ":pk": beerKey("").pk, ...(style ? { ":style": style } : {}) },
-        ...(style ? { FilterExpression: "#style = :style", ExpressionAttributeNames: { "#style": "style" } } : {}),
       }),
     );
-    beers.push(...(page.Items ?? []).map(fromItem));
+    items.push(...(page.Items ?? []));
     start = page.LastEvaluatedKey;
-  } while (start);
-  return beers;
+  } while (start && items.length <= limit);
+
+  const beers = items.slice(0, limit);
+  const last = beers.at(-1);
+  return {
+    beers: beers.map(fromItem),
+    ...(items.length > limit && last ? { next: { order: last[`${index}sk`], id: last.id } } : {}),
+  };
 }
 
 export function applyChanges(id: string, changes: BeerChanges, updated_at: string): Promise<StoredBeer> {
@@ -111,7 +136,13 @@ export function applyChanges(id: string, changes: BeerChanges, updated_at: strin
     const current = await readBeer(id);
     if (!current) throw new BeerNotFound();
 
-    const next = { ...changes, updated_at };
+    const next = {
+      ...changes,
+      updated_at,
+      // Keep the beer's place in the listing indexes in step with its name and style.
+      ...(changes.name === undefined ? {} : { gsi1sk: orderKey(changes.name), gsi2sk: orderKey(changes.name) }),
+      ...(changes.style === undefined ? {} : { gsi2pk: stylePartition(changes.style) }),
+    };
     const fields = Object.keys(next);
     const update = {
       TableName: tableName,
@@ -139,7 +170,7 @@ export function applyChanges(id: string, changes: BeerChanges, updated_at: strin
     ]);
     // A transaction cannot return the item. Read it for its current ratings;
     // if it has been retired since, the update still happened, so answer with it.
-    return (await readBeer(id)) ?? { ...current, ...next };
+    return (await readBeer(id)) ?? fromItem({ ...current, ...next });
   });
 }
 

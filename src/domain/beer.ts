@@ -42,11 +42,12 @@ export function toBeer({ rating_total, ...beer }: StoredBeer): Beer {
   return { ...beer, average_rating: averageOf(beer.rating_count, rating_total) };
 }
 
-// A fixed locale, so the order is the same wherever the Lambda runs.
-const ignoringCase = new Intl.Collator("en", { sensitivity: "accent" });
-const exact = new Intl.Collator("en", { sensitivity: "variant" });
-
-/** Catalogue order: alphabetical by name, ignoring case - "Éclair" sorts with the Es, not after Z. */
-export function byName(a: { name: string }, b: { name: string }): number {
-  return ignoringCase.compare(a.name, b.name) || exact.compare(a.name, b.name);
+/**
+ * A beer's place in the catalogue: names in alphabetical order, ignoring case
+ * and accents, so "Éclair" sorts with the Es and not after Z. The exact name
+ * key follows, to order names that differ only by accent.
+ */
+export function orderKey(name: string): string {
+  const key = nameKey(name);
+  return `${key.normalize("NFD").replace(/\p{M}+/gu, "")}|${key}`;
 }
