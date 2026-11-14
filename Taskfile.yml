@@ -134,6 +134,47 @@ tasks:
       - node tools/asyncapi/asyncapi.ts examples check
   # component:asyncapi:end
 
+  # component:consume:start
+  consume:generate:
+    desc: Generate src/generated/consumers.ts - every receive operation of the AsyncAPI contract wired to its file in src/consumers/ (task generate runs it)
+    cmds:
+      - node scripts/consume.ts generate
+
+  consume:scaffold:
+    desc: Write a typed stub in src/consumers/ for every receive operation without a file (task scaffold runs it)
+    cmds:
+      - node scripts/consume.ts scaffold
+
+  consume:check:
+    desc: Gate - every receive operation of the AsyncAPI contract was delivered a message by a scenario in the last full feature run
+    cmds:
+      - node scripts/consume.ts check
+
+  queue:send:
+    desc: Send a message to the API's queue - an example from messages/ by name (task queue:send -- beer_rated), or a file of your own (ENV=local|aws, default local)
+    deps: [install]
+    cmds:
+      - node local/queue.ts send {{.CLI_ARGS}}
+
+  queue:peek:
+    desc: Show how many messages are waiting on the queue and the dead-letter queue, and how many are being handled - counts only, so looking costs a message none of its tries (ENV=local|aws)
+    deps: [install]
+    cmds:
+      - node local/queue.ts peek
+
+  dlq:peek:
+    desc: Show the messages on the dead-letter queue and why each is there, without taking them (ENV=local|aws)
+    deps: [install]
+    cmds:
+      - node local/queue.ts dead-letters
+
+  dlq:redrive:
+    desc: Move the dead-letter queue's messages back to the queue, to be handled again - after fixing what failed them (ENV=local|aws)
+    deps: [install]
+    cmds:
+      - node local/queue.ts redrive
+  # component:consume:end
+
   component:list:
     desc: The template's optional components, and whether this repository has each
     deps: [install]
@@ -151,6 +192,11 @@ tasks:
     deps: [install]
     cmds:
       - node scripts/components.ts add {{.CLI_ARGS}}
+
+  component:acceptance:
+    desc: Gate - what the optional components hold the last feature run to; used by acceptance, against a stack that is already up
+    cmds:
+      - node scripts/components.ts run acceptance
 
   component:gates:
     desc: Gate - the gates the optional components still in this repository add to task ci
@@ -204,6 +250,8 @@ tasks:
     deps: [generate]
     cmds:
       - node scripts/scaffold.ts
+      # What an optional component scaffolds from a contract of its own.
+      - node scripts/components.ts run scaffold
 
   spec:check:
     desc: Gate - the contract is valid and every operation is covered by a tagged scenario
@@ -355,7 +403,7 @@ tasks:
     desc: Gate - features, that they reach every documented response, then fuzz - one stack, infra/ applied to AWS Emulator, called through its API Gateway
     deps: [build, emulator:install]
     cmds:
-      - node local/stack.mjs -- task features:run responses:check contract:fuzz:run
+      - node local/stack.mjs -- task features:run responses:check component:acceptance contract:fuzz:run
 
   features:run:
     desc: The feature files against a stack that is already up (BASE_URL); used by features and acceptance
@@ -381,8 +429,8 @@ tasks:
     cmds:
       - rm -rf dist
       - >-
-        npx esbuild src/handler.ts --bundle --platform=node --target=node22 --format=esm
-        --outfile=dist/handler.mjs --external:@aws-sdk/* --log-level=warning
+        npx esbuild $(ls src/handler.ts src/consumer.ts 2>/dev/null) --bundle --platform=node --target=node22 --format=esm
+        --outdir=dist --out-extension:.js=.mjs --external:@aws-sdk/* --log-level=warning
 
   infra:validate:
     desc: Gate - the Terraform is formatted and valid

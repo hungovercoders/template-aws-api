@@ -34,6 +34,34 @@
           "asyncapi:examples:check"
         ]
       }
+    },
+    "consume": {
+      "title": "Async input: the API takes messages from an SQS queue, each a receive operation of the AsyncAPI contract",
+      "needs": [
+        "asyncapi"
+      ],
+      "files": [
+        "infra/consume.tf",
+        "src/lib/consumer.ts",
+        "src/consumer.ts",
+        "scripts/consume.ts",
+        "steps/messages.ts",
+        "local/queue.ts",
+        "test/consumer.test.ts",
+        "test/consumers.test.ts",
+        ".claude/skills/implement-api/messages.md"
+      ],
+      "gates": {
+        "generate": [
+          "consume:generate"
+        ],
+        "scaffold": [
+          "consume:scaffold"
+        ],
+        "acceptance": [
+          "consume:check"
+        ]
+      }
     }
   }
 }
