@@ -1,0 +1,39 @@
+# For the template repository itself - delete this file in an API created from it.
+#
+# `ci` is red on main by design: there is no spec to implement. This is the
+# green signal for the skeleton instead. It lays the example's spec and
+# implementation (the example/implementation branch) over the skeleton being
+# proposed and runs every gate, so a change to the skeleton - a Renovate
+# update included - is proven before it is merged down.
+name: template
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  skeleton:
+    name: skeleton delivers the example
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v5
+      - name: Lay the example over this skeleton
+        run: |
+          git fetch origin example/implementation
+          # Everything an API owns comes from the example...
+          git checkout origin/example/implementation -- specs http/contract.http src/operations src/domain src/store steps test
+          # ...and everything the skeleton owns stays as proposed here.
+          git checkout HEAD -- steps/world.ts test/routes.test.ts test/log.test.ts
+      - run: task ci
+      - name: AWS Emulator log
+        if: failure()
+        run: tail -n 200 .local/emulator.log 2>/dev/null || true

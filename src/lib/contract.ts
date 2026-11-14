@@ -41,7 +41,10 @@ export type Violation = { in: "path" | "query" | "body"; pointer: string; messag
 
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
 
-const contract = document as { paths?: Record<string, Record<string, unknown>>; security?: SecurityRequirement[] };
+const contract = document as { info?: { version?: string }; paths?: Record<string, Record<string, unknown>>; security?: SecurityRequirement[] };
+
+/** The contract version this build serves (info.version). */
+export const apiVersion = contract.info?.version ?? "0.0.0";
 
 export const operations: Operation[] = Object.entries(contract.paths ?? {}).flatMap(([path, item]) =>
   METHODS.filter((method) => item[method]).map((method) => {
