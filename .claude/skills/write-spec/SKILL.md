@@ -81,7 +81,9 @@ you assumed something, say so and get a yes.
    traces to something the user confirmed. Remove what does not.
 8. **Get the user's approval** of the final spec, with a summary: the
    operations, who may call each, the rules, and every assumption you made.
-   Then stop. Tell them `/implement-api` builds it.
+   Then run `task stage -- spec` and commit `.stage`: until the code catches
+   up, the pre-push hook checks the spec and not the code. Stop there, and
+   tell them `/implement-api` builds it.
 
 ## The repository becomes the API
 

@@ -281,13 +281,6 @@ tasks:
   ci:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
     cmds:
-      - task: check
-      - task: infra:validate
-      - task: acceptance
-
-  check:
-    desc: The fast gates - everything in task ci that needs nothing running. What the pre-push hook runs.
-    cmds:
       - task: skeleton:check
       - task: docs:check
       - task: spec:check
@@ -298,6 +291,20 @@ tasks:
       - task: test:unit
       - task: typecheck
       - task: steps:check
+      - task: infra:validate
+      - task: acceptance
+
+  check:
+    desc: The fast gates for the stage in .stage (template, spec, implemented) - nothing started, nothing downloaded. What the pre-push hook runs.
+    deps: [install]
+    cmds:
+      - node scripts/check.ts
+
+  stage:
+    desc: Move to the next stage once its fast gates pass, so task check and the hook run them from now on (task stage -- spec | implemented). The skills do this.
+    deps: [install]
+    cmds:
+      - node scripts/check.ts {{.CLI_ARGS}}
 
   hooks:install:
     desc: Opt in to the pre-push hook - git runs task check before every push (skip one push with git push --no-verify)
