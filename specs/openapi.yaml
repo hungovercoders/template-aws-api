@@ -309,15 +309,34 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: The request does not satisfy the contract.
+            errors:
+              - in: body
+                pointer: /abv
+                message: must be <= 20
     NotFound:
       description: There is no such beer in the catalogue.
       content:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+          example:
+            type: about:blank
+            title: Not Found
+            status: 404
+            detail: There is no such beer in the catalogue.
     Conflict:
       description: Another beer in the catalogue already has that name.
       content:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/Problem"
+          example:
+            type: about:blank
+            title: Conflict
+            status: 409
+            detail: Another beer in the catalogue already has that name.
