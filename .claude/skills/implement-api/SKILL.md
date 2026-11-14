@@ -57,6 +57,12 @@ You bring only the business logic the specs describe. That means you write:
 - the body of each operation in `src/operations/<operationId>.ts` (likewise)
 - `src/domain/`, `src/store/` and their unit tests in `test/`
 
+`task skeleton:check` enforces this: it is the first gate in `task ci` and
+fails if any skeleton file differs from `skeleton.lock`. If it fails, undo
+your change to the file it names. Never run `task skeleton:lock` yourself and
+never edit `skeleton.lock` - accepting a skeleton change is the user's
+decision.
+
 Do not regenerate, restructure, "improve" or replace anything else, and do not
 add a framework, another router, validator, test runner or build tool. If the
 skeleton genuinely cannot express something the specs need (for example a
@@ -273,6 +279,7 @@ leave them to CI.
 
 | Gate | Proves |
 | --- | --- |
+| `skeleton:check` | No skeleton file has been changed |
 | `spec:check` | The contract is valid; every operation has a tagged scenario |
 | `spec:lint` | The contract meets the house standards and this API's own rules |
 | `spec:compat` | Contract changes since the last published one are listed and versioned |

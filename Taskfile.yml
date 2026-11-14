@@ -49,6 +49,18 @@ tasks:
       - src/generated/api.d.ts
       - src/generated/routes.ts
 
+  skeleton:check:
+    desc: Gate - no skeleton file differs from skeleton.lock; the skeleton is the same for every API
+    deps: [install]
+    cmds:
+      - node scripts/skeleton.ts check
+
+  skeleton:lock:
+    desc: Accept the skeleton as it is now - a deliberate step for a person, after changing the skeleton on purpose
+    deps: [install]
+    cmds:
+      - node scripts/skeleton.ts lock
+
   scaffold:
     desc: Write what follows from the specs - a typed stub for every operation without a file, a pending step for every unbound sentence
     deps: [generate]
@@ -228,6 +240,7 @@ tasks:
   ci:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
     cmds:
+      - task: skeleton:check
       - task: spec:check
       - task: spec:lint
       - task: spec:compat
