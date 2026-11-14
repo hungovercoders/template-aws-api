@@ -7,7 +7,7 @@ import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { randomUUID } from "node:crypto";
 import generated from "../generated/asyncapi.json" with { type: "json" };
-import { traceparent } from "./trace.ts";
+import { continueTrace, traceparent } from "./trace.ts";
 
 export type CloudEvent<Type extends string = string, Data = unknown> = {
   specversion: "1.0";
@@ -36,7 +36,9 @@ export class InvalidEvent extends Error {
 }
 
 type Schema = Record<string, unknown> & { allOf?: Schema[]; properties?: Record<string, Schema>; const?: unknown };
-type Document = { components?: { messages?: Record<string, { name?: string; payload?: Schema }> } };
+type Message = { payload?: Schema };
+// The contract as `task generate` wrote it: resolved, so every operation holds its messages.
+type Document = { operations?: Record<string, { action?: string; messages?: Message[] }> };
 
 // The `type` a payload fixes with a const, wherever allOf puts it.
 function fixedType(schema: Schema | undefined): string | undefined {
@@ -52,18 +54,28 @@ function fixedType(schema: Schema | undefined): string | undefined {
 
 /** The events of one contract. `events` below is this API's; a test makes its own. */
 export function eventsOf(document: Document, source = () => process.env.EVENT_SOURCE ?? "/local") {
-  const ajv = addFormats(new Ajv2020({ allErrors: true, strict: false }));
-  const validators = new Map<string, ValidateFunction>();
-  for (const message of Object.values(document.components?.messages ?? {})) {
-    const type = fixedType(message.payload);
-    if (type && message.payload) validators.set(type, ajv.compile(message.payload));
+  // What the contract says this API publishes (`send`) and accepts (`receive`), by type.
+  const schemas = { send: new Map<string, Schema>(), receive: new Map<string, Schema>() };
+  for (const operation of Object.values(document.operations ?? {})) {
+    const direction = operation.action === "send" ? schemas.send : operation.action === "receive" ? schemas.receive : undefined;
+    for (const message of operation.messages ?? []) {
+      const type = fixedType(message.payload);
+      if (direction && type && message.payload) direction.set(type, message.payload);
+    }
   }
-  const violationsOf = (validate: ValidateFunction, event: unknown): EventViolation[] =>
-    validate(event) ? [] : (validate.errors ?? []).map((error) => ({ pointer: error.instancePath, message: error.message ?? "is invalid" }));
+  // Compiled the first time a type is used, as the router compiles a request's schema.
+  const ajv = addFormats(new Ajv2020({ allErrors: true, strict: false }));
+  const compiled = new Map<Schema, ValidateFunction>();
+  const validator = (schema: Schema) => compiled.get(schema) ?? compiled.set(schema, ajv.compile(schema)).get(schema)!;
+  const violationsOf = (schema: Schema, event: unknown): EventViolation[] => {
+    const validate = validator(schema);
+    return validate(event) ? [] : (validate.errors ?? []).map((error) => ({ pointer: error.instancePath, message: error.message ?? "is invalid" }));
+  };
 
   return {
-    /** The types this API's contract describes. */
-    types: [...validators.keys()],
+    /** The types this API publishes and the types it accepts. */
+    publishes: [...schemas.send.keys()],
+    accepts: [...schemas.receive.keys()],
 
     /**
      * An event to publish: `type`, `data` and what it happened to are yours;
@@ -72,8 +84,8 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
      * where a scenario sees it, not after the write.
      */
     create<Event extends CloudEvent>(type: Event["type"], data: Event["data"], subject?: string): Event {
-      const validate = validators.get(type);
-      if (!validate) throw new Error(`"${type}" is not an event in specs/asyncapi.yaml; an event is added to the contract before it is published`);
+      const schema = schemas.send.get(type);
+      if (!schema) throw new Error(`"${type}" is not an event specs/asyncapi.yaml says this API publishes; an event is added to the contract, as a send operation, before it is published`);
       const event = {
         specversion: "1.0",
         id: randomUUID(),
@@ -85,14 +97,16 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
         traceparent: traceparent(),
         data,
       } as Event;
-      const violations = violationsOf(validate, event);
+      const violations = violationsOf(schema, event);
       if (violations.length > 0) throw new Error(`the ${type} event does not match specs/asyncapi.yaml: ${violations.map((v) => `${v.pointer || "/"} ${v.message}`).join("; ")}`);
       return event;
     },
 
     /**
      * A message received: the CloudEvent it is, held to the contract for its
-     * type. Throws InvalidEvent for anything else, before any of your code runs.
+     * type. Throws InvalidEvent for anything else, before any of your code
+     * runs. The trace the message carries becomes the one in force, so what
+     * handling it logs and publishes belongs to the same trace.
      */
     parse(message: string | unknown): CloudEvent {
       let event: unknown = message;
@@ -105,10 +119,11 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
       }
       const type = (event as { type?: unknown } | null)?.type;
       if (typeof type !== "string") throw new InvalidEvent("the message is not a CloudEvent: it has no type");
-      const validate = validators.get(type);
-      if (!validate) throw new InvalidEvent(`"${type}" is not a type this API's contract describes`);
-      const violations = violationsOf(validate, event);
+      const schema = schemas.receive.get(type);
+      if (!schema) throw new InvalidEvent(`"${type}" is not a message this API's contract says it accepts`);
+      const violations = violationsOf(schema, event);
       if (violations.length > 0) throw new InvalidEvent(`the ${type} message does not match the contract`, violations);
+      continueTrace((event as CloudEvent).traceparent);
       return event as CloudEvent;
     },
   };

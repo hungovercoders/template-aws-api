@@ -87,11 +87,14 @@ rules:
     description: An event's type is reverse-DNS, lower case, in the past tense, with its major version last - com.<org>.<api>.<thing>.<happened>.v1.
     message: 'Event type "{{value}}" is not com.<org>.<api>.<thing>.<happened>.v<major>.'
     severity: error
-    given: "$..properties.type.const"
+    # The envelope's own type, not a property called type inside data.
+    given:
+      - "$.components.messages[*].payload.properties.type.const"
+      - "$.components.messages[*].payload.allOf[*].properties.type.const"
     then:
       function: pattern
       functionOptions:
-        match: "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+\\.v[1-9][0-9]*$"
+        match: "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*){4,}\\.v[1-9][0-9]*$"
 
   house-enum-values-snake-case:
     description: String enum values are lower snake_case.

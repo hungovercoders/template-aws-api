@@ -148,12 +148,14 @@ payload:
 ```
 
 A `type` is `com.<org>.<api>.<thing>.<happened>.v<major>`: lower case, what
-happened in the past tense, the major version last. `asyncapi:check` and
-`asyncapi:lint` hold every message to the envelope, to that form and to
+happened in the past tense, the major version last. `asyncapi:check` holds
+every message to the envelope and to a `type` of its own; `asyncapi:lint`
+holds the `type` to that form and the message to
 `contentType: application/cloudevents+json`. At runtime
 `src/lib/cloudevents.ts` sets `id`, `source`, `time` and the trace on what is
 published, and refuses what is received unless it is a CloudEvent the
-contract describes.
+contract says the API accepts. A change to the envelope itself counts as a
+breaking change to the contract.
 
 **Changing an event that is already published.** A change consumers would
 notice is a new `type`, ending `.v2`, published alongside `.v1` for as long

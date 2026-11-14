@@ -61,7 +61,7 @@ components:
         - type: object
           required: [data]
           properties:
-            type: { type: string, const: com.example.brewery.closed.v1 }
+            type: { type: string, const: com.example.registry.brewery.closed.v1 }
             data:
               type: object
               required: [brewery_id]
@@ -74,7 +74,7 @@ components:
         - type: object
           required: [data]
           properties:
-            type: { type: string, const: com.example.beer.created.v1 }
+            type: { type: string, const: com.example.catalogue.beer.created.v1 }
             data:
               type: object
               required: [beer_id, name, abv]
@@ -116,7 +116,7 @@ test.each<[string, string, (document: Document) => void]>([
   }],
   ["a property made required", "breaking", (d) => data(d).required.push("style")],
   ["a property's type changed", "breaking", (d) => (data(d).properties.abv.type = "string")],
-  ["an event's type renamed", "breaking", (d) => (d.components.schemas.BeerCreatedEvent.allOf[1].properties.type.const = "com.example.beer.created.v2")],
+  ["an event's type renamed", "breaking", (d) => (d.components.schemas.BeerCreatedEvent.allOf[1].properties.type.const = "com.example.catalogue.beer.created.v2")],
   ["an operation removed", "breaking", (d) => delete d.operations.publish_beer_created],
   ["a channel's address changed", "breaking", (d) => (d.channels.beer_events.address = "beers")],
   ["a property called description removed", "breaking", (d) => {
@@ -242,11 +242,8 @@ test("every message is a CloudEvent with a type of its own, named the house way"
   const problems = (name: string, edit: (document: Document) => void) => run(repository(name, stringify(edited(edit))), "check").output;
   const beer = (d: Document) => d.components.schemas.BeerCreatedEvent;
   expect(problems("bare", (d) => (beer(d).allOf = [beer(d).allOf[1]]))).toContain("message beer_created is not a CloudEvent: its payload must extend the envelope");
-  expect(problems("media", (d) => (d.components.messages.beer_created.contentType = "application/json"))).toContain("a CloudEvent in structured mode is application/cloudevents+json");
   expect(problems("untyped", (d) => delete beer(d).allOf[1].properties.type)).toContain("message beer_created does not fix its type");
-  expect(problems("camel", (d) => (beer(d).allOf[1].properties.type.const = "com.example.BeerCreated"))).toContain("a type is com.<org>.<api>.<thing>.<happened>.v<major>");
-  expect(problems("unversioned", (d) => (beer(d).allOf[1].properties.type.const = "com.example.beer.created"))).toContain("a type is com.<org>.<api>.<thing>.<happened>.v<major>");
-  expect(problems("shared", (d) => (beer(d).allOf[1].properties.type.const = "com.example.brewery.closed.v1"))).toContain("have the same type");
+  expect(problems("shared", (d) => (beer(d).allOf[1].properties.type.const = "com.example.registry.brewery.closed.v1"))).toContain("have the same type");
   expect(problems("dataless", (d) => (beer(d).allOf[1].required = []))).toContain("does not require and describe its data");
 });
 
@@ -257,9 +254,14 @@ test("the house rules lint the contract's names and its event types", () => {
     return { status: result.status, output: result.stdout + result.stderr };
   };
   expect(lint("clean", () => {}).status).toBe(0);
-  const named = lint("badtype", (d) => (d.components.schemas.BeerCreatedEvent.allOf[1].properties.type.const = "BeerCreated"));
-  expect(named.status).not.toBe(0);
-  expect(named.output).toContain("house-event-type-naming");
+  const type = (value: string) => (d: Document) => (d.components.schemas.BeerCreatedEvent.allOf[1].properties.type.const = value);
+  for (const [name, value] of Object.entries({ camel: "com.example.catalogue.BeerCreated.v1", unversioned: "com.example.catalogue.beer.created", short: "beer.created.v1" })) {
+    const named = lint(name, type(value));
+    expect(named.status).not.toBe(0);
+    expect(named.output).toContain("house-event-type-naming");
+  }
+  // A property of the data that happens to be called type is not the event's type.
+  expect(lint("inner", (d) => (data(d).properties.type = { type: "string", const: "lager" })).status).toBe(0);
   expect(lint("badmedia", (d) => (d.components.messages.beer_created.contentType = "application/json")).output).toContain("house-message-is-a-cloudevent");
   expect(lint("camel", (d) => (data(d).properties.beerId = { type: "string" })).output).toContain("house-property-names-snake-case");
 });
@@ -323,12 +325,27 @@ test("an example on a base schema is not taken for the whole message", () => {
   expect(JSON.parse(readFileSync(join(dir, "messages/beer_created.json"), "utf8")).data).toEqual({ beer_id: "beer id", name: "name", abv: 0 });
 });
 
+test("a change to the envelope every message extends is a breaking change to the contract", () => {
+  const dir = repository("envelope");
+  const envelope = parse(readFileSync(ENVELOPE, "utf8")) as Document;
+  expect(run(dir, "compat").output).toContain("unchanged since");
+  // Words about it are not a change to it.
+  envelope.CloudEvent.properties.id.description = "Reworded.";
+  write(dir, "tools/asyncapi/cloudevent.yaml", stringify(envelope));
+  expect(run(dir, "compat").output).toContain("unchanged since");
+  envelope.CloudEvent.required.push("subject");
+  write(dir, "tools/asyncapi/cloudevent.yaml", stringify(envelope));
+  const compat = run(dir, "compat");
+  expect(compat.status).toBe(1);
+  expect(compat.output).toContain("tools/asyncapi/cloudevent.yaml - the envelope every message extends");
+});
+
 test("generate writes the resolved contract, a type for every payload and the table of operations", () => {
   const dir = repository("generated");
   expect(run(dir, "generate").status).toBe(0);
   const types = readFileSync(join(dir, "src/generated/messages.d.ts"), "utf8");
   expect(types).toContain("export interface BeerCreatedEvent {");
-  expect(types).toContain("'type': 'com.example.beer.created.v1';");
+  expect(types).toContain("'type': 'com.example.catalogue.beer.created.v1';");
   expect(types).toContain("'data': BeerCreatedEventData;");
   expect(types).toContain("export interface BeerCreatedEventData {");
   expect(types).toContain("'style'?: string;");
@@ -338,7 +355,7 @@ test("generate writes the resolved contract, a type for every payload and the ta
   expect(operations).toContain('"id": "handle_brewery_closed"');
   expect(operations).toContain('"action": "receive"');
   expect(operations).toContain('"address": "beer-events"');
-  expect(operations).toContain('"type": "com.example.beer.created.v1"');
+  expect(operations).toContain('"type": "com.example.catalogue.beer.created.v1"');
   expect(JSON.stringify(JSON.parse(readFileSync(join(dir, "src/generated/asyncapi.json"), "utf8")))).not.toContain("x-parser-");
 });
 
@@ -350,7 +367,7 @@ test("examples are written from the contract and checked against it", () => {
     specversion: "1.0",
     id: "id",
     source: "source",
-    type: "com.example.beer.created.v1",
+    type: "com.example.catalogue.beer.created.v1",
     time: "2026-01-01T00:00:00Z",
     data: { beer_id: "beer id", name: "name", abv: 0 },
   });

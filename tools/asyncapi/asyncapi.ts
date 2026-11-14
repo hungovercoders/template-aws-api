@@ -112,7 +112,6 @@ function named_or_stop(all: Operation[]): Operation[] {
 // Every message is a CloudEvent: the skeleton's envelope (cloudevent.yaml),
 // with a `type` the message fixes and a `data` it describes.
 const ENVELOPE = ["specversion", "id", "source", "type", "time"];
-export const EVENT_TYPE = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9_]*)+\.v[1-9][0-9]*$/;
 function envelopeProblems(all: Operation[]): string[] {
   const problems: string[] = [];
   const types = new Map<string, string>();
@@ -123,9 +122,8 @@ function envelopeProblems(all: Operation[]): string[] {
       problems.push(`message ${message.name} is not a CloudEvent: its payload must extend the envelope - allOf: [{ $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent' }, ...]`);
       continue;
     }
-    if (message.contentType !== "application/cloudevents+json") problems.push(`message ${message.name} has contentType ${message.contentType ?? "none"}; a CloudEvent in structured mode is application/cloudevents+json`);
+    // How a type is spelt, and the content type, are house rules: asyncapi:lint.
     if (!message.type) problems.push(`message ${message.name} does not fix its type: add properties.type.const`);
-    else if (!EVENT_TYPE.test(message.type)) problems.push(`message ${message.name} has type "${message.type}"; a type is com.<org>.<api>.<thing>.<happened>.v<major>, lower case`);
     else if (types.has(message.type)) problems.push(`messages ${types.get(message.type)} and ${message.name} have the same type "${message.type}"; a type names one message`);
     else types.set(message.type, message.name);
     if (!schema.properties?.data || !schema.required?.includes("data")) problems.push(`message ${message.name} does not require and describe its data`);
@@ -201,6 +199,27 @@ export function changes(before: unknown, after: unknown): (Change & { level: Lev
   return ([...output.breaking(), ...output.nonBreaking(), ...output.unclassified()] as Change[]).map((change) => ({ ...change, level: level(change) }));
 }
 
+// Every message extends the skeleton's envelope by reference, so a change to
+// that file changes every message without touching the contract. Words aside,
+// any difference in it is treated as breaking.
+const ENVELOPE_FILE = "tools/asyncapi/cloudevent.yaml";
+function envelopeChanges(ref: string): (Change & { level: Level })[] {
+  const before = show(ref, ENVELOPE_FILE);
+  if (before === undefined || !existsSync(ENVELOPE_FILE)) return [];
+  const wordless = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(wordless)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value)
+              .filter(([key]) => !WORDS.has(key))
+              .map(([key, inner]) => [key, wordless(inner)]),
+          )
+        : value;
+  const same = JSON.stringify(wordless(parseYaml(before))) === JSON.stringify(wordless(parseYaml(readFileSync(ENVELOPE_FILE, "utf8"))));
+  return same ? [] : [{ action: "edit", path: `${ENVELOPE_FILE} - the envelope every message extends`, type: "breaking", level: "breaking" }];
+}
+
 async function compat(): Promise<void> {
   const skip = (why: string) => console.log(`asyncapi:compat skipped - ${why}`);
   const ref = baseline();
@@ -211,7 +230,7 @@ async function compat(): Promise<void> {
   await load();
   type Document = { info?: { version?: string } };
   const [old, current] = [parseYaml(before) as Document, parseYaml(now) as Document];
-  const found = changes(old, current).filter((change) => change.path !== "/info/version");
+  const found = [...changes(old, current).filter((change) => change.path !== "/info/version"), ...envelopeChanges(ref)];
   const breaking = found.filter((change) => change.level === "breaking");
   // What the rules cannot place is shown, and treated as breaking until a person has looked.
   const unknown = found.filter((change) => change.level === "unclassified");
@@ -226,7 +245,7 @@ async function compat(): Promise<void> {
     any: major > oldMajor || (major === oldMajor && (minor > oldMinor || (minor === oldMinor && patch > oldPatch))),
   };
   const from = `${old.info?.version} (at ${ref.slice(0, 12)})`;
-  const edited = before.trim() !== now.trim();
+  const edited = before.trim() !== now.trim() || found.length > 0;
   const problems: string[] = [];
   if (breaking.length + unknown.length > 0 && !(bumped.major || (oldMajor === 0 && bumped.minor))) {
     problems.push(
