@@ -95,7 +95,9 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 1. **Create your repo** from this template (*Use this template* on GitHub; see
    [Using this repository as a template](#using-this-repository-as-a-template))
    and run `mise install`.
-2. **Add your spec.**
+2. **Add your spec.** In Claude Code, `/write-spec` works through it with
+   you: it asks for your requirements, drafts the features and contract, and
+   checks them against the gates. Or write it by hand:
    - Replace `specs/openapi.yaml` with your contract. Every operation needs an
      `operationId`. Document error responses with the `Problem` schema already
      in the file - it is the error body the router emits.
@@ -134,6 +136,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | `task scaffold` | Write what follows from the spec: a typed stub per operation, a pending step per sentence |
 | `task spec:check` | The contract is valid and every operation has a tagged scenario |
 | `task spec:lint` | The contract meets the house rules and your own (Spectral) |
+| `task spec:compat` | Changes since the last published contract are listed and `info.version` is bumped to match |
 | `task mock` | Serve a mock of the contract on http://127.0.0.1:4010 - no implementation needed |
 | `task http` | Send requests from `http/*.http` to the mock, the local stack or a deployed API |
 | `task typecheck` | The code agrees with the types generated from the contract |
@@ -168,6 +171,7 @@ rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
 http/                   .http requests for exploring by hand; contract.http is generated
 scripts/                generate, scaffold, spec:check and http:generate
+.claude/skills/write-spec/      the skill that helps you write the spec
 .claude/skills/implement-api/   the skill that drives an implementation
 ```
 
@@ -180,6 +184,9 @@ Each gate fails for one reason and says what it is:
   not exist.
 - **`spec:lint`** - the contract breaks a rule in `rules/house.yaml` or
   `.spectral.yaml`. Warnings fail as well as errors.
+- **`spec:compat`** - the contract changed since the last published one and
+  `info.version` does not say so: a breaking change without a new major
+  version, an API change without a new minor, or an edit without a new version.
 - **`http:check`** - `http/contract.http` no longer matches the contract; run
   `task http:generate` and commit it.
 - **`test:unit`** (`test/routes.test.ts`) - an operation in the contract with
@@ -194,6 +201,43 @@ Each gate fails for one reason and says what it is:
 
 The router validates every incoming request against the contract before your
 code runs, so the 400 responses are the contract's, not hand-written checks.
+
+## Writing and changing the spec
+
+**Writing it.** The `write-spec` skill (`.claude/skills/write-spec`) helps
+you get from requirements to a spec. You own the requirements: it asks what
+the API is for, who uses it and what the rules are, proposes the conventional
+parts, and writes only what you have confirmed. It writes the features first,
+then a contract that carries exactly that behaviour, runs the spec gates, and
+has you try the result on the mock before you approve it. It stops there;
+`/implement-api` builds it.
+
+**Changing it.** A published contract has consumers, so every change is
+versioned. `info.version` is a semantic version, and `task spec:compat` - a
+gate in `task ci` - holds it to what actually changed:
+
+| The change | Examples | `info.version` needs |
+| --- | --- | --- |
+| Breaking - an existing consumer can fail | Removing or renaming an operation, property or enum value; a new required request property; a tighter limit | A new **major** (a new minor while the API is `0.x`) |
+| Additive - existing consumers are unaffected | A new operation, a new optional request property, a new response property | A new **minor** |
+| Clarifying - the API behaves the same | Descriptions, examples | A new **patch** |
+
+The gate compares the contract with the last published one using
+[oasdiff](https://github.com/oasdiff/oasdiff): on a branch, the contract on
+the default branch; on the default branch, the previous commit. It prints
+every change, grouped by whether it breaks consumers, and fails if the
+version does not match. So a breaking change cannot be merged by accident: it
+is listed in the CI log and needs a deliberate major version.
+
+```sh
+task spec:compat                         # against the default branch / previous commit
+SPEC_BASELINE=v1.4.0 task spec:compat    # against any tag, branch or commit
+```
+
+Prefer not to break: add the new thing beside the old, mark the old
+`deprecated: true`, and remove it in a later major version. The gate checks
+the contract's version; how you serve two major versions side by side, if
+you need to, is a deployment decision the template leaves to you.
 
 ## Contract standards
 
