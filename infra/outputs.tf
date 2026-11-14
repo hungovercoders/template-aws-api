@@ -1,6 +1,9 @@
 output "base_url" {
   description = "Base URL of the deployed API."
-  value       = aws_apigatewayv2_stage.default.invoke_url
+  # The API's own endpoint, not the stage's invoke_url: the two are the same on
+  # AWS for the $default stage, and on AWS Emulator this one is the local URL.
+  value      = "${aws_apigatewayv2_api.this.api_endpoint}/"
+  depends_on = [aws_apigatewayv2_stage.default]
 }
 
 output "table_name" {

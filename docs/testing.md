@@ -68,8 +68,8 @@ task http -- --all                   # every request in turn
 
 | Environment | Sends to | Caller |
 | --- | --- | --- |
-| `mock` | Prism, `http://127.0.0.1:4010` | `test:explorer` |
-| `local` | the local stack, `http://127.0.0.1:3000` | `test:explorer` - the local stand-in for a signed-in caller |
+| `mock` | Prism, `http://127.0.0.1:4010` | any token |
+| `local` | the running `task dev`: its URL on AWS Emulator, from `.local/stack.json` | a token `task dev` minted, as the caller `explorer` |
 | `aws` | your deployed API | a real token |
 
 Environments are in `http/http-client.env.json`. For `aws`, put your stack's
@@ -120,12 +120,21 @@ from scratch and throws it away:
 | Lambda code | `dist/handler.mjs`, the esbuild bundle Terraform packages | Yes - the same file |
 | Infrastructure | `infra/` applied to AWS Emulator with `terraform apply` | Same definitions; the emulator's control plane, not AWS's |
 | DynamoDB | The table that apply created, on AWS Emulator | Emulated |
-| API Gateway | `local/server.ts` builds the payload-format-2.0 event from the contract's routes | Stand-in |
-| Lambda runtime, IAM | Not exercised - the bundle runs in Node on the test machine | No |
+| API Gateway | The emulator's HTTP API: the routes apply created, each integrated with the function | Emulated |
+| Lambda runtime | The emulator runs the bundle as the function, on its Node 22 runtime | Emulated |
+| Authorizer | The emulator's JWT authorizer refuses a missing or malformed token and a wrong issuer or audience, and passes the claims to the function. It does not verify signatures | Partly |
+| IAM | Not enforced the way AWS enforces it; the emulator's guide says not to test security on it | No |
 
-The last two rows are a limit of the emulator, not a choice: it accepts the
-Lambda and HTTP API definitions but cannot yet invoke a function. Until it
-can, API Gateway, IAM and the Lambda runtime are only proven by a real deploy.
+Nothing stands in for AWS: every request in a scenario or a fuzz run goes
+through the emulator's API Gateway to the function and on to its DynamoDB.
+What only a real deploy proves is token signatures, IAM and anything the
+emulator gets wrong. The emulator's Node runtime is not the whole of Node -
+`node:http`, `node:https` and `node:module` are missing in 1.0.365 - so a
+dependency that needs them fails there as a `Runtime.ImportModuleError`.
+
+A request takes tens of milliseconds, so a full run is slower than calling
+the code directly would be. When a run fails, `local/stack.mjs` prints the
+function's log if the AWS CLI is installed.
 
 A new emulator release can change a response to match AWS more closely, which
 is why the version is pinned; see

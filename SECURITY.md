@@ -33,7 +33,9 @@ So you know what to rely on, and what to check when reporting:
   resources. See [Deploy](docs/deploying.md#deploy).
 - **AWS Emulator is verified** against AWS's signing key before it is used,
   and is never installed system-wide.
-- **The local test caller** (`Bearer test:<subject>`) exists only in the
-  local stand-in; it is not in the deployed Lambda.
+- **Local callers are not a security test.** On the local stack, AWS
+  Emulator's authorizer checks a token's shape, issuer and audience but not
+  its signature, so `local/token.ts` can mint callers for tests. On AWS the
+  same authorizer verifies every token against your identity provider.
 
 The API is deployed without authentication unless the contract asks for it.

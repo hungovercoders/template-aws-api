@@ -2,7 +2,8 @@
 // Bring up the local stack and either keep it running or run a command against it:
 //   1. AWS Emulator
 //   2. infra/ applied to it with Terraform - the same definitions that deploy to AWS
-//   3. the built Lambda bundle (dist/handler.mjs) behind a local API Gateway stand-in
+//   3. nothing else: the API is the emulator's HTTP API, routing to the Lambda
+//      that apply created from the built bundle (dist/handler.mjs)
 //   node local/stack.mjs                      keep running (task dev)
 //   node local/stack.mjs -- npx cucumber-js   run the command with BASE_URL set, then stop
 //
@@ -11,7 +12,7 @@
 //   2. one already serving on EMULATOR_PORT (e.g. the Docker container from `task emulator:docker`)
 //   3. start one: AWS_EMULATOR_BIN, then .tools/ (from `task emulator:install`), then PATH
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:https";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -22,7 +23,13 @@ const command = sep === -1 ? [] : args.slice(sep + 1);
 const children = [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Written while `task dev` is up, for `task http`.
+const stackFile = join(".local", "stack.json");
+// The callers the local stack accepts; local/token.ts signs tokens to match.
+const jwt = { issuer: "https://issuer.invalid/", audience: "local" };
+
 function stop(code) {
+  rmSync(stackFile, { force: true });
   for (const child of children) child.kill("SIGTERM");
   process.exit(code);
 }
@@ -78,6 +85,7 @@ async function emulatorEnv() {
     AWS_CONFIG_FILE: join(dir, "config"),
     AWS_CA_BUNDLE: ca,
     NODE_EXTRA_CA_CERTS: ca,
+    REQUESTS_CA_BUNDLE: ca,
     AWS_EC2_METADATA_DISABLED: "true",
     AWS_DISABLE_HOST_PREFIX_INJECTION: "true",
     AWS_REGION: "us-east-1",
@@ -106,14 +114,22 @@ function deploy(env) {
   };
   if (!existsSync(join("infra", ".terraform", "providers"))) terraform(["init", "-input=false", "-no-color"]);
   const region = env.AWS_REGION ?? "us-east-1";
-  // Any issuer will do: the emulated authorizer is created but never consulted,
-  // because local/server.ts stands in for it with test callers.
-  const authorizer = ["-var", "jwt_issuer=https://issuer.invalid/", "-var", "jwt_audience=local"];
+  // The emulated authorizer checks a token's issuer and audience against
+  // these; it does not fetch the issuer's keys, so the issuer need not exist.
+  const authorizer = ["-var", `jwt_issuer=${jwt.issuer}`, "-var", `jwt_audience=${jwt.audience}`];
   console.log("applying infra/ to AWS Emulator");
   terraform(["apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`, ...authorizer]);
   const outputs = JSON.parse(terraform(["output", "-json", `-state=${state}`], true));
   console.log("infra/ applied to AWS Emulator");
-  return { TABLE_NAME: outputs.table_name.value };
+  return { TABLE_NAME: outputs.table_name.value, BASE_URL: outputs.base_url.value.replace(/\/$/, ""), LOCAL_JWT_ISSUER: jwt.issuer, LOCAL_JWT_AUDIENCE: jwt.audience };
+}
+
+// When the command failed, what the Lambda logged is the first thing to read.
+// Best effort: it needs the AWS CLI, and the emulator to have kept the logs.
+function lambdaLogs(env) {
+  const logs = spawnSync("aws", ["logs", "tail", "/aws/lambda/api-local", "--since", "15m", "--format", "short"], { env, encoding: "utf8" });
+  const lines = logs.status === 0 ? logs.stdout.trim().split("\n").filter(Boolean) : [];
+  if (lines.length > 0) console.error(["", "--- the Lambda's log (last 60 lines) ---", ...lines.slice(-60)].join("\n"));
 }
 
 mkdirSync(".local", { recursive: true });
@@ -130,38 +146,33 @@ if (overrides.AWS_ENDPOINT_URL) {
 
 Object.assign(env, deploy(env));
 
-// The built Lambda, behind the local API Gateway stand-in. With a command to run it
-// takes a free port; on its own it serves on PORT (default 3000).
-const api = spawn(process.execPath, ["--import", "tsx", "local/server.ts"], {
-  env: {
-    ...env,
-    PORT: process.env.PORT ?? (command.length > 0 ? "0" : "3000"),
-    // A test run makes hundreds of requests; only show their logs when something goes wrong.
-    LOG_LEVEL: process.env.LOG_LEVEL ?? (command.length > 0 ? "warn" : "info"),
-  },
-  stdio: ["ignore", "pipe", "inherit"],
-});
-children.push(api);
-const baseUrl = await new Promise((resolve) => {
-  let output = "";
-  api.stdout.on("data", (chunk) => {
-    output += chunk;
-    const url = /listening (http:\/\/\S+)/.exec(output)?.[1];
-    if (url) resolve(url);
-  });
-  api.on("exit", (code) => {
-    console.error(`the local API exited with code ${code} before it was ready`);
-    stop(1);
-  });
-});
-api.stdout.on("data", (chunk) => process.stdout.write(chunk));
+// The API is the emulator's own HTTP API, routing to the Lambda that apply
+// created from dist/handler.mjs. Nothing stands in for API Gateway.
+const baseUrl = env.BASE_URL;
 console.log(`API ready on ${baseUrl}`);
 
 if (command.length > 0) {
-  const run = spawn(command[0], command.slice(1), { stdio: "inherit", env: { ...env, BASE_URL: baseUrl } });
+  const run = spawn(command[0], command.slice(1), { stdio: "inherit", env });
   run.on("error", (error) => {
     console.error(`could not run ${command[0]}: ${error.message}`);
     stop(1);
   });
-  run.on("exit", (code, signal) => stop(code ?? (signal ? 1 : 0)));
+  run.on("exit", (code, signal) => {
+    const status = code ?? (signal ? 1 : 0);
+    if (status !== 0) lambdaLogs(env);
+    stop(status);
+  });
+} else {
+  // task dev: stay up, and tell `task http` (and you) how to call the API.
+  const token = spawnSync(process.execPath, ["--import", "tsx", "local/token.ts", "explorer"], { env, encoding: "utf8" }).stdout.trim();
+  writeFileSync(stackFile, JSON.stringify({ base_url: baseUrl, token, ca: env.AWS_CA_BUNDLE ?? "" }, null, 2) + "\n");
+  console.log(
+    [
+      "",
+      "The stack stays up until you stop it (Ctrl-C). In another terminal:",
+      "  task http                       send the requests in http/contract.http to it",
+      `  curl --cacert ${env.AWS_CA_BUNDLE ?? "<the emulator's ca.pem>"} ${baseUrl}/<path>`,
+      "  a signed-in caller:             -H \"Authorization: Bearer $(node local/token.ts <name>)\"",
+    ].join("\n"),
+  );
 }
