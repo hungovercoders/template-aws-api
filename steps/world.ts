@@ -16,7 +16,7 @@ export class ApiWorld extends World {
   /** Who the next calls are made as; undefined calls anonymously. Only matters for operations the contract secures. */
   caller: string | undefined;
   /** Scenario-scoped memory for step definitions, e.g. records a Given step created, by name. */
-  remembered = new Map<string, Json>();
+  remembered = new Map<string, any>();
 
   /**
    * Call the API. The response must conform to the contract - a documented
