@@ -5,6 +5,7 @@ http/http-client.private.env.json
 .tools/
 .local/
 .hypothesis/
+.schemathesis/
 .task/
 infra/.terraform/
 infra/.terraform-aws/
