@@ -13,6 +13,33 @@ info:
 # names) and to your own rules in .spectral.yaml.
 paths: {}
 
+# To require a signed-in caller, declare it here - for every operation, or
+# under `security:` on the ones that need it - and document 401 on each:
+#
+# security:
+#   - bearer_auth: []
+#
+# and under components:
+#
+#   securitySchemes:
+#     bearer_auth:
+#       type: http
+#       scheme: bearer
+#       bearerFormat: JWT
+#   responses:
+#     Unauthorized:
+#       description: The caller is not signed in. API Gateway answers this itself.
+#       content:
+#         application/json:
+#           schema:
+#             type: object
+#             required: [message]
+#             properties:
+#               message:
+#                 type: string
+#           example:
+#             message: Unauthorized
+
 components:
   schemas:
     # The error body the template's router emits (RFC 9457). Reference it

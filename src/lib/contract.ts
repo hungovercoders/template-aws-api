@@ -10,8 +10,10 @@ type Schema = Record<string, unknown>;
 type Parameter = { name: string; in: string; required?: boolean; schema?: Schema };
 type Media = { schema?: Schema };
 type Response = { content?: Record<string, Media> };
+type SecurityRequirement = Record<string, string[]>;
 type OperationObject = {
   operationId?: string;
+  security?: SecurityRequirement[];
   parameters?: Parameter[];
   requestBody?: { required?: boolean; content?: Record<string, Media> };
   responses?: Record<string, Response>;
@@ -26,15 +28,22 @@ export type Operation = {
   parameters: Parameter[];
   requestBody?: { required: boolean; schema?: Schema };
   responses: Record<string, Response>;
+  /** The contract's `security` requires a caller: API Gateway will only let authenticated requests through. */
+  secured: boolean;
 };
+
+/** OpenAPI: an operation's own `security` replaces the document's; an empty requirement ({}) allows anonymous calls. */
+function requiresCaller(requirements: SecurityRequirement[] | undefined): boolean {
+  return requirements !== undefined && requirements.length > 0 && requirements.every((requirement) => Object.keys(requirement).length > 0);
+}
 
 export type Violation = { in: "path" | "query" | "body"; pointer: string; message: string };
 
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
 
-export const operations: Operation[] = Object.entries(
-  (document as { paths?: Record<string, Record<string, unknown>> }).paths ?? {},
-).flatMap(([path, item]) =>
+const contract = document as { paths?: Record<string, Record<string, unknown>>; security?: SecurityRequirement[] };
+
+export const operations: Operation[] = Object.entries(contract.paths ?? {}).flatMap(([path, item]) =>
   METHODS.filter((method) => item[method]).map((method) => {
     const op = item[method] as OperationObject;
     const body = op.requestBody;
@@ -46,6 +55,7 @@ export const operations: Operation[] = Object.entries(
       parameters: [...((item.parameters as Parameter[]) ?? []), ...(op.parameters ?? [])],
       requestBody: body && { required: body.required === true, schema: body.content?.["application/json"]?.schema },
       responses: op.responses ?? {},
+      secured: requiresCaller(op.security ?? contract.security),
     };
   }),
 );

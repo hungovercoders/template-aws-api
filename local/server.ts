@@ -17,7 +17,23 @@ async function read(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-function toEvent(req: IncomingMessage, url: URL, body: string, routeKey: string, pathParameters: Record<string, string>): APIGatewayProxyEventV2 {
+/**
+ * Stands in for API Gateway's JWT authorizer. Locally a caller is
+ * `Authorization: Bearer test:<subject>`; real tokens are only verified on AWS.
+ */
+function testCaller(req: IncomingMessage): Record<string, string> | undefined {
+  const subject = /^Bearer test:([\w.@-]+)$/.exec(req.headers.authorization ?? "")?.[1];
+  return subject ? { sub: subject } : undefined;
+}
+
+function toEvent(
+  req: IncomingMessage,
+  url: URL,
+  body: string,
+  routeKey: string,
+  pathParameters: Record<string, string>,
+  claims?: Record<string, string>,
+): APIGatewayProxyEventV2 {
   const headers: Record<string, string> = {};
   for (const [name, value] of Object.entries(req.headers)) headers[name] = Array.isArray(value) ? value.join(",") : (value ?? "");
   const query: Record<string, string> = {};
@@ -42,6 +58,7 @@ function toEvent(req: IncomingMessage, url: URL, body: string, routeKey: string,
       stage: "$default",
       time: now.toISOString(),
       timeEpoch: now.getTime(),
+      ...(claims ? { authorizer: { jwt: { claims, scopes: null } } } : {}),
     },
     ...(body === "" ? {} : { body }),
     isBase64Encoded: false,
@@ -75,7 +92,13 @@ const server = createServer(async (req, res) => {
       return send(400, { "content-type": "application/json" }, JSON.stringify({ message: "Bad Request" }));
     }
 
-    const event = toEvent(req, url, body, match.operation.routeKey, pathParameters);
+    // On a secured route API Gateway answers 401 itself when there is no valid token; the Lambda never runs.
+    const claims = match.operation.secured ? testCaller(req) : undefined;
+    if (match.operation.secured && !claims) {
+      return send(401, { "content-type": "application/json" }, JSON.stringify({ message: "Unauthorized" }));
+    }
+
+    const event = toEvent(req, url, body, match.operation.routeKey, pathParameters, claims);
     const result = (await handler(event, {} as Context, () => {})) as APIGatewayProxyStructuredResultV2;
     const headers = Object.fromEntries(Object.entries(result.headers ?? {}).map(([k, v]) => [k, String(v)]));
     send(result.statusCode ?? 200, headers, result.isBase64Encoded ? Buffer.from(result.body ?? "", "base64").toString() : result.body);

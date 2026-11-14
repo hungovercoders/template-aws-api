@@ -162,6 +162,7 @@ tasks:
       - >-
         uvx --from "schemathesis>=4,<5" schemathesis run specs/openapi.yaml
         --url "$BASE_URL" --seed 1 --max-examples 25 --request-timeout 10
+        -H "Authorization: Bearer test:fuzz"
         --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance
 
   build:

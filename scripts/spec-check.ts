@@ -3,6 +3,7 @@
 //   - every operation has a unique operationId
 //   - every operation is covered by a scenario tagged @operation:<operationId>
 //   - every @operation tag names an operation that exists
+//   - every operation the contract secures uses HTTP bearer auth and documents 401
 import SwaggerParser from "@apidevtools/swagger-parser";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,10 +11,17 @@ import { join } from "node:path";
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
 const problems: string[] = [];
 
-let paths: Record<string, Record<string, { operationId?: string }>> = {};
+type Security = Record<string, string[]>[];
+type Api = {
+  paths?: Record<string, Record<string, { operationId?: string; security?: Security; responses?: Record<string, unknown> }>>;
+  security?: Security;
+  components?: { securitySchemes?: Record<string, { type?: string; scheme?: string }> };
+};
+let api: Api = {};
+let paths: NonNullable<Api["paths"]> = {};
 try {
-  const api = await SwaggerParser.validate("specs/openapi.yaml");
-  paths = (api as { paths?: typeof paths }).paths ?? {};
+  api = (await SwaggerParser.validate("specs/openapi.yaml")) as Api;
+  paths = api.paths ?? {};
 } catch (error) {
   problems.push(`specs/openapi.yaml is not a valid OpenAPI document: ${(error as Error).message}`);
 }
@@ -25,6 +33,20 @@ for (const [path, item] of Object.entries(paths)) {
     if (!id) problems.push(`${method.toUpperCase()} ${path} has no operationId`);
     else if (operationIds.includes(id)) problems.push(`operationId ${id} is used more than once`);
     else operationIds.push(id);
+
+    // Authentication is the skeleton's: an API Gateway JWT authorizer on AWS,
+    // which answers 401 itself. That is the only scheme it knows how to enforce.
+    const security = item[method]!.security ?? api.security ?? [];
+    const secured = security.length > 0 && security.every((requirement) => Object.keys(requirement).length > 0);
+    if (!secured) continue;
+    const name = id ?? `${method.toUpperCase()} ${path}`;
+    for (const scheme of new Set(security.flatMap((requirement) => Object.keys(requirement)))) {
+      const definition = api.components?.securitySchemes?.[scheme];
+      if (definition?.type !== "http" || definition.scheme?.toLowerCase() !== "bearer") {
+        problems.push(`${name} is secured by "${scheme}", which is not an HTTP bearer scheme - the only kind the template enforces`);
+      }
+    }
+    if (!item[method]!.responses?.["401"]) problems.push(`${name} is secured but does not document a 401 response`);
   }
 }
 if (problems.length === 0 && operationIds.length === 0) {

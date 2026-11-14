@@ -36,6 +36,9 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      # Only needed when the contract secures operations.
+      TF_VAR_jwt_issuer: ${{ vars.JWT_ISSUER }}
+      TF_VAR_jwt_audience: ${{ vars.JWT_AUDIENCE }}
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
