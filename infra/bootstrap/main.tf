@@ -147,6 +147,70 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["*"]
   }
 
+  # component:consume:start
+  # Async input: the queue, its dead-letter queue, the consumer function, its
+  # role and its mapping to the queue (infra/consume.tf).
+  statement {
+    sid       = "Queues"
+    actions   = ["sqs:*"]
+    resources = ["arn:${local.partition}:sqs:${var.region}:${local.account}:${var.name}-messages*"]
+  }
+
+  statement {
+    sid       = "Consumer"
+    actions   = ["lambda:*"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-consumer"]
+  }
+
+  # A mapping has no name before it exists, so making, changing and removing
+  # one is limited to this stack's function instead.
+  statement {
+    sid       = "ConsumerMapping"
+    actions   = ["lambda:CreateEventSourceMapping", "lambda:UpdateEventSourceMapping", "lambda:DeleteEventSourceMapping"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringLike"
+      variable = "lambda:FunctionArn"
+      values   = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-consumer"]
+    }
+  }
+
+  # Reading mappings cannot be limited to one function.
+  statement {
+    sid       = "ConsumerMappingRead"
+    actions   = ["lambda:GetEventSourceMapping", "lambda:ListEventSourceMappings"]
+    resources = ["*"]
+  }
+
+  # Tags on mappings only - not on any function in the account.
+  statement {
+    sid       = "ConsumerMappingTags"
+    actions   = ["lambda:TagResource", "lambda:UntagResource", "lambda:ListTags"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:event-source-mapping:*"]
+  }
+
+  statement {
+    sid = "ConsumerRole"
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:GetRole",
+      "iam:PassRole",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
+    ]
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-consumer"]
+  }
+  # component:consume:end
+
   # The Lambda's execution role. Managing a role means this role can decide
   # what the Lambda is allowed to do - review changes to infra/ accordingly.
   statement {

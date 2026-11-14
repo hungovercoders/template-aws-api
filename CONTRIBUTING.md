@@ -24,6 +24,9 @@ removal alike. Nothing is changed in the code alone.
 | Fix a bug | A bug is a scenario that is missing or wrong. Write the scenario that fails first, then fix the code |
 | Remove something | Delete its scenarios and its part of the contract (breaking: a new major version); delete the code and steps the gates then call unused |
 | Rename or reshape data | Change the contract; the generated types make the compiler find every use |
+<!-- component:consume:start -->
+| Take a new kind of message | Add its scenarios and a `receive` operation to `specs/asyncapi.yaml`; `task scaffold` writes the stub in `src/consumers/`; implement it |
+<!-- component:consume:end -->
 | Use a capability the API removed | `task component:add -- <name>` restores it from the template, with what it needs; then the spec first, as for any change |
 | Update a dependency | Renovate proposes it; `task ci` decides. When it moves a skill source in `skills.json`, run `task skills:fetch` on its branch and push |
 | Work with a service the API integrates with | Ask whether a skill for it should be added; with the owner's agreement, `task skills:add`. A skill every API needs is a change to the template instead |

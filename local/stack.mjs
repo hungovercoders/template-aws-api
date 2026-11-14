@@ -98,6 +98,7 @@ async function emulatorEnv() {
 
 // Apply infra/ to the emulator. Its state lives in .local/ and is discarded
 // each run, because the emulator starts empty each run.
+let stackOutputs = {};
 function deploy(env) {
   const state = resolve(".local", "emulator.tfstate");
   for (const file of [state, `${state}.backup`]) rmSync(file, { force: true });
@@ -124,13 +125,25 @@ function deploy(env) {
   terraform(["apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`, ...authorizer]);
   const outputs = JSON.parse(terraform(["output", "-json", `-state=${state}`], true));
   console.log("infra/ applied to AWS Emulator");
-  return { TABLE_NAME: outputs.table_name.value, BASE_URL: outputs.base_url.value.replace(/\/$/, ""), LOCAL_JWT_ISSUER: jwt.issuer, LOCAL_JWT_AUDIENCE: jwt.audience };
+  // Every output is there for whatever runs against the stack, under its own
+  // name in capitals (queue_url is QUEUE_URL), and kept for the tasks that
+  // talk to a stack `task dev` has up.
+  stackOutputs = Object.fromEntries(Object.entries(outputs).map(([name, output]) => [name, String(output.value)]));
+  return {
+    ...Object.fromEntries(Object.entries(stackOutputs).map(([name, value]) => [name.toUpperCase(), value])),
+    TABLE_NAME: outputs.table_name.value,
+    BASE_URL: outputs.base_url.value.replace(/\/$/, ""),
+    LOCAL_JWT_ISSUER: jwt.issuer,
+    LOCAL_JWT_AUDIENCE: jwt.audience,
+  };
 }
 
 // When the command failed, what the Lambda logged is the first thing to read.
 // Best effort: it needs the AWS CLI, and the emulator to have kept the logs.
-function lambdaLogs(env) {
-  const logs = spawnSync("aws", ["logs", "tail", "/aws/lambda/api-local", "--since", "15m", "--format", "short"], { env, encoding: "utf8" });
+function lambdaLogs(env, group = "/aws/lambda/api-local") {
+  // The API's function, then any other the stack has (a queue consumer).
+  if (group === "/aws/lambda/api-local") lambdaLogs(env, "/aws/lambda/api-local-consumer");
+  const logs = spawnSync("aws", ["logs", "tail", group, "--since", "15m", "--format", "short"], { env, encoding: "utf8" });
   const lines = logs.status === 0 ? logs.stdout.trim().split("\n").filter(Boolean) : [];
   if (lines.length === 0) return;
   // Errors first: in a long run they are far above the end of the log.
@@ -145,7 +158,11 @@ if (!existsSync(join("dist", "handler.mjs"))) {
   process.exit(1);
 }
 const overrides = await emulatorEnv();
-const env = { ...process.env, ...overrides };
+// Locally a scenario should not wait as long as production would make a
+// message wait: a failing message is offered again, and given up on, in
+// seconds. Terraform ignores a TF_VAR_ for a variable the stack does not have.
+const quick = { TF_VAR_consume_timeout: "5", TF_VAR_consume_visibility_timeout: "5", TF_VAR_consume_max_receives: "2" };
+const env = { ...quick, ...process.env, ...overrides };
 if (overrides.AWS_ENDPOINT_URL) {
   // Real credentials must never sign requests while the emulator is the target.
   for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"]) delete env[name];
@@ -172,7 +189,7 @@ if (command.length > 0) {
 } else {
   // task dev: stay up, and tell `task http` (and you) how to call the API.
   const token = spawnSync(process.execPath, ["--import", "tsx", "local/token.ts", "explorer"], { env, encoding: "utf8" }).stdout.trim();
-  writeFileSync(stackFile, JSON.stringify({ base_url: baseUrl, token, ca: env.AWS_CA_BUNDLE ?? "" }, null, 2) + "\n");
+  writeFileSync(stackFile, JSON.stringify({ base_url: baseUrl, token, ca: env.AWS_CA_BUNDLE ?? "", env: overrides, outputs: stackOutputs }, null, 2) + "\n");
   console.log(
     [
       "",
