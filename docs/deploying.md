@@ -93,7 +93,7 @@ From that one declaration:
 | --- | --- |
 | AWS | Terraform puts an API Gateway JWT authorizer on exactly the secured routes. It verifies the token and answers 401 itself; the Lambda never sees an unauthenticated request. |
 | Your code | A secured operation always has `context.caller` (`subject` and the token's `claims`). |
-| Local stack and CI | The stand-in enforces the same routes. A caller is `Authorization: Bearer test:<subject>`; in step definitions, set `this.caller = "<subject>"`. |
+| Local stack and CI | The same authorizer, on AWS Emulator: it checks a token's shape, issuer and audience, not its signature. In step definitions, set `this.caller = "<subject>"`; by hand, `node local/token.ts <subject>` prints a token. |
 | `spec:check` | A secured operation must use an HTTP bearer scheme and document 401. |
 
 Deploying a contract with secured operations needs to know who issues the
@@ -125,5 +125,5 @@ routes and rules, not your identity provider's configuration.
   sets what is written; test runs use `warn` to keep their output readable.
 - **CORS.** Off by default. To let browsers on other origins call the API,
   deploy with `-- -var 'cors_allowed_origins=["https://app.example.com"]'`.
-  API Gateway answers the preflight requests itself; the local stand-in does
-  not emulate CORS.
+  API Gateway answers the preflight requests itself; no gate covers CORS on
+  the local stack.

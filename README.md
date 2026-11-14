@@ -44,7 +44,7 @@ once - not regenerated, slightly differently, by AI each time.
 | Authentication, from the contract's `security` | | |
 | RFC 9457 error responses | | `src/domain/`, `src/store/` - your rules and data access |
 | Types, route table, operation and step outlines generated from the spec | | |
-| Local API Gateway stand-in + AWS Emulator | | |
+| The whole stack on AWS Emulator: API Gateway, authorizer, Lambda, DynamoDB | | |
 | Contract-checking test harness, fuzzing | | |
 | Contract linting to shared standards | | |
 | mise, Taskfile, GitHub Actions CI | | |
@@ -145,8 +145,8 @@ description; these are the ones you start with:
 | `task scaffold` | Write what follows from the spec: a typed stub per operation, a pending step per sentence |
 | `task mock` | Serve a mock of the contract - no implementation needed |
 | `task http` | Send requests to the mock, the local stack or a deployed API |
-| `task features` | The feature files against the built Lambda on AWS Emulator |
-| `task dev` | The API on http://127.0.0.1:3000 against AWS Emulator |
+| `task features` | The feature files, through AWS Emulator's API Gateway to the built Lambda |
+| `task dev` | The API on AWS Emulator, kept running; prints its URL and a token |
 | `task deploy` | Apply the stack to AWS (opt-in) |
 
 ## Layout
@@ -163,7 +163,7 @@ src/
 steps/
   world.ts              HTTP client that holds every response to the contract
   *.ts                  step definitions        ← implemented from the spec
-local/                  AWS Emulator runner, Terraform apply, API Gateway stand-in
+local/                  AWS Emulator runner, Terraform apply, local callers, table reset
 infra/                  Terraform: Lambda, HTTP API, DynamoDB
 infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 docs/                   guides, each for one reader at one moment; runbook.md for alarms
