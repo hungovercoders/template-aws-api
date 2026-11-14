@@ -97,6 +97,9 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
      (see [Contract standards](#contract-standards)).
    - `task spec:check` tells you when the spec is complete enough to build
      from, and `task spec:lint` that it meets the standards.
+   - `task mock` serves the contract as a mock API, so you and your consumers
+     can call it and react to its shape before anything is built
+     (see [Try the contract before it is built](#try-the-contract-before-it-is-built)).
 3. **Implement it.** In [Claude Code](https://claude.com/claude-code), run:
 
    ```
@@ -119,6 +122,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | `task ci` | Every gate, in order. The definition of done; what CI runs. |
 | `task spec:check` | The contract is valid and every operation has a tagged scenario |
 | `task spec:lint` | The contract meets the house rules and your own (Spectral) |
+| `task mock` | Serve a mock of the contract on http://127.0.0.1:4010 - no implementation needed |
 | `task typecheck` | The code agrees with the types generated from the contract |
 | `task test:unit` | Unit tests, including "every contract operation has a handler" |
 | `task acceptance` | Features, then fuzz, against one stack - what `task ci` runs |
@@ -213,6 +217,32 @@ rules:
 
 Treat `rules/house.yaml` as part of the skeleton: change a house standard in
 the template, once, not in one API.
+
+## Try the contract before it is built
+
+In the spec phase there is nothing to run yet, but a contract is easier to
+judge by calling it than by reading it. `task mock` starts
+[Prism](https://github.com/stoplightio/prism), which serves
+`specs/openapi.yaml` as a mock API:
+
+```sh
+task mock                       # http://127.0.0.1:4010, answers from the contract's examples
+task mock -- --dynamic          # generate varied data from the schemas instead
+MOCK_PORT=4011 task mock
+
+curl http://127.0.0.1:4010/things
+curl -X POST http://127.0.0.1:4010/things -H 'content-type: application/json' -d '{}'
+curl http://127.0.0.1:4010/things/123 -H 'Prefer: code=404'   # ask for a documented response
+```
+
+It validates each request against the contract and answers with a documented
+response, so a consumer can build against it while the API is being
+implemented. It is a mock: it holds no data and knows none of the behaviour
+in the feature files - something you create is not there when you list. Good
+examples in the contract make it far more useful.
+
+Prism is not a gate and is not installed with the project; the task fetches
+the version pinned in `Taskfile.yml` the first time you run it.
 
 ## AWS Emulator
 
