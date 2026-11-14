@@ -12,9 +12,10 @@ Each gate fails for one reason and says what it is:
 - **`docs:check`** - `AGENTS.md`, a skill, the README or a guide is over its
   line budget, a guide does not say who it is for, or a link is broken; see
   [What gets documented](../CONTRIBUTING.md#what-gets-documented).
-- **`skills:check`** - a skill listed in `skills.json` is missing from
-  `.claude/skills/`, was edited after it was copied, or its source has moved
-  to a newer commit than the copy; run `task skills:fetch` and commit.
+- **`skills:check`** - a skill in `.claude/skills/` is not listed in
+  `skills.json`, a listed one is missing, a copied one was edited, or its
+  source has moved to a newer commit than the copy; run `task skills:fetch`
+  and commit.
 - **`spec:check`** - no operations, an operation without an `operationId`, an
   operation no scenario is tagged for, or a tag naming an operation that does
   not exist.

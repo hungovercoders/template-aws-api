@@ -25,9 +25,10 @@ files) is the requirement; `task ci` is the definition of done.
   skill.
 - A skill is the instructions in `.claude/skills/<name>/SKILL.md`. If your
   tool does not load skills itself, read that file and follow it.
-- `skills.json` lists the skills copied into `.claude/skills/` from elsewhere
-  (AWS's, and any added for this API) and the ones the template offers. Never
-  edit a copied skill; `task skills:check` fails if one is. Before working
+- `skills.json` lists every skill in `.claude/skills/` - the template's,
+  those copied from elsewhere (AWS's, and any added for this API) - and the
+  ones the template offers. Never edit a copied skill or add an unlisted
+  one; `task skills:check` fails. Before working
   with a service or tool that has no skill here, ask the user whether one
   should be added (`task skills:add`); never add one unasked.
 - Use the `aws-emulator` skill before deciding AWS Emulator cannot do

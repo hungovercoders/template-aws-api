@@ -1,5 +1,5 @@
 {
-  "$comment": "The skills copied into .claude/skills/ from somewhere else, and where each came from. `task skills:check` holds the copies to this file; `task skills:fetch` makes them match it; `task skills:add -- <name>` adds one. owner 'template' is in every API built on the template; owner 'api' was added for this API. integrations: what this API calls or is called by, each { name, skill (a name above, or null), note }, recorded by /write-spec so the question is asked once.",
+  "$comment": "Every skill in .claude/skills/, and for one copied from somewhere else, where it came from. `task skills:check` holds the directory to this file; `task skills:fetch` makes the copies match it; `task skills:add -- <name>` adds one. owner 'template' is in every API built on the template; owner 'api' was added for this API. A skill with no source is written here and maintained by hand. integrations: what this API calls or is called by, each { name, skill (a name above, or null), note }, recorded by /write-spec so the question is asked once.",
   "sources": {
     "aws": {
       "repository": "https://github.com/aws/agent-toolkit-for-aws",
@@ -8,6 +8,16 @@
     }
   },
   "skills": [
+    {
+      "name": "write-spec",
+      "owner": "template",
+      "for": "Writing and changing the spec with the user: the contract and the feature files"
+    },
+    {
+      "name": "implement-api",
+      "owner": "template",
+      "for": "Implementing the API from the spec until task ci is green"
+    },
     {
       "name": "aws-emulator",
       "owner": "template",
