@@ -31,6 +31,12 @@ once - not regenerated, slightly differently, by AI each time.
   built. The agent is not asked whether it is finished - `task ci` tells it,
   with the same answer every time, exactly which scenario or contract rule is
   not yet met.
+- **Generate before you write.** Anything a command can derive from the spec
+  is produced by that command: types, the route table, a typed stub for every
+  operation, a pending step for every sentence, a request for every
+  operation. Generated output is identical every time, free, and cannot drift
+  from the spec. AI is used only where no deterministic tool exists - the
+  behaviour inside each operation and step.
 - **Every API looks the same.** Same layout, same tasks, same gates, same
   deployment. Anyone - or any agent - who has seen one has seen them all.
 
@@ -40,7 +46,7 @@ once - not regenerated, slightly differently, by AI each time.
 | Request validation against the contract | `specs/features/*.feature` - the behaviour | `src/operations/*.ts` - one function per operation |
 | Authentication, from the contract's `security` | | |
 | RFC 9457 error responses | | `src/domain/`, `src/store/` - your rules and data access |
-| Types generated from the contract | | |
+| Types, route table, operation and step outlines generated from the spec | | |
 | Local API Gateway stand-in + AWS Emulator | | |
 | Contract-checking test harness, fuzzing | | |
 | Contract linting to shared standards | | |
@@ -69,7 +75,7 @@ is what implementing one adds.
 
 ```
 specs/openapi.yaml ──┬─► request validation inside the Lambda
-   (the contract)    ├─► TypeScript types for every operation
+   (the contract)    ├─► types, the route table and a stub for every operation
                      ├─► API Gateway routes (Terraform reads the contract)
                      ├─► response validation on every call the features make
                      └─► generated fuzz requests (schemathesis)
@@ -113,8 +119,9 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
    /implement-api
    ```
 
-   The skill (`.claude/skills/implement-api`) reads the spec, writes the step
-   definitions and operations, and works gate by gate until `task ci` is
+   The skill (`.claude/skills/implement-api`) reads the spec, runs
+   `task scaffold` to generate everything that follows from it, fills in the
+   steps and operations, and works gate by gate until `task ci` is
    green. It may not edit `specs/`, weaken a gate or rebuild the skeleton. You can follow the same
    steps by hand - they are written out in the skill.
 4. **Deploy, when you are ready.** Opt-in: `task deploy NAME=my-api` from your
@@ -127,6 +134,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 | Task | What it does |
 | --- | --- |
 | `task ci` | Every gate, in order. The definition of done; what CI runs. |
+| `task scaffold` | Write what follows from the spec: a typed stub per operation, a pending step per sentence |
 | `task spec:check` | The contract is valid and every operation has a tagged scenario |
 | `task spec:lint` | The contract meets the house rules and your own (Spectral) |
 | `task mock` | Serve a mock of the contract on http://127.0.0.1:4010 - no implementation needed |
@@ -149,11 +157,10 @@ specs/
   openapi.yaml          the contract            ← you write
   features/             the behaviour           ← you write
 src/
-  routes.ts             operationId → handler   ← implemented from the spec
   operations/           one file per operation  ← implemented from the spec
   handler.ts            the Lambda entry point
   lib/                  router, contract validation, problem responses, DynamoDB client
-  generated/            types + runtime contract (task generate; not committed)
+  generated/            types, runtime contract, route table (task generate; not committed)
 steps/
   world.ts              HTTP client that holds every response to the contract
   *.ts                  step definitions        ← implemented from the spec
@@ -163,7 +170,7 @@ infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 rules/house.yaml        contract standards shared by every API
 .spectral.yaml          contract rules for this API ← you add
 http/                   .http requests for exploring by hand; contract.http is generated
-scripts/                generate, spec:check and http:generate
+scripts/                generate, scaffold, spec:check and http:generate
 .claude/skills/implement-api/   the skill that drives an implementation
 ```
 
@@ -179,8 +186,8 @@ Each gate fails for one reason and says what it is:
 - **`http:check`** - `http/contract.http` no longer matches the contract; run
   `task http:generate` and commit it.
 - **`test:unit`** (`test/routes.test.ts`) - an operation in the contract with
-  no handler in `src/routes.ts`, or a handler for an operation that is not in
-  the contract.
+  no file in `src/operations/`, or one that is still the stub `task scaffold`
+  wrote.
 - **`features`** - an undefined step, a failed assertion, or *any* response
   whose status, content type or body is not what the contract documents for
   that operation.
