@@ -69,6 +69,25 @@ tasks:
     cmds:
       - npx --yes @stoplight/prism-cli@{{.PRISM_VERSION}} mock specs/openapi.yaml --port {{.MOCK_PORT}} {{.CLI_ARGS}}
 
+  http:generate:
+    desc: Write http/contract.http - a ready-to-send request for every operation in the contract
+    deps: [generate]
+    cmds:
+      - node scripts/http-generate.ts
+    sources:
+      - specs/openapi.yaml
+      - scripts/http-generate.ts
+    generates:
+      - http/contract.http
+
+  http:
+    desc: Explore the API by hand - pick a request from http/*.http and send it (ENV=mock|local|aws, default local; -- --all sends every one)
+    deps: [http:generate]
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - npx httpyac send "http/*.http" --env {{.ENV | default "local"}} {{.CLI_ARGS}}
+
   typecheck:
     desc: Gate - the code agrees with the types generated from the contract
     deps: [generate]
