@@ -69,7 +69,14 @@ Feature: Rules the catalogue enforces
       | retire |
       | rate   |
 
-  @operation:get_beer
-  Scenario: A beer is identified by a UUID
-    When staff fetch the beer with id "not-a-uuid"
+  @operation:get_beer @operation:update_beer @operation:retire_beer @operation:rate_beer
+  Scenario Outline: A beer is identified by a UUID
+    When staff <action> the beer with id "not-a-uuid"
     Then the request is refused as invalid, pointing at "beer_id"
+
+    Examples:
+      | action |
+      | fetch  |
+      | change |
+      | retire |
+      | rate   |
