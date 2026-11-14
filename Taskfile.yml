@@ -121,8 +121,7 @@ tasks:
     desc: Gate - the committed http/contract.http matches the contract (run task http:generate and commit if not)
     deps: [generate]
     cmds:
-      - node scripts/http-generate.ts
-      - git diff --exit-code -- http/contract.http
+      - node scripts/http-generate.ts check
 
   readme:generate:
     desc: Write the README's API section from the contract - once there is a spec, the repository describes the API, not the template

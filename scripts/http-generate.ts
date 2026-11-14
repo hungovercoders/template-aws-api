@@ -3,7 +3,7 @@
 // it can be read and run without generating anything, and `task http:check`
 // fails when it no longer matches the contract. Keep requests of your own in
 // other files in http/.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 type Schema = {
   type?: string | string[];
@@ -92,6 +92,19 @@ const header = [
   ...[...variables].map(([name, value]) => `@${name} = ${String(value)}`),
 ];
 
-mkdirSync("http", { recursive: true });
-writeFileSync("http/contract.http", [header.join("\n"), ...requests].join("\n\n") + "\n");
-console.log(`generated http/contract.http - ${requests.length} requests`);
+const target = "http/contract.http";
+const generated = [header.join("\n"), ...requests].join("\n\n") + "\n";
+
+// `check` compares with the file as it is, so it passes as soon as the file
+// has been regenerated - committed or not.
+if (process.argv[2] === "check") {
+  if (!existsSync(target) || readFileSync(target, "utf8") !== generated) {
+    console.error("http:check failed\n  - http/contract.http does not match the contract; run `task http:generate` and commit it");
+    process.exit(1);
+  }
+  console.log(`http:check ok - http/contract.http matches the contract, ${requests.length} requests`);
+} else {
+  mkdirSync("http", { recursive: true });
+  writeFileSync(target, generated);
+  console.log(`generated http/contract.http - ${requests.length} requests`);
+}
