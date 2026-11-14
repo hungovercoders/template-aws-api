@@ -43,6 +43,7 @@ once - not regenerated, slightly differently, by AI each time.
 | Contract linting to shared standards | | |
 | mise, Taskfile, GitHub Actions CI | | |
 | Terraform: Lambda, HTTP API, DynamoDB | | |
+| Standard alarms and structured logs | | |
 
 If you find yourself asking AI to write a router, a test harness, a pipeline
 or Terraform for an API built from this template, stop: it is already here.
@@ -401,6 +402,38 @@ operation from `context.caller` and answer 403 with a problem.
 
 Real tokens are verified only on AWS. The local test caller proves your
 routes and rules, not your identity provider's configuration.
+
+## Alerting
+
+Every stack is deployed with the same baseline alarms (`infra/alarms.tf`).
+They exist from the first deploy; you only choose where they notify.
+
+| Alarm | Fires when | Usually means |
+| --- | --- | --- |
+| `<name>-lambda-errors` | Any Lambda error in 5 minutes | An unhandled error, a timeout or out of memory |
+| `<name>-lambda-throttles` | Any throttled invocation in 5 minutes | The concurrency limit was reached |
+| `<name>-lambda-duration` | p99 duration above 80% of the timeout for 15 minutes | Timeouts are about to start |
+| `<name>-api-5xx` | Any 5xx response in 5 minutes | The API failed, or API Gateway could not reach the Lambda |
+| `<name>-api-latency` | p99 latency above 3 seconds for 15 minutes | Callers are waiting |
+| `<name>-table-throttles` | Any throttled DynamoDB read or write in 5 minutes | The table is refusing work |
+
+Each alarm notifies when it fires and again when it recovers. Routing:
+
+```sh
+task deploy NAME=my-api -- -var alarm_email=oncall@example.com        # email; the address must confirm
+task deploy NAME=my-api -- -var alarm_topic_arn=arn:aws:sns:...        # your existing topic instead
+```
+
+With neither, the alarms still exist and notify the stack's own topic
+(`alarm_topic_arn` in the outputs), which you can subscribe a chat or on-call
+tool to. In the CI deploy job, set the repository variables `ALARM_EMAIL` or
+`ALARM_TOPIC_ARN`.
+
+Thresholds are strict on purpose: a new API should be quiet, and an alarm you
+learn to ignore is worse than none. The unexpected error behind a
+`lambda-errors` or `api-5xx` alarm is in the logs with its `request_id`.
+Alarms on business outcomes - orders failing, sign-ups dropping - are yours
+to add; these cover the platform.
 
 ## Logging and CORS
 
