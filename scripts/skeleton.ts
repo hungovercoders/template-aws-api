@@ -7,6 +7,7 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { declarations, lock, owns, removed, split } from "./components-lib.ts";
 
 const LOCK = "skeleton.lock";
 
@@ -16,6 +17,7 @@ const LOCK = "skeleton.lock";
 // skills.json and the skills it lists.
 const SKELETON = [
   "Taskfile.yml",
+  "components.json",
   "cucumber.mjs",
   "tsconfig.json",
   "vitest.config.ts",
@@ -29,6 +31,7 @@ const SKELETON = [
   "steps/world.ts",
   "test/routes.test.ts",
   "test/log.test.ts",
+  "test/components.test.ts",
   "infra/",
   // The template's own skills. Skills copied from elsewhere are held by
   // `task skills:check` instead, so adding or updating one is not a skeleton change.
@@ -45,10 +48,27 @@ function normalised(path: string, text: string): string {
   return unix;
 }
 
+// One entry per skeleton file. A file that carries sections of optional
+// components (scripts/components-lib.ts) is recorded in parts: the file without
+// them, and each component's sections as "path#component". So removing a
+// component, or restoring it from the template, never needs a new lock.
+const markers: string[] = [];
+const placeholders: [path: string, component: string][] = [];
 function current(): Map<string, string> {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", ...SKELETON], { encoding: "utf8" });
   const files = listed.stdout.split("\n").filter((path) => path && !NOT_SOURCE.test(path) && existsSync(path));
-  return new Map(files.sort().map((path) => [path, createHash("sha256").update(normalised(path, readFileSync(path, "utf8"))).digest("hex")]));
+  const hash = (text: string) => createHash("sha256").update(text).digest("hex");
+  const entries = new Map<string, string>();
+  for (const path of files.sort()) {
+    const text = normalised(path, readFileSync(path, "utf8"));
+    // The scripts that implement the markers, and their test, name them without being marked.
+    const parts = path.startsWith("scripts/components") || path === "test/components.test.ts" ? { core: text, sections: new Map<string, string[]>(), placeholders: new Map(), problems: [] } : split(text);
+    markers.push(...parts.problems.map((problem) => `${path}: ${problem}`));
+    for (const name of parts.placeholders.keys()) placeholders.push([path, name]);
+    entries.set(path, hash(parts.core));
+    for (const [name, sections] of parts.sections) entries.set(`${path}#${name}`, hash(sections.join("\n")));
+  }
+  return entries;
 }
 
 const now = current();
@@ -71,18 +91,25 @@ if (!existsSync(LOCK)) {
   console.error(`skeleton:check failed\n  - ${LOCK} is missing; restore it from the template`);
   process.exit(1);
 }
-const locked = new Map(
-  readFileSync(LOCK, "utf8")
-    .split("\n")
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => line.split("  ") as [string, string])
-    .map(([hash, path]) => [path, hash]),
-);
+const locked = lock(LOCK);
+
+// What a removed component took with it is expected to be missing, and
+// nothing of it may remain.
+const gone = removed();
+const components = declarations().components;
+const taken = (entry: string) => {
+  const [path, section] = entry.split("#") as [string, string | undefined];
+  return section ? gone.has(section) : [...gone].some((name) => components[name] && owns(components[name], path));
+};
 
 const problems = [
-  ...[...locked].filter(([path, hash]) => now.has(path) && now.get(path) !== hash).map(([path]) => `changed: ${path}`),
-  ...[...locked.keys()].filter((path) => !now.has(path)).map((path) => `removed: ${path}`),
-  ...[...now.keys()].filter((path) => !locked.has(path)).map((path) => `added:   ${path}`),
+  ...markers,
+  // A placeholder stands for a section this repository removed, and nothing else.
+  ...placeholders.filter(([path, name]) => !gone.has(name) || !locked.has(`${path}#${name}`)).map(([path, name]) => `${path}: component:${name}:removed is not a section this repository removed`),
+  ...[...locked].filter(([entry, hash]) => now.has(entry) && !taken(entry) && now.get(entry) !== hash).map(([entry]) => `changed: ${entry}`),
+  ...[...locked.keys()].filter((entry) => !now.has(entry) && !taken(entry)).map((entry) => `removed: ${entry}`),
+  ...[...now.keys()].filter((entry) => !locked.has(entry)).map((entry) => `added:   ${entry}`),
+  ...[...now.keys()].filter(taken).map((entry) => `still here: ${entry} belongs to a component recorded as removed in .components - run \`task component:remove\` again, or \`task component:add\``),
 ];
 
 if (problems.length > 0) {
