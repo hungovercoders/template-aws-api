@@ -28,5 +28,9 @@ files) is the requirement; `task ci` is the definition of done.
   `src/store/`, `steps/*.ts` other than `world.ts`, and their tests
   (`example/implementation`). `git diff main example/spec --stat` and
   `git diff example/spec example/implementation --stat` should list nothing else.
+- When a change to the starter `specs/openapi.yaml` on `main` is merged down,
+  the example branches keep their own contract: restore it from before the
+  merge and re-apply the same idea by hand. Never resolve with `-X ours` or
+  `-X theirs` - both silently mix the starter into the example contract.
 - CI is red by design on `main` and `example/spec` and green on
   `example/implementation`.
