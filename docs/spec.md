@@ -132,6 +132,36 @@ tools (`tools/asyncapi/`):
 `task generate` also writes `src/generated/messages.d.ts` (a type for every
 payload, by Modelina) and `src/generated/async-operations.ts`.
 
+**Every message is a CloudEvent** 1.0 in structured JSON mode. The envelope
+is the skeleton's (`tools/asyncapi/cloudevent.yaml`); a message extends it
+and adds only what is its own, the `type` it fixes and the shape of `data`:
+
+```yaml
+payload:
+  allOf:
+    - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
+    - type: object
+      required: [data]
+      properties:
+        type: { type: string, const: com.example.beer_catalogue.beer.created.v1 }
+        data: { type: object, required: [beer_id], properties: { beer_id: { type: string } } }
+```
+
+A `type` is `com.<org>.<api>.<thing>.<happened>.v<major>`: lower case, what
+happened in the past tense, the major version last. `asyncapi:check` holds
+every message to the envelope and to a `type` of its own; `asyncapi:lint`
+holds the `type` to that form and the message to
+`contentType: application/cloudevents+json`. At runtime
+`src/lib/cloudevents.ts` sets `id`, `source`, `time` and the trace on what is
+published, and refuses what is received unless it is a CloudEvent the
+contract says the API accepts. A change to the envelope itself counts as a
+breaking change to the contract.
+
+**Changing an event that is already published.** A change consumers would
+notice is a new `type`, ending `.v2`, published alongside `.v1` for as long
+as they need. Adding a message is not breaking; removing `.v1` later is, and
+takes a new major version of the contract.
+
 **What counts as breaking.** AsyncAPI's diff compares the two documents path
 by path, so it cannot tell a message the API sends from one it receives. The
 rules are the cautious ones for both: a property removed, retyped or made

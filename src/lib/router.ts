@@ -4,6 +4,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from "aws-lambd
 import type { operations } from "../generated/api.d.ts";
 import { apiVersion, operationForRouteKey, validateRequest } from "./contract.ts";
 import { createLogger, type Logger } from "./log.ts";
+import { continueTrace, traceId } from "./trace.ts";
 import { HttpProblem, problem, unauthorized, type Result } from "./problem.ts";
 
 type OperationId = keyof operations;
@@ -45,8 +46,11 @@ export function createHandler(routes: Routes): APIGatewayProxyHandlerV2 {
   // Every request is logged once, with the same fields, whatever handled it.
   return async (event) => {
     const started = Date.now();
+    // The caller's trace carries on through this request's logs and anything it publishes.
+    continueTrace(event.headers?.traceparent);
     const log = createLogger({
       request_id: event.requestContext?.requestId,
+      trace_id: traceId(),
       route_key: event.routeKey,
       operation_id: operationForRouteKey(event.routeKey)?.operationId,
     });

@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { baseline, show } from "../../scripts/spec-baseline.ts";
-import { type Schema, sample } from "../../scripts/sample.ts";
+import { type Schema, merged, sample } from "../../scripts/sample.ts";
 
 export const CONTRACT = "specs/asyncapi.yaml";
 const FEATURES = "specs/features";
@@ -53,7 +53,7 @@ function plain<T>(value: T, keep: (key: string) => boolean = (key) => !key.start
   ) as T;
 }
 
-type Operation = { id: string; action: "send" | "receive"; summary: string; channel: string; address: string; messages: { name: string; type?: string; payload: Schema }[] };
+type Operation = { id: string; action: "send" | "receive"; summary: string; channel: string; address: string; messages: { name: string; type?: string; contentType?: string; payload: Schema }[] };
 
 // The `type` a CloudEvent payload fixes with a const, wherever allOf puts it.
 function eventType(schema: Schema | undefined): string | undefined {
@@ -84,7 +84,7 @@ function operations(document: AsyncAPIDocumentInterface): Operation[] {
           .all()
           .map((message) => {
             const payload = plain(message.payload()?.json() ?? {}) as Schema;
-            return { name: message.name() ?? message.id(), type: eventType(payload), payload };
+            return { name: message.name() ?? message.id(), type: eventType(payload), contentType: message.contentType(), payload };
           }),
       };
     })
@@ -109,9 +109,31 @@ function named_or_stop(all: Operation[]): Operation[] {
   return all;
 }
 
+// Every message is a CloudEvent: the skeleton's envelope (cloudevent.yaml),
+// with a `type` the message fixes and a `data` it describes.
+const ENVELOPE = ["specversion", "id", "source", "type", "time"];
+function envelopeProblems(all: Operation[]): string[] {
+  const problems: string[] = [];
+  const types = new Map<string, string>();
+  for (const message of messagesOf(all)) {
+    const schema = merged(message.payload);
+    const missing = ENVELOPE.filter((attribute) => !schema.required?.includes(attribute) || !schema.properties?.[attribute]);
+    if (missing.length > 0 || schema.properties?.specversion?.const !== "1.0") {
+      problems.push(`message ${message.name} is not a CloudEvent: its payload must extend the envelope - allOf: [{ $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent' }, ...]`);
+      continue;
+    }
+    // How a type is spelt, and the content type, are house rules: asyncapi:lint.
+    if (!message.type) problems.push(`message ${message.name} does not fix its type: add properties.type.const`);
+    else if (types.has(message.type)) problems.push(`messages ${types.get(message.type)} and ${message.name} have the same type "${message.type}"; a type names one message`);
+    else types.set(message.type, message.name);
+    if (!schema.properties?.data || !schema.required?.includes("data")) problems.push(`message ${message.name} does not require and describe its data`);
+  }
+  return problems;
+}
+
 async function check(): Promise<void> {
   const all = operations(await load());
-  const problems: string[] = nameProblems(all);
+  const problems: string[] = [...nameProblems(all), ...envelopeProblems(all)];
   const features = existsSync(FEATURES) ? readdirSync(FEATURES, { recursive: true, encoding: "utf8" }).filter((file) => file.endsWith(".feature")) : [];
   const tagged = new Set(features.flatMap((file) => [...readFileSync(join(FEATURES, file), "utf8").matchAll(/@operation:([\w.-]+)/g)].map(([, id]) => id!)));
   for (const operation of all) {
@@ -177,6 +199,27 @@ export function changes(before: unknown, after: unknown): (Change & { level: Lev
   return ([...output.breaking(), ...output.nonBreaking(), ...output.unclassified()] as Change[]).map((change) => ({ ...change, level: level(change) }));
 }
 
+// Every message extends the skeleton's envelope by reference, so a change to
+// that file changes every message without touching the contract. Words aside,
+// any difference in it is treated as breaking.
+const ENVELOPE_FILE = "tools/asyncapi/cloudevent.yaml";
+function envelopeChanges(ref: string): (Change & { level: Level })[] {
+  const before = show(ref, ENVELOPE_FILE);
+  if (before === undefined || !existsSync(ENVELOPE_FILE)) return [];
+  const wordless = (value: unknown): unknown =>
+    Array.isArray(value)
+      ? value.map(wordless)
+      : value && typeof value === "object"
+        ? Object.fromEntries(
+            Object.entries(value)
+              .filter(([key]) => !WORDS.has(key))
+              .map(([key, inner]) => [key, wordless(inner)]),
+          )
+        : value;
+  const same = JSON.stringify(wordless(parseYaml(before))) === JSON.stringify(wordless(parseYaml(readFileSync(ENVELOPE_FILE, "utf8"))));
+  return same ? [] : [{ action: "edit", path: `${ENVELOPE_FILE} - the envelope every message extends`, type: "breaking", level: "breaking" }];
+}
+
 async function compat(): Promise<void> {
   const skip = (why: string) => console.log(`asyncapi:compat skipped - ${why}`);
   const ref = baseline();
@@ -187,7 +230,7 @@ async function compat(): Promise<void> {
   await load();
   type Document = { info?: { version?: string } };
   const [old, current] = [parseYaml(before) as Document, parseYaml(now) as Document];
-  const found = changes(old, current).filter((change) => change.path !== "/info/version");
+  const found = [...changes(old, current).filter((change) => change.path !== "/info/version"), ...envelopeChanges(ref)];
   const breaking = found.filter((change) => change.level === "breaking");
   // What the rules cannot place is shown, and treated as breaking until a person has looked.
   const unknown = found.filter((change) => change.level === "unclassified");
@@ -202,7 +245,7 @@ async function compat(): Promise<void> {
     any: major > oldMajor || (major === oldMajor && (minor > oldMinor || (minor === oldMinor && patch > oldPatch))),
   };
   const from = `${old.info?.version} (at ${ref.slice(0, 12)})`;
-  const edited = before.trim() !== now.trim();
+  const edited = before.trim() !== now.trim() || found.length > 0;
   const problems: string[] = [];
   if (breaking.length + unknown.length > 0 && !(bumped.major || (oldMajor === 0 && bumped.minor))) {
     problems.push(
@@ -337,6 +380,13 @@ function absent(command: string | undefined, mode: string | undefined): void {
         "    Remove the operations first, in a new major version of the contract that is published; delete the file in a later change.",
       ].join("\n"),
     );
+  }
+  // The runtime imports what generate writes, contract or not.
+  if (command === "generate") {
+    mkdirSync("src/generated", { recursive: true });
+    writeFileSync("src/generated/asyncapi.json", "{}\n");
+    writeFileSync("src/generated/messages.d.ts", "// Generated by `task generate` - there is no specs/asyncapi.yaml.\nexport {};\n");
+    writeFileSync("src/generated/async-operations.ts", "// Generated by `task generate` - there is no specs/asyncapi.yaml.\nexport const asyncOperations = [] as const;\n");
   }
   const left = command === "examples" && mode === "check" && existsSync(EXAMPLES) ? readdirSync(EXAMPLES).filter((file) => file.endsWith(".json")) : [];
   if (left.length > 0) stop(`asyncapi:examples:check failed\n  - ${EXAMPLES}/ still has examples (${left.join(", ")}) but there is no ${CONTRACT}; remove them`);
