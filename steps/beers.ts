@@ -87,8 +87,8 @@ When("staff fetch {string}", async function (this: ApiWorld, name: string) {
   await this.call("GET", `/beers/${idOf(this, name)}`);
 });
 
-When("staff fetch the beer with id {string}", async function (this: ApiWorld, id: string) {
-  await this.call("GET", `/beers/${id}`);
+When(/^staff (fetch|change|retire|rate) the beer with id "([^"]*)"$/, async function (this: ApiWorld, action: string, id: string) {
+  await act(this, action, id);
 });
 
 When("staff list the beers", async function (this: ApiWorld) {
@@ -116,12 +116,16 @@ When("staff retire {string}", async function (this: ApiWorld, name: string) {
 });
 
 When(/^staff (fetch|change|retire|rate) a beer that is not in the catalogue$/, async function (this: ApiWorld, action: string) {
-  const id = randomUUID();
-  if (action === "fetch") await this.call("GET", `/beers/${id}`);
-  if (action === "change") await this.call("PATCH", `/beers/${id}`, { abv: 5 });
-  if (action === "retire") await this.call("DELETE", `/beers/${id}`);
-  if (action === "rate") await this.call("POST", `/beers/${id}/ratings`, { score: 3 });
+  await act(this, action, randomUUID());
 });
+
+/** One valid request of each kind that names a beer by id. */
+async function act(world: ApiWorld, action: string, id: string) {
+  if (action === "fetch") await world.call("GET", `/beers/${id}`);
+  if (action === "change") await world.call("PATCH", `/beers/${id}`, { abv: 5 });
+  if (action === "retire") await world.call("DELETE", `/beers/${id}`);
+  if (action === "rate") await world.call("POST", `/beers/${id}/ratings`, { score: 3 });
+}
 
 When(/^a drinker rates "([^"]*)" ([\d.]+)$/, async function (this: ApiWorld, name: string, score: string) {
   await rate(this, name, Number(score));
