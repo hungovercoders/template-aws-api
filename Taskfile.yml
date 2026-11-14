@@ -67,6 +67,18 @@ tasks:
     cmds:
       - node scripts/docs-check.ts
 
+  adopt:
+    desc: Run once, after the first spec - turn a repository created from the template into the API's own (removes template-only files and sections, writes the README)
+    deps: [generate]
+    cmds:
+      - node scripts/adopt.ts
+
+  steps:check:
+    desc: Gate - every step definition is used by a sentence in the feature files
+    deps: [generate]
+    cmds:
+      - node scripts/steps-check.ts
+
   scaffold:
     desc: Write what follows from the specs - a typed stub for every operation without a file, a pending step for every unbound sentence
     deps: [generate]
@@ -267,6 +279,7 @@ tasks:
       - task: readme:check
       - task: test:unit
       - task: typecheck
+      - task: steps:check
       - task: infra:validate
       - task: acceptance
 

@@ -7,19 +7,19 @@ Please do not open a public issue. Report it privately through
 vulnerability reporting). Say what you found, how to reproduce it, and what
 an attacker could do with it.
 
-You will get a reply once it has been read. A fix is made on `main` and
-merged down to the example branches; you are credited unless you ask not to be.
+You will get a reply once it has been read, and you are credited for the fix
+unless you ask not to be.
 
+<!-- template-only:start - removed by `task adopt` when a repository becomes an API -->
 ## What is covered
 
 The template's skeleton on `main`: the router and contract validation, the
 local stack, the gates and generators, the CI workflows and the Terraform.
 Only the latest `main` is supported; there are no maintained older versions.
+An API built from the template is its owner's responsibility.
+<!-- template-only:end -->
 
-An API built from the template is its owner's responsibility, including the
-`SECURITY.md` it should replace this one with.
-
-## What the template does about security
+## What the skeleton does about security
 
 So you know what to rely on, and what to check when reporting:
 

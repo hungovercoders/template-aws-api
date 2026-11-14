@@ -8,7 +8,7 @@ Each gate fails for one reason and says what it is:
 
 - **`skeleton:check`** - a skeleton file differs from `skeleton.lock`. The
   skeleton is the same for every API, so implementing a spec should never
-  change it; see [Changing the skeleton](../CONTRIBUTING.md#changing-the-skeleton).
+  change it; see [Changing the skeleton](../CONTRIBUTING.md#what-you-do-not-change).
 - **`docs:check`** - `AGENTS.md`, a skill, the README or a guide is over its
   line budget, a guide does not say who it is for, or a link is broken; see
   [What gets documented](../CONTRIBUTING.md#what-gets-documented).
@@ -31,6 +31,8 @@ Each gate fails for one reason and says what it is:
 - **`features`** - an undefined step, a failed assertion, or *any* response
   whose status, content type or body is not what the contract documents for
   that operation.
+- **`steps:check`** - a step definition that no sentence in the feature
+  files uses any more. Delete it: the behaviour it described has left the spec.
 - **`contract:fuzz`** - a generated request that produced a 5xx, an
   undocumented status, or a body that does not match its schema. The seed is
   fixed, so a failure reproduces.

@@ -1,6 +1,6 @@
 ---
 name: implement-api
-description: Implement the AWS Lambda API described by the BDD feature files and OpenAPI contract in specs/, driven test-first by the template's deterministic gates until `task ci` is green. Use when asked to implement, build or deliver the API from feature files and an OpenAPI spec, or when specs/ has changed and the implementation must catch up.
+description: Implement, or bring up to date, the AWS Lambda API described by the BDD feature files and OpenAPI contract in specs/, driven test-first by the template's deterministic gates until `task ci` is green. Use for the first build from a spec and for every change after it - whenever specs/ has changed (a new operation, a changed rule, a bug's failing scenario, something removed) and the implementation must catch up.
 ---
 
 # Implement the API from its features and contract
@@ -164,6 +164,31 @@ it tells you exactly what is missing.
 9. **`task ci`** - all gates, in CI order. Done only when this exits 0. Report
    the final output, and every choice you made where the specs were silent.
 
+## When the spec has changed
+
+The same workflow serves every change after the first build; the gates tell
+you what kind it is. Behaviour never changes in the code alone - if a change
+has no scenario, stop: it needs the spec changed first (`write-spec`).
+
+- **Something new** - `task scaffold` adds a stub for each new operation and
+  a pending step for each new sentence, and touches nothing you have written.
+  The backlog gate lists the new stubs. Implement them as in steps 5 and 6.
+- **Something changed** - nothing is scaffolded; `task features` goes red on
+  the scenarios whose behaviour moved, and `task typecheck` on every use of a
+  type the contract reshaped. Fix the code until both pass. Do not edit a
+  scenario or the contract to match the code.
+- **A bug** - the spec should now hold the scenario that reproduces it,
+  failing. If it does not, that is the missing piece: ask for it. Then fix
+  the code; do not fix a bug no scenario demonstrates.
+- **Something removed** - `task typecheck` fails on the operation file whose
+  `operationId` has left the contract, and `task steps:check` lists step
+  definitions no sentence uses. Delete both, and any domain or store code
+  only they used.
+
+Afterwards the whole of `task ci` must pass, not only the gates you touched:
+`http:check` and `readme:check` if the contract changed (regenerate and
+commit), and `spec:compat`, which is the user's to resolve.
+
 ## Writing operations
 
 - **`context`** - `path`, `query` and `body` are typed from the contract and
@@ -302,6 +327,7 @@ leave them to CI.
 | `spec:compat` | Contract changes since the last published one are listed and versioned |
 | `typecheck` | Operations agree with the types generated from the contract |
 | `test:unit` | Every contract operation has a file and none is still a stub; domain rules |
+| `steps:check` | No step definition is left over from behaviour the spec no longer has |
 | `features` | The behaviour in the feature files, with every response held to the contract |
 | `contract:fuzz` | Inputs nobody wrote a scenario for still get contract-conforming answers |
 | `infra:validate` | The Terraform is formatted and valid |

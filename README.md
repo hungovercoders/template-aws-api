@@ -167,7 +167,7 @@ infra/                  Terraform: Lambda, HTTP API, DynamoDB
 infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 docs/                   guides, each for one reader at one moment; runbook.md for alarms
 AGENTS.md               instructions for coding agents; CLAUDE.md imports it
-CONTRIBUTING.md         how the template itself is changed
+CONTRIBUTING.md         how the API is changed: spec first, then implementation
 SECURITY.md             how to report a vulnerability
 skeleton.lock           what the skeleton is; skeleton:check fails if it changes
 rules/house.yaml        contract standards shared by every API
@@ -186,11 +186,12 @@ reading, not for building on.
 
 Then, in your new repository:
 
-- Delete `.github/rulesets/` and `.github/workflows/template.yml`, and
-  replace `CONTRIBUTING.md` and `SECURITY.md` with your own. They describe
-  how *this* repository is kept, tested and reported on, not your API.
-- Replace this README's top section with a description of your API. The rest
-  is a working manual for the tooling and can stay.
+- Write your spec, then run `task adopt` once. It removes what is only about
+  the template (its self-test workflow, its branch ruleset, the template
+  sections of `CONTRIBUTING.md` and `SECURITY.md`) and replaces this README
+  with one that describes your API.
+- From then on, every change follows `CONTRIBUTING.md`: the spec first, then
+  the implementation, for the whole life of the API.
 - Change the copyright line in `LICENSE` if the code is not MIT or not yours
   to license that way.
 - Add your spec and carry on from [Use it](#use-it). CI is red until the spec
@@ -207,5 +208,6 @@ Each guide is for one reader at one moment. Read the one you need.
 | [Deploying](docs/deploying.md) | Putting an API on AWS; sign-in, CORS and CI deployment |
 | [Runbook](docs/runbook.md) | An alarm has fired |
 
-Changing the template itself: [CONTRIBUTING.md](CONTRIBUTING.md). Reporting a
+Changing an API built on it, or the template itself:
+[CONTRIBUTING.md](CONTRIBUTING.md). Reporting a
 vulnerability: [SECURITY.md](SECURITY.md).
