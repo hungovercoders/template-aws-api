@@ -330,5 +330,7 @@ have.
 
 - Request and response bodies are JSON.
 - Errors are RFC 9457 `application/problem+json` (`Problem` in the contract).
-- One DynamoDB table with string keys `pk` and `sk`, defined once in
-  `infra/main.tf` and created from it for local runs too.
+- One DynamoDB table with string keys `pk` and `sk`, and two generic indexes
+  (`gsi1`, `gsi2`, keyed on `gsi1pk`/`gsi1sk` and `gsi2pk`/`gsi2sk`) for
+  listings and lookups the keys cannot serve. Defined once in `infra/main.tf`
+  and created from it for local runs too.
