@@ -1,7 +1,11 @@
 version: '3'
 
 vars:
-  EMULATOR_BASE: https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/latest
+  # AWS Emulator is pinned so every run, here and in CI, tests against the same
+  # emulator. Versions: https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS/versions.json
+  # AWS only ships security fixes in the latest release, so raise this regularly.
+  EMULATOR_VERSION: 1.0.365
+  EMULATOR_BASE: https://downloads.aws.com/aws-emulator/packages/aws-emulator/LTS
   # The AWS publishing key that signs the emulator packages (from its user guide).
   EMULATOR_KEY_FINGERPRINT: 98BCF336A3BE53B734E967C52E5BF49BD940F624
   EMULATOR_PORT: '{{.EMULATOR_PORT | default "9297"}}'
@@ -67,7 +71,7 @@ tasks:
       - npx vitest run
 
   emulator:install:
-    desc: Download AWS Emulator (Linux), verify AWS's signature and unpack it into .tools/ - no sudo
+    desc: Download the pinned AWS Emulator (Linux), verify AWS's signature and unpack it into .tools/ - no sudo
     cmds:
       - |
         set -e
@@ -79,8 +83,9 @@ tasks:
         command -v dpkg-deb >/dev/null && command -v gpgv >/dev/null || { echo "emulator:install needs dpkg-deb and gpgv; otherwise install AWS Emulator yourself so that aws-emulator is on PATH"; exit 1; }
         tmp=$(mktemp -d)
         trap 'rm -rf "$tmp"' EXIT
-        curl -fsSLo "$tmp/aws-emulator.deb" "{{.EMULATOR_BASE}}/aws-emulator_$arch.deb"
-        curl -fsSLo "$tmp/aws-emulator.deb.sig" "{{.EMULATOR_BASE}}/aws-emulator_$arch.deb.sig"
+        package="aws-emulator_{{.EMULATOR_VERSION}}-1_$arch.deb"
+        curl -fsSLo "$tmp/aws-emulator.deb" "{{.EMULATOR_BASE}}/$package"
+        curl -fsSLo "$tmp/aws-emulator.deb.sig" "{{.EMULATOR_BASE}}/$package.sig"
         curl -fsSLo "$tmp/key.asc" https://downloads.aws.com/keys/gpg/current.asc
         gpg --show-keys --with-colons "$tmp/key.asc" | grep -q "^fpr:::::::::{{.EMULATOR_KEY_FINGERPRINT}}:" || { echo "the AWS publishing key does not have the expected fingerprint"; exit 1; }
         gpg --dearmor < "$tmp/key.asc" > "$tmp/key.gpg"
@@ -89,14 +94,19 @@ tasks:
         dpkg-deb -x "$tmp/aws-emulator.deb" .tools/aws-emulator
         .tools/aws-emulator/opt/aws-emulator/bin/aws-emulator -v
     status:
-      - test -x .tools/aws-emulator/opt/aws-emulator/bin/aws-emulator || command -v aws-emulator || test -n "$AWS_ENDPOINT_URL"
+      # Up to date when .tools/ holds the pinned version. An emulator you run
+      # yourself (AWS_ENDPOINT_URL, AWS_EMULATOR_BIN) is used as it is.
+      - >-
+        test -n "$AWS_ENDPOINT_URL" || test -n "$AWS_EMULATOR_BIN" ||
+        .tools/aws-emulator/opt/aws-emulator/bin/aws-emulator -v 2>/dev/null | grep -qx "Version: {{.EMULATOR_VERSION}}"
 
   emulator:docker:
     desc: Build and run AWS Emulator in Docker (macOS/Windows); leave it running and use the other tasks in a second terminal
     cmds:
       - |
         set -e
-        case "$(uname -m)" in arm64|aarch64) package=aws-emulator-aarch64.rpm ;; *) package=aws-emulator-x86_64.rpm ;; esac
+        case "$(uname -m)" in arm64|aarch64) arch=aarch64 ;; *) arch=x86_64 ;; esac
+        package="aws-emulator-{{.EMULATOR_VERSION}}-1-$arch.rpm"
         docker build -t aws-emulator --build-arg PACKAGE=$package -f local/emulator.Dockerfile local
         mkdir -p "$HOME/.aws/emulator"
         docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:{{.EMULATOR_PORT}}:{{.EMULATOR_PORT}} \
@@ -161,6 +171,8 @@ tasks:
       - terraform -chdir=infra fmt -check -recursive
       - terraform -chdir=infra init -backend=false -input=false
       - terraform -chdir=infra validate
+      - terraform -chdir=infra/bootstrap init -backend=false -input=false
+      - terraform -chdir=infra/bootstrap validate
 
   ci:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
@@ -172,18 +184,55 @@ tasks:
       - task: infra:validate
       - task: acceptance
 
+  # --- Your AWS account (opt-in; see "Bring your AWS account" in the README) ---
+
+  aws:bootstrap:
+    desc: One-off, with admin credentials - create the state bucket and the GitHub OIDC deploy role (NAME=<stack name> REPO=<owner/repo>)
+    requires:
+      vars: [NAME, REPO]
+    cmds:
+      - terraform -chdir=infra/bootstrap init -input=false
+      - terraform -chdir=infra/bootstrap apply -var name={{.NAME}} -var github_repository={{.REPO}} {{.CLI_ARGS}}
+
   deploy:
-    desc: Build and deploy to AWS with Terraform (uses your AWS credentials; NAME=<stack name>)
+    desc: Build and deploy to AWS with Terraform (NAME=<stack name>; state in S3 when TF_STATE_BUCKET is set)
     deps: [build]
     requires:
       vars: [NAME]
     cmds:
-      - terraform -chdir=infra init -input=false
-      - terraform -chdir=infra apply -var name={{.NAME}} {{.CLI_ARGS}}
+      - task: aws:terraform
+        vars: { ACTION: apply }
 
   destroy:
     desc: Remove the deployed stack (NAME=<stack name>)
     requires:
       vars: [NAME]
     cmds:
-      - terraform -chdir=infra destroy -var name={{.NAME}} {{.CLI_ARGS}}
+      - task: aws:terraform
+        vars: { ACTION: destroy }
+
+  aws:terraform:
+    internal: true
+    cmds:
+      - |
+        set -e
+        if [ -n "$AWS_ENDPOINT_URL" ]; then
+          echo "AWS_ENDPOINT_URL is set ($AWS_ENDPOINT_URL): that is an emulator, not AWS. Unset it to deploy."
+          exit 1
+        fi
+        # Kept apart from the .terraform the emulator runs use, so a real
+        # backend and the local stack can never be confused.
+        export TF_DATA_DIR="{{.ROOT_DIR}}/infra/.terraform-aws"
+        if [ -n "$TF_STATE_BUCKET" ]; then
+          # Remote state, configured only for this command.
+          trap 'rm -f infra/backend_override.tf' EXIT
+          printf 'terraform {\n  backend "s3" {}\n}\n' > infra/backend_override.tf
+          terraform -chdir=infra init -input=false -reconfigure \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key={{.NAME}}/terraform.tfstate" \
+            -backend-config="region=${TF_STATE_REGION:-${AWS_REGION:-eu-west-2}}" \
+            -backend-config="use_lockfile=true"
+        else
+          terraform -chdir=infra init -input=false -reconfigure
+        fi
+        terraform -chdir=infra {{.ACTION}} -input=false -var name={{.NAME}} ${AWS_REGION:+-var region=$AWS_REGION} {{.CLI_ARGS}}
