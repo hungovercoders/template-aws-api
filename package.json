@@ -6,6 +6,7 @@
   "description": "BDD and contract driven AWS Lambda API template.",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1169.0",
+    "@aws-sdk/client-sqs": "^3.1169.0",
     "@aws-sdk/lib-dynamodb": "^3.1169.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1"

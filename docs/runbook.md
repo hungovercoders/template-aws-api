@@ -15,6 +15,12 @@ They exist from the first deploy; you only choose where they notify.
 | `<name>-api-5xx` | Any 5xx response in 5 minutes | The API failed, or API Gateway could not reach the Lambda |
 | `<name>-api-latency` | p99 latency above 3 seconds for 15 minutes | Callers are waiting |
 | `<name>-table-throttles` | Any throttled DynamoDB read or write in 5 minutes | The table is refusing work |
+<!-- component:consume:start -->
+| `<name>-queue-age` | The oldest message has waited longer than a message can take to be given up on, twice over | The consumer is failing, throttled or too slow |
+| `<name>-dead-letters` | Any message on the dead-letter queue | A message could not be handled |
+| `<name>-consumer-errors` | Any error of the consumer function in 5 minutes | An unhandled error, a timeout or out of memory |
+| `<name>-consumer-throttles` | Any throttled invocation of the consumer in 5 minutes | The concurrency limit was reached |
+<!-- component:consume:end -->
 
 Each alarm notifies when it fires and again when it recovers. Routing:
 
@@ -129,3 +135,65 @@ callers see slowness before errors.
 **Usually** a hot partition: one item everything touches, or a list that
 grew. Spread the key or page the read. A brief burst after a long quiet
 spell is DynamoDB scaling up and clears on its own.
+
+<!-- component:consume:start -->
+## Messages
+
+The consumer's log group is `/aws/lambda/<name>-consumer`. Every message is
+one JSON line, `message`, with `message_id`, `event_id`, `event_type`,
+`operation_id`, `receive_count`, `trace_id` and its `outcome`: `handled`,
+`duplicate`, `busy`, `failed` or `dead_lettered` (with the `reason`).
+
+```
+fields @timestamp, outcome, operation_id, event_type, event_id, reason, receive_count
+| filter message = "message" and outcome not in ["handled", "duplicate"]
+| sort @timestamp desc
+```
+
+### dead-letters
+
+**Means** a message is on the dead-letter queue, where it stays for 14 days.
+Nothing is lost yet, and nothing else is held up.
+
+1. `ENV=aws task dlq:peek` shows each message and its `reason`.
+2. A reason about the contract: the sender sent something the contract does
+   not describe. That is the sender's to fix; tell them, with the message.
+3. A reason from a consumer (`Rejected`): the message named something that
+   does not exist here. Decide with the sender whether it matters.
+4. No reason: the message failed every time it was offered. Find its
+   `event_id` in the query above; the `failed` lines carry the error. A
+   message that was redriven keeps the reason from its earlier visit.
+5. Once the cause is fixed, `ENV=aws task dlq:redrive` sends them round again.
+
+**Usually** a sender and this API disagreeing about the contract. Compare
+the message with `specs/asyncapi.yaml` and with `messages/`.
+
+### queue-age
+
+**Means** messages are waiting much longer than it takes to handle one.
+
+1. `ENV=aws task queue:peek`: how many are waiting, how many being handled.
+   It shows counts only: reading a message would use up one of its tries.
+2. Check `consumer-errors` and `consumer-throttles`; either explains it.
+3. Neither: the consumer is slower than messages arrive. Its duration is in
+   the `handled` lines.
+
+**Usually** a consumer that fails on every message, so each waits out its
+retries. Fix the failure; the queue then drains on its own.
+
+### consumer-errors
+
+**Means** the consumer function failed outright: an unhandled error, a
+timeout or out of memory. The messages it held are offered again.
+
+1. Run the query above for `failed` lines, then look for `Task timed out`
+   or `Runtime exited` in the raw log.
+2. Started right after a deploy: redeploy the previous commit, then debug.
+
+**Usually** a bug on a message no scenario covers. Write the scenario first.
+
+### consumer-throttles
+
+**Means** the consumer was refused concurrency. Messages wait; none is lost.
+See `lambda-throttles`: the cause and the remedy are the same.
+<!-- component:consume:end -->

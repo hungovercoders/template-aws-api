@@ -50,6 +50,13 @@ Each gate fails for one reason and says what it is:
   never shows. Add the scenario, or remove the response. Runs in `acceptance`,
   after the features. Not required: 5XX, `default`, and a 400 on an operation
   that takes no input.
+<!-- component:consume:start -->
+- **`consume:check`** - a `receive` operation of the AsyncAPI contract that
+  no scenario delivered a message to, so the contract says the API accepts
+  something the behaviour spec never shows. Runs in `acceptance`, after the
+  features. `test:unit` (`test/consumers.test.ts`) fails for a `receive`
+  operation with no file in `src/consumers/`, or one that is still a stub.
+<!-- component:consume:end -->
 - **`check`** - not a gate of its own: the fast gates above for the stage in
   `.stage`, which the pre-push hook runs (`task hooks:install`). `template`
   checks the skeleton and docs; `spec` adds the spec gates; `implemented`
@@ -148,6 +155,9 @@ from scratch and throws it away:
 | API Gateway | The emulator's HTTP API: the routes apply created, each integrated with the function | Emulated |
 | Lambda runtime | The emulator runs the bundle as the function, on its Node 22 runtime | Emulated |
 | Authorizer | The emulator's JWT authorizer refuses a missing or malformed token and a wrong issuer or audience, and passes the claims to the function. It does not verify signatures | Partly |
+<!-- component:consume:start -->
+| Queue | The SQS queue and dead-letter queue that apply created; the emulator hands each batch to the consumer function, offers a failed message again and dead-letters it after its tries | Emulated. Locally a message gets two tries five seconds apart, not three at a minute |
+<!-- component:consume:end -->
 | IAM | Not enforced the way AWS enforces it; the emulator's guide says not to test security on it | No |
 
 Nothing stands in for AWS: every request in a scenario or a fuzz run goes

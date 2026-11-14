@@ -43,7 +43,7 @@ jobs:
           # Everything an API owns comes from the example...
           git checkout origin/example/implementation -- README.md specs http/contract.http src/operations src/domain src/store steps test
           # ...and everything the skeleton owns stays as proposed here.
-          git checkout HEAD -- steps/world.ts test/routes.test.ts test/log.test.ts test/components.test.ts test/asyncapi.test.ts test/cloudevents.test.ts test/trace.test.ts
+          git checkout HEAD -- steps/world.ts steps/messages.ts test/consumer.test.ts test/consumers.test.ts test/routes.test.ts test/log.test.ts test/components.test.ts test/asyncapi.test.ts test/cloudevents.test.ts test/trace.test.ts
       - run: task ci
       - name: AWS Emulator log
         if: failure()
