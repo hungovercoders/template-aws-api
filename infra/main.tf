@@ -177,6 +177,10 @@ resource "aws_lambda_function" "api" {
   environment {
     variables = {
       TABLE_NAME = aws_dynamodb_table.this.name
+      # component:asyncapi:start
+      # The `source` of every CloudEvent this API publishes.
+      EVENT_SOURCE = "/${var.name}"
+      # component:asyncapi:end
     }
   }
 

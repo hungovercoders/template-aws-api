@@ -17,7 +17,7 @@ export type Schema = {
 };
 
 // allOf is how a schema extends another: its parts describe one value.
-function merged(schema: Schema): Schema {
+export function merged(schema: Schema): Schema {
   if (!schema.allOf) return schema;
   const { allOf, ...own } = schema;
   // An example or a default on a part is of that part, not of the whole.
