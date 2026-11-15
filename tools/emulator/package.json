@@ -1,0 +1,19 @@
+{
+  "name": "template-aws-api-emulator-tools",
+  "private": true,
+  "type": "module",
+  "description": "The AWS clients `task emulator:gaps` needs to test what AWS Emulator cannot do yet. A package of its own so the API's install does not carry clients it never calls.",
+  "devDependencies": {
+    "@aws-sdk/client-apigatewayv2": "3.1169.0",
+    "@aws-sdk/client-cloudwatch": "3.1169.0",
+    "@aws-sdk/client-cloudwatch-logs": "3.1169.0",
+    "@aws-sdk/client-dynamodb": "3.1169.0",
+    "@aws-sdk/client-eventbridgev2": "3.1169.0",
+    "@aws-sdk/client-firehose": "3.1169.0",
+    "@aws-sdk/client-iam": "3.1169.0",
+    "@aws-sdk/client-lambda": "3.1169.0",
+    "@aws-sdk/client-resource-groups": "3.1169.0",
+    "@aws-sdk/client-s3": "3.1169.0",
+    "@aws-sdk/client-sqs": "3.1169.0"
+  }
+}
