@@ -180,6 +180,10 @@ once**, and events about one thing **may arrive out of order** - so a
 subscriber tells a repeat by the event's `id` and orders by its `time`. Say
 so in the contract's `info.description`.
 <!-- component:publish:end -->
+<!-- component:data:start -->
+**The events as data.** Kept in S3, the events have a third contract,
+`specs/datacontract.yaml`: see [Events as data](data.md).
+<!-- component:data:end -->
 
 ## Try the contract before it is built
 

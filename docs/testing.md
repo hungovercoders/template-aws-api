@@ -63,6 +63,14 @@ Each gate fails for one reason and says what it is:
   the scenarios run is also held to the contract, looked at or not. Runs in
   `acceptance`, after the features.
 <!-- component:publish:end -->
+<!-- component:data:start -->
+- **`data:lint`, `data:check`, `data:compat`** - the data contract is not
+  valid ODCS or breaks a house rule; disagrees with the AsyncAPI contract or
+  leaves out what the infrastructure reads; or changed without its version
+  saying so. **`data:test`**, in `acceptance` after the features - an event
+  the scenarios published never landed in S3, or the data that landed
+  breaks the contract. See [Events as data](data.md#gates).
+<!-- component:data:end -->
 - **`check`** - not a gate of its own: the fast gates above for the stage in
   `.stage`, which the pre-push hook runs (`task hooks:install`). `template`
   checks the skeleton and docs; `spec` adds the spec gates; `implemented`
@@ -167,6 +175,9 @@ from scratch and throws it away:
 <!-- component:publish:start -->
 | Events | The table's stream, the forwarder function, the event bus and the rule that logs every event, as apply created them; scenarios read the log | Emulated. The stream's retry limit is ignored there, which is why the forwarder sets failures aside itself |
 <!-- component:publish:end -->
+<!-- component:data:start -->
+| Data | The rule, the Firehose stream and the bucket apply created; `data:test` reads what Firehose wrote | Emulated. The bucket is made through Cloud Control because the emulator has no S3 Control; Firehose emits no metrics there, so its two alarms never change state |
+<!-- component:data:end -->
 | IAM | Not enforced the way AWS enforces it; the emulator's guide says not to test security on it | No |
 
 Nothing stands in for AWS: every request in a scenario or a fuzz run goes
@@ -178,7 +189,8 @@ dependency that needs them fails there as a `Runtime.ImportModuleError`.
 
 A request takes tens of milliseconds, so the scenarios and the fuzz run take
 tens of seconds each. Bringing the stack up takes longer than either: about
-half a minute, and 25 seconds more for each queue a component adds. When a run fails, `local/stack.mjs` prints the
+half a minute, 25 seconds more for each queue a component adds, and
+about a minute more for the bucket of an API with a data contract. When a run fails, `local/stack.mjs` prints the
 function's log if the AWS CLI is installed.
 
 A new emulator release can change a response to match AWS more closely, which
