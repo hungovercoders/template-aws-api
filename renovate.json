@@ -103,7 +103,7 @@
       "automerge": true,
       "platformAutomerge": true,
       "prBodyNotes": [
-        "**When this merges, or if a check fails:**\n- [ ] `task skills:update` so the `aws-emulator` skill is current\n- [ ] Re-run what `probe/emulator/` tests; a workaround whose gap has closed is removed in its own change\n- [ ] Bring the fidelity table in `docs/testing.md` up to date\n- [ ] A remaining difference from AWS is reported at https://github.com/aws/aws-emulator/issues if it is not already there"
+        "The `emulator gaps` check on this pull request says which of the emulator's gaps are still there (`task emulator:gaps`). A gap that has closed does not block the merge: an issue is raised for it once this is on `main`.\n\n**When this merges, or if a check fails:**\n- [ ] `task skills:update` so the `aws-emulator` skill is current\n- [ ] A new difference from AWS is added to `tools/emulator/gaps/` and reported at https://github.com/aws/aws-emulator/issues if it is not already there"
       ]
     },
     {
