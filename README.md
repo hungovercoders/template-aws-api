@@ -1,4 +1,4 @@
-<!-- api:start - generated from specs/openapi.yaml by `task readme:generate`. Change the contract, not this block. -->
+<!-- api:start - generated from the contracts in specs/ by `task readme:generate`. Change a contract, not this block. -->
 # Beer Catalogue API
 
 A brewery's beer catalogue. Signed-in staff add the beers they brew, keep the details current and retire beers. Anyone can browse the catalogue, and drinkers rate beers from 1 to 5.
@@ -33,6 +33,11 @@ Messages and events are version 0.2.0 of [their own contract](specs/asyncapi.yam
 | `publish_beer_retired` | `beer-events` | A beer was retired from the catalogue |
 | `publish_beer_rated` | `beer-events` | A beer was rated |
 
+## Events kept as data
+
+Every event it publishes is also kept in S3, under version 0.1.0 of a [data contract](specs/datacontract.yaml): owned by the catalogue team, kept for 2 years, there to read within 15 minutes.
+See [events as data](docs/data.md) for how it is tested and queried.
+
 ## Working on it
 
 | Task | What it does |
@@ -40,6 +45,9 @@ Messages and events are version 0.2.0 of [their own contract](specs/asyncapi.yam
 | `task dev` | Run the API on AWS Emulator; prints its URL and a token |
 | `task http` | Send it the requests in `http/contract.http` |
 | `task mock` | Serve the contract as a mock, with nothing implemented |
+| `task queue:send -- <message>` | Send it one of the example messages in `messages/` |
+| `task events:tail` | Follow the events it publishes |
+| `task data:query -- "<sql>"` | Query the events kept in S3, a view for each |
 | `task ci` | Every gate, in order: the definition of done |
 
 What this API does is decided by its spec. To change it, change the
@@ -58,7 +66,8 @@ spec and the behaviour behind it are this API's own.
 > [template-aws-api](../../tree/main): the template plus a complete spec.**
 > The contract and feature files above are the whole requirement. Nothing is
 > implemented yet, so **CI is red on purpose** - `task ci` stops at
-> `test:unit`, listing the six operations that have no file. Running
+> `test:unit`, listing the six operations and the one message that have
+> no file. Running
 > `/implement-api` here produces
 > [`example/implementation`](../../tree/example/implementation).
 >
