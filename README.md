@@ -48,9 +48,36 @@ You need [mise](https://mise.jdx.dev). It installs everything else.
    may not edit your spec, weaken a check or rebuild the template.
 5. **Deploy when you are ready.** `task deploy NAME=my-api`, or let CI deploy
    `main` ([Deploying](docs/deploying.md#deploy)). Nothing deploys until you
-   opt in.
+   opt in. To see the result first: [See it working](#see-it-working).
 
-Want to see the result first? [See it working](#see-it-working).
+## The architecture you get
+
+One service, every way in and out of it described by a contract:
+
+```mermaid
+flowchart TB
+  caller(["API callers"]) <-->|"HTTP (OpenAPI)"| gateway["API Gateway"]
+  sender(["Other services"]) -->|"messages (AsyncAPI)"| queue[["SQS queue"]]
+  gateway --> api["Lambda: your operations"]
+  queue --> consumer["Lambda: your consumers"]
+  queue -.->|"after retries"| dlq[["Dead-letter queue"]]
+  api --> table[("DynamoDB: your data and the outbox")]
+  consumer --> table
+  table -->|"stream"| forwarder["Lambda: forwarder"]
+  forwarder -->|"events (AsyncAPI, CloudEvents)"| bus{{"EventBridge bus"}}
+  bus --> subscriber(["Subscribers"])
+  bus --> firehose["Firehose"] --> bucket[("S3: events as data")]
+  bucket -->|"data contract (ODCS)"| analyst(["Analysts: DuckDB, Harlequin"])
+```
+
+| Interface | Direction | Contract | Optional |
+| --- | --- | --- | --- |
+| HTTP API | in and out | `specs/openapi.yaml` | no |
+| Messages from a queue | in | `specs/asyncapi.yaml`, `receive` | yes |
+| Events on a bus | out | `specs/asyncapi.yaml`, `send` | yes |
+| Events as data in S3 | out | `specs/datacontract.yaml` | yes |
+
+Each part brings its Terraform, alarms, logs and tags. An optional one can be removed and restored: `task component:list`.
 
 ## What you get
 
@@ -63,15 +90,9 @@ Want to see the result first? [See it working](#see-it-working).
 
 **Messages in, events out - only if you need them**
 
-- A queue with retries, a dead-letter queue and duplicate handling: one
-  function per message.
-- Events published with the change they describe, as CloudEvents on
-  EventBridge: one line in your write, `outbox(event)`.
-- Those events kept in S3 under a data contract, with DuckDB and Harlequin
-  to query them.
-
-Each of the three is optional. Remove one and bring it back later:
-`task component:list`.
+- A queue with retries and duplicate handling: one function per message.
+- Events published with the change they describe: `outbox(event)` in a write.
+- Those events kept in S3, with DuckDB and Harlequin to query them.
 
 **Tests that mean something**
 
@@ -92,16 +113,13 @@ Every API needs the same router, test harness, pipeline and Terraform. That
 should be built once, not regenerated slightly differently by AI each time.
 
 - **Known problems stay solved.** Asking an agent to work them out again
-  costs tokens and review time on every project.
-- **AI works only on what is new:** your business logic.
+  costs tokens and review time on every project. AI works only on what is
+  new: your business logic.
 - **The spec is the prompt and the test.** The files that tell the agent what
   to build are run against what it built, so "done" has one answer.
 - **Generate before you write.** Anything a command can derive from the spec
   comes from that command: identical every time, and it cannot drift.
 - **Every API looks the same.** Seen one, seen them all.
-
-If you catch yourself asking AI for a router or a pipeline here, stop: it
-exists. If something every API needs is missing, add it to the template.
 
 ## How it works
 
@@ -121,13 +139,6 @@ specs/datacontract.yaml ─► the bucket, its retention and freshness alarm
 specs/features/*.feature ──► cucumber, strict, against the built Lambda
    (the behaviour)           on infra/ applied to AWS Emulator
 ```
-
-| You bring | The template has | The agent writes |
-| --- | --- | --- |
-| `specs/openapi.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
-| `specs/asyncapi.yaml`, if it has messages or events | The queue, the outbox, the event bus | `src/consumers/`, and `outbox(event)` in a write |
-| `specs/datacontract.yaml`: owner, retention, sensitivity | The bucket, delivery, the data test | |
-| Who owns it: `domain` and `team` | Tags and a resource group | |
 
 ## See it working
 
@@ -168,16 +179,10 @@ start with:
 
 ## Writing the spec by hand
 
-- Replace `specs/openapi.yaml` with your contract. Every operation needs an
-  `operationId`; error responses use the `Problem` schema already in the file.
-- Add feature files to `specs/features/`, each scenario tagged with the
-  operations it covers: `@operation:<operationId>`.
-- Rules for this API alone go in `.spectral.yaml`
-  ([Contract standards](docs/spec.md#contract-standards)).
-- `task spec:check` says when the spec is complete enough to build from;
-  `task spec:lint` that it meets the standards.
-- `task mock` and `ENV=mock task http` let you call the contract first
-  ([Try the contract before it is built](docs/spec.md#try-the-contract-before-it-is-built)).
+Replace `specs/openapi.yaml`, add feature files to `specs/features/` with
+each scenario tagged `@operation:<operationId>`, and run `task spec:check`.
+[The spec](docs/spec.md#writing-and-changing-the-spec) has the rest,
+including [trying the contract as a mock](docs/spec.md#try-the-contract-before-it-is-built).
 
 ## Where things are
 
@@ -190,14 +195,10 @@ steps/                  glue for your feature sentences      ← written from th
 src/lib/, src/handler.ts  router, validation, DynamoDB, queue, outbox: the template's
 infra/                  Terraform; tags.auto.tfvars.json     ← you say who owns it
 local/                  runs the stack on AWS Emulator; the queue, event and data tasks
-docs/                   one guide per reader; runbook.md for alarms
-messages/, http/        examples of every message; requests to explore by hand
 rules/, .spectral.yaml  contract standards: shared, and this API's ← you add
-scripts/, tools/        the generators and checks
 .claude/skills/         write-spec, implement-api, and AWS's own skills (skills.json)
 AGENTS.md               instructions for coding agents
 CONTRIBUTING.md         how the API is changed: spec first, then implementation
-skeleton.lock, components.json  what the template is, and its optional parts
 ```
 
 ## Guides
