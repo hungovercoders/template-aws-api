@@ -1,6 +1,6 @@
 ---
 name: implement-api
-description: Implement, or bring up to date, the AWS Lambda API described by the BDD feature files and OpenAPI contract in specs/, driven test-first by the template's deterministic gates until `task ci` is green. Use for the first build from a spec and for every change after it - whenever specs/ has changed (a new operation, a changed rule, a bug's failing scenario, something removed) and the implementation must catch up.
+description: Implement, or bring up to date, the AWS Lambda API described by the BDD feature files and the contracts in specs/ (OpenAPI for HTTP; where present, AsyncAPI for messages and events and a data contract for events kept in S3), driven test-first by the template's deterministic gates until `task ci` is green. Use for the first build from a spec and for every change after it - whenever specs/ has changed (a new operation, a changed rule, a bug's failing scenario, something removed) and the implementation must catch up.
 ---
 
 # Implement the API from its features and contract
@@ -114,6 +114,9 @@ it tells you exactly what is missing.
    <!-- component:publish:start -->
    For a `send` operation there, also follow [events.md](events.md).
    <!-- component:publish:end -->
+   <!-- component:data:start -->
+   With a `specs/datacontract.yaml`, also read [data.md](data.md).
+   <!-- component:data:end -->
 2. **`task spec:check` and `task spec:lint`** must pass before you write code.
    If `spec:check` fails the spec is incomplete (an operation with no
    scenario, an unknown tag, an invalid document); if `spec:lint` fails the
@@ -180,24 +183,21 @@ changes in the code alone - if a change has no scenario, stop: it needs the
 spec changed first (`write-spec`).
 
 **Start by reading what changed:** `git diff <the commit the code was last
-green at> -- specs`. The gates find most of it, but not all without the local
-stack: a rule that changed while the contract's shape stayed the same, or a
-new row in a scenario outline, shows only when `task features` runs.
+green at> -- specs`. A rule that changed while the contract kept its shape,
+or a new row in a scenario outline, shows only when `task features` runs.
 
 - **Something new** - `task scaffold` adds a stub for each new operation and
   a pending step for each new sentence, and touches nothing you have written.
-  Implement them as in steps 5 and 6. Put new steps in your existing step
-  files; where a new sentence is an existing one plus a clause, extend the
-  existing pattern rather than adding a near-duplicate.
+  Implement them as in steps 5 and 6, in your existing step files; extend an
+  existing pattern rather than add a near-duplicate of it.
 - **Something changed** - nothing is scaffolded. `task features` goes red on
   the scenarios whose behaviour moved, and `task typecheck` on every use of a
   type the contract reshaped. Fix the code until both pass, and update any
   unit test in `test/` that states the old rule. Do not edit a scenario or
   the contract to match the code.
-- **A bug** - the spec should now hold a scenario for it. If that scenario
-  fails, fix the code. If it passes once its steps exist, the bug is not
-  reproduced: change no code and say so in your report. Never fix a bug no
-  scenario demonstrates.
+- **A bug** - the spec should now hold a scenario for it. If it fails, fix
+  the code. If it passes once its steps exist, the bug is not reproduced:
+  change no code and say so. Never fix a bug no scenario demonstrates.
 - **Something removed** - `task typecheck` fails on the operation file whose
   `operationId` has left the contract, and `task steps:check` lists step
   definitions no sentence uses. Delete both, and any domain or store code
