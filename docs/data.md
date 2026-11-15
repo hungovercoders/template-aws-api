@@ -54,7 +54,7 @@ of its own in the contract, and is deployed with `-var data_server=<name>`.
 | `task data:lint` | The contract is valid ODCS (the [Data Contract CLI](https://cli.datacontract.com)) and meets the house rules in `rules/datacontract.yaml`; this API's own go in `.spectral.datacontract.yaml` |
 | `task data:check` | It is of the ODCS version the template pins (`ODCS_VERSION` in `Taskfile.yml`), describes every published event exactly as the AsyncAPI contract has it, and says what the infrastructure reads |
 | `task data:compat` | What changed since the last published contract (the CLI's changelog), and that `version` says so: a breaking change - a property removed, a type changed - needs a new major version |
-| `task data:test` | The data keeps the contract: types, required properties, limits and quality rules - tested where it is, in the bucket; nothing is copied. In `task acceptance` it runs after the features, on the events the scenarios published, every one of which must have landed. `ENV=aws task data:test` tests the last two days of the deployed stack's data (`DATA_DAYS`) |
+| `task data:test` | The data keeps the contract: types, required properties, limits and quality rules - tested where it is, in the bucket; nothing is copied. In `task acceptance` it runs after the features, on the events the scenarios published, every one of which must have landed. `ENV=aws task data:test` tests the last two days of the deployed stack's data (`DATA_DAYS`), each day by itself, so a rule about the whole - an `id` that repeats - is held within a day |
 
 ## Reading the data
 
@@ -81,6 +81,8 @@ volume where storage matters. The cost: the Data Contract CLI cannot read a
 gzipped file, so `data:test` then needs an unpacked copy. With `ENV=aws` it
 refuses to make one unless told `DATA_COPY=yes`; the copy is private and
 removed when the test ends. Leave it off for data that must not leave AWS.
+After a switch from gzip, the days that still hold gzipped files are
+named and not tested until they age out of the days tested.
 Querying is unaffected: DuckDB reads either where it is.
 
 `-var data_buffer_seconds=N` is how long Firehose gathers events before it

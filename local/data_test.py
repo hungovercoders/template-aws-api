@@ -32,7 +32,8 @@ def connection() -> "duckdb.DuckDBPyConnection":
         # extra brings with it.
         version = con.sql("PRAGMA version").fetchone()[0]
         package = importlib.resources.files(importlib.import_module("duckdb_extension_httpfs"))
-        con.sql("LOAD '%s'" % (pathlib.Path(str(package)) / "extensions" / version / "httpfs.duckdb_extension"))
+        extension = pathlib.Path(str(package)) / "extensions" / version / "httpfs.duckdb_extension"
+        con.sql("LOAD '%s'" % str(extension).replace("'", "''"))
         con.sql("SET ca_cert_file='%s'" % ca.replace("'", "''"))
     return con
 

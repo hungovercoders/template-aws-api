@@ -29,7 +29,7 @@ if (!existsSync(CONTRACT)) {
 }
 // Inside `task acceptance` the stack's outputs are already in the environment.
 const inAcceptance = Boolean(process.env.DATA_BUCKET) && where === "local";
-const outputs = inAcceptance ? { data_bucket: process.env.DATA_BUCKET, data_prefix: process.env.DATA_PREFIX } : stackOutputs("data");
+const outputs = inAcceptance ? { data_bucket: process.env.DATA_BUCKET, data_prefix: process.env.DATA_PREFIX, data_compression: process.env.DATA_COMPRESSION } : stackOutputs("data");
 const bucket = outputs.data_bucket || fail(`data: the stack has no bucket for the data - it was applied before ${CONTRACT} was written. Apply it again (locally: restart \`task dev\`)`);
 const prefix = outputs.data_prefix ?? "";
 const emulator = process.env.AWS_ENDPOINT_URL;
@@ -56,9 +56,15 @@ async function stored(): Promise<Stored[]> {
   return found;
 }
 
+// The local stack's objects are the scenarios' own and small: one read serves both finding their ids and a copy.
+const fetched = new Map<string, Buffer>();
 const read = async (key: string) => {
+  const kept = fetched.get(key);
+  if (kept) return kept;
   const body = await (await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }))).Body!.transformToByteArray();
-  return key.endsWith(".gz") ? gunzipSync(body) : Buffer.from(body);
+  const content = key.endsWith(".gz") ? gunzipSync(body) : Buffer.from(body);
+  if (where === "local") fetched.set(key, content);
+  return content;
 };
 
 /**
@@ -82,7 +88,11 @@ async function copyTo(dir: string, objects: Stored[]): Promise<void> {
 const REAL_DATA = `That would put a copy of real data on this machine. Read it where it is instead`;
 
 async function test(): Promise<void> {
-  const days = where === "aws" ? Number(process.env.DATA_DAYS ?? 2) : undefined;
+  // What an earlier version of this task kept here: a copy of the data. Nothing is kept any more.
+  for (const old of [resolve(".local", "data"), resolve(".local", "datacontract.test.yaml")]) rmSync(old, { recursive: true, force: true });
+  const given = process.env.DATA_DAYS ?? "2";
+  if (where === "aws" && !/^[1-9]\d*$/.test(given)) fail(`data:test - DATA_DAYS is how many recent days of the deployed stack's data to test, a whole number from 1; it is "${given}"`);
+  const days = where === "aws" ? Number(given) : undefined;
   const since = days ? new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10) : "";
   const recent = async () => (await stored()).filter((object) => object.day >= since);
 
@@ -121,32 +131,42 @@ async function test(): Promise<void> {
   if (withData.length === 0) return console.log(`data:test - nothing has landed in s3://${bucket}/${prefix}${days ? ` in the last ${days} days` : ""}, so there is nothing to test`);
 
   // Plain JSON is tested where it is. The Data Contract CLI cannot read a gzipped file, so those are unpacked first.
-  const zipped = objects.some((object) => object.key.endsWith(".gz"));
+  const zippedDays = new Set(objects.filter((object) => object.key.endsWith(".gz")).map((object) => object.day));
   let copy: string | undefined;
-  if (zipped) {
-    if (where === "aws" && process.env.DATA_COPY !== "yes") {
+  let skipped: string[] = [];
+  if (zippedDays.size > 0 && (where !== "aws" || process.env.DATA_COPY === "yes")) {
+    copy = temporary();
+    await copyTo(copy, objects);
+  } else if (zippedDays.size > 0) {
+    const copyNote = "if this data may be on this machine for the length of the test: DATA_COPY=yes. The copy is private and is removed when the test ends.";
+    const plainDays = [...new Set(objects.map((object) => object.day))].filter((day) => !zippedDays.has(day));
+    if (outputs.data_compression === "GZIP" || plainDays.length === 0) {
       fail(
         [
-          `data:test - the data in s3://${bucket}/${prefix} is gzipped (data_compression = GZIP), and the Data Contract CLI can only test gzipped data from an unpacked copy.`,
-          `  ${REAL_DATA}: deploy with data_compression = UNCOMPRESSED.`,
-          "  Or, if this data may be on this machine for the length of the test: DATA_COPY=yes. The copy is private and is removed when the test ends.",
+          `data:test - the data in s3://${bucket}/${prefix} is gzipped, and the Data Contract CLI can only test gzipped data from an unpacked copy.`,
+          `  ${REAL_DATA}: deploy with data_compression = UNCOMPRESSED${outputs.data_compression === "GZIP" ? "" : " (the stack already is; the gzipped files are from before, and age out of the days tested)"}.`,
+          `  Or, ${copyNote}`,
         ].join("\n"),
       );
     }
-    copy = temporary();
-    await copyTo(copy, objects);
+    // A stack that used to write gzip: those days cannot be tested where they are, and are said, not hidden.
+    skipped = [...zippedDays].sort();
+    objects = objects.filter((object) => !zippedDays.has(object.day));
+    console.log(`data:test - not tested: ${skipped.join(", ")}, which hold gzipped files from before the stack wrote plain JSON. To test them too, ${copyNote}`);
   }
+  const tested = schemas.filter((object) => objects.some((landed) => landed.type === object.physicalName));
 
   // One contract for each event that has data: the contract as written, pointed at where that event's data is.
   const dir = resolve(".local", "datacontract.test");
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const contract = parseDocument(readFileSync(CONTRACT, "utf8")).toJS() as { schema: SchemaObject[] };
-  // A deployed stack is tested on its recent days (DATA_DAYS says how many), each day's data by itself.
+  // A deployed stack is tested on its recent days (DATA_DAYS says how many). The CLI reads one place at a
+  // time, so each day's data is tested by itself: a rule about the whole (a repeated id) is held within a day.
   type Place = { object: SchemaObject; label: string; server: Record<string, string> };
-  const places = withData.flatMap((object): Place[] => {
+  const places = tested.flatMap((object): Place[] => {
     if (copy) return [{ object, label: object.name, server: { type: "local", path: `${copy}/${object.name}/*/*.json` } }];
-    const at = (day: string) => ({ type: "s3", location: `s3://${bucket}/${prefix}type=${object.physicalName}/${day}/*`, ...(emulator ? { endpointUrl: emulator } : {}) });
+    const at = (day: string) => ({ type: "s3", location: `s3://${bucket}/${prefix}type=${object.physicalName}/${day}/*`, ...(emulator ? { endpointUrl: new URL(emulator).origin } : {}) });
     if (!days) return [{ object, label: object.name, server: at("*") }];
     const landed = [...new Set(objects.filter((candidate) => candidate.type === object.physicalName).map((candidate) => candidate.day))].sort();
     return landed.map((day) => ({ object, label: `${object.name}.${day}`, server: at(`dt=${day}`) }));
@@ -161,10 +181,13 @@ async function test(): Promise<void> {
     return file;
   });
   const version = process.env.DATACONTRACT_CLI_VERSION ?? fail("data: DATACONTRACT_CLI_VERSION is not set - run this through `task data:test`");
-  const run = spawnSync("uvx", ["--from", `datacontract-cli[duckdb,s3]==${version}`, "python", "local/data_test.py", "data", ...contracts], { stdio: "inherit" });
+  // The CLI finds the region as boto3 does, which does not read AWS_REGION.
+  const region = process.env.AWS_DEFAULT_REGION ?? process.env.AWS_REGION;
+  const env = { ...process.env, ...(region ? { AWS_DEFAULT_REGION: region } : {}) };
+  const run = spawnSync("uvx", ["--from", `datacontract-cli[duckdb,s3]==${version}`, "python", "local/data_test.py", "data", ...contracts], { stdio: "inherit", env });
   if (run.status !== 0) fail(`data:test failed - the data in s3://${bucket}/${prefix} does not keep ${CONTRACT} (above)`);
   const how = copy ? "from an unpacked copy that has been removed" : "where it is";
-  console.log(`data:test ok - the data in s3://${bucket}/${prefix} keeps the data contract, tested ${how}: ${withData.length} events' data${without.length > 0 ? `; none yet for ${without.map((object) => object.name).join(", ")}` : ""}`);
+  console.log(`data:test ok - the data in s3://${bucket}/${prefix} keeps the data contract, tested ${how}: ${tested.length} events' data${skipped.length > 0 ? ` (${skipped.length} days of gzipped data not tested)` : ""}${without.length > 0 ? `; none yet for ${without.map((object) => object.name).join(", ")}` : ""}`);
 }
 
 const quote = (text: string) => `'${text.replace(/'/g, "''")}'`;
