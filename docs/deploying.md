@@ -5,9 +5,9 @@
 ## Deploy
 
 Terraform in `infra/` creates the Lambda (Node 22, arm64), an API Gateway HTTP
-API with one route per contract operation, and a DynamoDB table. The API is
-deployed without authentication; add an authorizer to the routes in
-`infra/main.tf` before exposing anything that needs one.
+API with one route per contract operation, and a DynamoDB table. Operations
+the contract secures get a JWT authorizer ([Authentication](#authentication));
+the rest are open. An optional component adds its own part, described with it.
 
 Deploying is **opt-in**. Nothing in `task ci` touches AWS, and the template
 works end to end without an AWS account.
@@ -61,7 +61,8 @@ passes. It is skipped until you set it up, which takes three steps:
    repository's `main` branch and can manage only the resources `infra/`
    creates for the stack called `NAME`. If the account already has GitHub's
    OIDC provider, add `-- -var create_oidc_provider=false`. For a region other
-   than eu-west-2, add `-- -var region=<region>`.
+   than eu-west-2, add `-- -var region=<region>`. Say the [tags](#tags) first:
+   the role and the bucket carry them, and nothing is applied without them.
 
 2. **Give GitHub the outputs.** The command prints four values. Add each as a
    repository **variable** (Settings → Secrets and variables → Actions →
@@ -131,6 +132,21 @@ operation from `context.caller` and answer 403 with a problem.
 
 Real tokens are verified only on AWS. The local test caller proves your
 routes and rules, not your identity provider's configuration.
+
+<!-- component:consume:start -->
+## Messages
+
+The stack makes a standard queue, `<name>-messages`, a dead-letter queue and
+the function that consumes them. What a sender needs is the `queue_url` and
+`queue_arn` outputs, and permission to send, which is yours to grant.
+
+| Variable | Default | What it is |
+| --- | --- | --- |
+| `consume_timeout` | 10 | Seconds the consumer may take over one batch |
+| `consume_visibility_timeout` | six times the timeout | Seconds before a message that was not finished is offered again |
+| `consume_max_receives` | 3 | Times a message is offered before it goes to the dead-letter queue |
+| `consume_fifo` | false | A FIFO queue: messages of one group in order, each once. Changing it replaces the queue |
+<!-- component:consume:end -->
 
 <!-- component:publish:start -->
 ## Events

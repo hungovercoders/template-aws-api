@@ -4,8 +4,8 @@
 
 ## Alerting
 
-Every stack is deployed with the same baseline alarms (`infra/alarms.tf`).
-They exist from the first deploy; you only choose where they notify.
+Every stack is deployed with the same alarms: the baseline in
+`infra/alarms.tf`, and each component's beside what it watches.
 
 | Alarm | Fires when | Usually means |
 | --- | --- | --- |
@@ -27,6 +27,9 @@ They exist from the first deploy; you only choose where they notify.
 | `<name>-forwarder-errors` | Any error of the forwarder function in 5 minutes | An unhandled error, a timeout or out of memory |
 | `<name>-event-delivery-failed` | Any failed delivery from the bus to a target in 5 minutes | A rule's target is refusing events |
 <!-- component:publish:end -->
+<!-- component:data:start -->
+| `<name>-data-delivery`, `-data-freshness`, `-data-rule` | The events kept in S3 are failing to arrive, late, or not reaching the stream | See [Events as data](data.md#alarms) |
+<!-- component:data:end -->
 
 Each alarm notifies when it fires and again when it recovers. Routing:
 
@@ -75,8 +78,7 @@ out of memory. Callers got a 5xx.
 3. Started right after a deploy: redeploy the previous commit, then debug.
 
 **Usually** a bug on an input no scenario covers. Reproduce it with a
-feature scenario first, then fix; the fuzz gate should have a chance to find
-the next one.
+feature scenario first, then fix.
 
 ### lambda-throttles
 
@@ -85,8 +87,7 @@ limit. Callers got 429 or 5xx.
 
 1. Check whether traffic rose (API Gateway `Count`) or each request got
    slower (`lambda-duration`), since slow requests hold concurrency longer.
-2. Check the account's concurrent-execution limit and whether another
-   function is using it.
+2. Check the account's concurrent-execution limit, and what else uses it.
 
 **Usually** a traffic spike or a slow dependency. Raise the account limit or
 give the function reserved concurrency in `infra/main.tf`.
@@ -96,8 +97,7 @@ give the function reserved concurrency in `infra/main.tf`.
 **Means** the slowest 1% of invocations are within 20% of the timeout.
 Timeouts - and `lambda-errors` - are next.
 
-1. Find the slow operations:
-   `stats pct(duration_ms, 99) by operation_id`.
+1. Find the slow operations: `stats pct(duration_ms, 99) by operation_id`.
 2. Check `table-throttles`: DynamoDB retries look like slowness first.
 3. Check for a listing that reads more than a page, or a retry loop.
 
