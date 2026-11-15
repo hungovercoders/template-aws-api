@@ -239,6 +239,7 @@ tasks:
       NODE_OPTIONS: ''
     cmds:
       - |
+        set -e
         test -f specs/datacontract.yaml || { echo "data:lint - no specs/datacontract.yaml, so the events this API publishes are not kept as data"; exit 0; }
         uvx --from "datacontract-cli[duckdb]=={{.DATACONTRACT_CLI_VERSION}}" datacontract lint specs/datacontract.yaml
         rules=rules/datacontract.yaml; test -f .spectral.datacontract.yaml && rules=.spectral.datacontract.yaml

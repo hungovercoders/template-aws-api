@@ -2,7 +2,10 @@
 // `task data:check` asks of it (scripts/data.ts).
 import { expect, test } from "vitest";
 import { parse } from "yaml";
-import { generated, needs, read } from "../scripts/data.ts";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { generated, needs, published, read } from "../scripts/data.ts";
 
 const rated = {
   name: "beer_rated",
@@ -106,4 +109,50 @@ test("the contract must say where the data is kept, for how long and how fresh, 
   expect(needs(read(good.replace("s3://catalogue-events/events/", "s3://catalogue-events/events")))[0]).toContain("s3://<bucket>/<prefix>/");
   expect(needs(read(good.replace("unit: y", "unit: months")))[0]).toContain("retention");
   expect(needs(read(good.replace("value: 15", "value: soon")))[0]).toContain("latency");
+});
+
+test("every server is held to the form the infrastructure reads, not only production", () => {
+  const server = (name: string, location: string) => `  - server: ${name}\n    type: s3\n    location: ${location}\n    format: json\n    delimiter: new_line\n`;
+  const sla = "slaProperties:\n  - property: retention\n    value: 30\n    unit: d\n  - property: latency\n    value: 1\n    unit: h\n";
+  expect(needs(read(`servers:\n${server("production", "s3://catalogue-events/events/")}${server("test", "s3://catalogue-events-test/events/")}${sla}`))).toEqual([]);
+  expect(needs(read(`servers:\n${server("production", "s3://catalogue-events/events/")}${server("test", "s3://catalogue-events-test")}${sla}`))).toEqual([expect.stringContaining("the test server's location")]);
+});
+
+test("what is read from the AsyncAPI contract: only published events, a nullable property is not required, and limits only where the type has them", () => {
+  const envelope = { type: "object", required: ["id", "time"], properties: { id: { type: "string", minLength: 1 }, time: { type: "string", format: "date-time", maxLength: 40 } } };
+  const payload = (type: string, data: object) => ({ allOf: [envelope, { type: "object", required: ["data"], properties: { type: { type: "string", const: type }, data } }] });
+  const file = join(mkdtempSync(join(tmpdir(), "data-test-")), "asyncapi.json");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      operations: {
+        publish_rated: {
+          action: "send",
+          messages: [
+            {
+              name: "beer_rated",
+              title: "Beer rated",
+              payload: payload("com.example.beer.rated.v1", {
+                type: "object",
+                required: ["score", "note"],
+                properties: { score: { type: "integer", minimum: 1, maximum: 5 }, note: { type: ["string", "null"], maxLength: 200 }, at: { type: "string", format: "date" } },
+              }),
+            },
+          ],
+        },
+        receive_rating: { action: "receive", messages: [{ name: "rating_submitted", payload: payload("com.example.rating.submitted.v1", { type: "object" }) }] },
+      },
+    }),
+  );
+  const events = published(file);
+  expect(events.map((event) => [event.name, event.type])).toEqual([["beer_rated", "com.example.beer.rated.v1"]]);
+  const byName = Object.fromEntries(events[0]!.properties.map((property) => [property.name, property]));
+  expect(byName.id).toMatchObject({ logicalType: "string", required: true, options: { minLength: 1 } });
+  // A timestamp has no length in ODCS.
+  expect(byName.time).toEqual({ name: "time", logicalType: "timestamp", required: true, description: undefined });
+  expect(byName.data!.properties).toEqual([
+    { name: "score", logicalType: "integer", required: true, description: undefined, options: { minimum: 1, maximum: 5 } },
+    { name: "note", logicalType: "string", required: false, description: undefined, options: { maxLength: 200 } },
+    { name: "at", logicalType: "date", required: false, description: undefined },
+  ]);
 });

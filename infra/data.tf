@@ -51,6 +51,10 @@ provider "awscc" {
 # aws_s3_bucket reads the bucket's tags through S3 Control, which AWS
 # Emulator does not serve. Everything else about it is the plain resources
 # below, so the same definition applies to the emulator and to AWS.
+#
+# A bucket that holds events is never deleted by a deploy: renaming it in
+# the contract, or removing the contract, fails until it has been emptied.
+# That is deliberate - the data outlives a mistake in a pull request.
 
 resource "awscc_s3_bucket" "data" {
   count = local.data_count
@@ -124,6 +128,8 @@ resource "aws_s3_bucket_policy" "data_readers" {
 
 # --- Firehose -----------------------------------------------------------------
 
+data "aws_caller_identity" "data" {}
+
 data "aws_iam_policy_document" "data_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -131,6 +137,13 @@ data "aws_iam_policy_document" "data_assume" {
     principals {
       type        = "Service"
       identifiers = ["firehose.amazonaws.com", "events.amazonaws.com"]
+    }
+
+    # Only for this account's rule and stream: never as another account's deputy.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.data.account_id]
     }
   }
 }
@@ -147,7 +160,7 @@ data "aws_iam_policy_document" "data" {
   statement {
     sid       = "Deliver"
     actions   = ["firehose:PutRecord", "firehose:PutRecordBatch"]
-    resources = ["arn:${data.aws_partition.current.partition}:firehose:${var.region}:*:deliverystream/${var.name}-data"]
+    resources = ["arn:${data.aws_partition.current.partition}:firehose:${var.region}:${data.aws_caller_identity.data.account_id}:deliverystream/${var.name}-data"]
   }
 }
 
@@ -213,6 +226,14 @@ resource "aws_kinesis_firehose_delivery_stream" "data" {
   }
 
   depends_on = [aws_iam_role_policy.data]
+
+  lifecycle {
+    # An event waits in the buffer before it is written, so the buffer has to fit inside what readers were promised.
+    precondition {
+      condition     = var.data_buffer_seconds < local.data_latency
+      error_message = "data_buffer_seconds must be less than the data contract's latency (slaProperties): an event is only in S3 once the buffer has been written."
+    }
+  }
 }
 
 # --- From the bus to the stream -----------------------------------------------

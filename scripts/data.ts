@@ -37,23 +37,22 @@ type Json = Schema & { description?: string; maximum?: number; maxLength?: numbe
 function derivedFrom(name: string, given: Json, required: boolean): Derived {
   const schema = merged(given) as Json;
   const type = Array.isArray(schema.type) ? schema.type.find((one) => one !== "null") : schema.type;
+  // ODCS reads `required` as never null, so a property that may be null is not required there, whatever JSON Schema says.
+  const nullable = Array.isArray(schema.type) && schema.type.includes("null");
   const logicalType =
     type === "string" && schema.format === "date-time" ? "timestamp" : type === "string" && schema.format === "date" ? "date" : type && ["string", "integer", "number", "boolean", "object", "array"].includes(type) ? type : schema.properties ? "object" : "string";
-  // What the type allows, where ODCS has a word for it.
-  const options = Object.fromEntries(
-    Object.entries({
-      format: logicalType === "string" && ["email", "uuid", "uri", "hostname", "ipv4", "ipv6", "password"].includes(schema.format ?? "") ? schema.format : undefined,
-      minLength: schema.minLength,
-      maxLength: schema.maxLength,
-      pattern: schema.pattern,
-      minimum: schema.minimum,
-      maximum: schema.maximum,
-    }).filter(([, value]) => value !== undefined),
-  );
+  // What the type allows, where ODCS has a word for it - and only the words that type has.
+  const allowed =
+    logicalType === "string"
+      ? { format: ["email", "uuid", "uri", "hostname", "ipv4", "ipv6", "password"].includes(schema.format ?? "") ? schema.format : undefined, minLength: schema.minLength, maxLength: schema.maxLength, pattern: schema.pattern }
+      : logicalType === "integer" || logicalType === "number"
+        ? { minimum: schema.minimum, maximum: schema.maximum }
+        : {};
+  const options = Object.fromEntries(Object.entries(allowed).filter(([, value]) => value !== undefined));
   return {
     name,
     logicalType,
-    required,
+    required: required && !nullable,
     description: schema.description,
     ...(Object.keys(options).length > 0 ? { options } : {}),
     ...(logicalType === "object" ? { properties: Object.entries(schema.properties ?? {}).map(([key, property]) => derivedFrom(key, property as Json, (schema.required ?? []).includes(key))) } : {}),
@@ -186,14 +185,15 @@ export const read = (text: string) => (parseDocument(text).toJS() ?? {}) as Cont
 /** What infra/data.tf and the tasks read from the contract; the same rules as the Terraform's. */
 export function needs(contract: Contract): string[] {
   const problems: string[] = [];
-  const production = contract.servers?.find((server) => server.server === "production");
-  if (!production) problems.push("servers has no server named `production`: where the data is kept");
-  else {
-    if (production.type !== "s3") problems.push("the production server's type must be s3");
-    if (!/^s3:\/\/[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\/([a-z0-9_-]+\/)+$/.test(production.location ?? "")) {
-      problems.push("the production server's location must be s3://<bucket>/<prefix>/ - lower case, ending in a slash; events land under it as type=<event type>/dt=<date>/");
+  if (!contract.servers?.some((server) => server.server === "production")) problems.push("servers has no server named `production`: where the data is kept");
+  // Every server is a stack's bucket (`-var data_server=<name>`), so each is held to what the Terraform reads.
+  for (const server of contract.servers ?? []) {
+    const name = `the ${server.server ?? "unnamed"} server`;
+    if (server.type !== "s3") problems.push(`${name}'s type must be s3`);
+    if (!/^s3:\/\/[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\/([a-z0-9_-]+\/)+$/.test(server.location ?? "")) {
+      problems.push(`${name}'s location must be s3://<bucket>/<prefix>/ - lower case, ending in a slash; events land under it as type=<event type>/dt=<date>/`);
     }
-    if (production.format !== "json" || production.delimiter !== "new_line") problems.push("the production server must say format: json and delimiter: new_line - one event per line is what is written");
+    if (server.format !== "json" || server.delimiter !== "new_line") problems.push(`${name} must say format: json and delimiter: new_line - one event per line is what is written`);
   }
   const sla = (property: string) => contract.slaProperties?.find((entry) => entry.property === property);
   const retention = sla("retention");
@@ -241,18 +241,27 @@ function compat(): void {
   const from = `${old.version} (at ${ref.slice(0, 12)})`;
   if (before.trim() === now.trim()) return console.log(`data:compat ok - unchanged since ${from}`);
 
+  // The Data Contract CLI says what changed (changelog) and whether a reader of the data would break (breaking).
   const work = mkdtempSync(join(tmpdir(), "data-compat-"));
-  let changes: { severity?: string; change?: string; path?: string; message?: string }[];
+  let changes: { type?: string; path?: string }[];
+  let breaking: boolean;
+  let verdict: string;
   try {
     writeFileSync(join(work, "before.yaml"), before);
-    const run = cli(["changelog", join(work, "before.yaml"), CONTRACT, "--output-format", "json"]);
-    if (run.status !== 0) stop(`data:compat failed - the Data Contract CLI could not compare the contracts\n${(run.stderr || run.stdout).trim()}`);
-    const report = JSON.parse(run.stdout.slice(run.stdout.indexOf("{"))) as { entries?: typeof changes; changes?: typeof changes };
-    changes = (report.entries ?? report.changes ?? []).filter((change) => change.path !== "version");
+    const log = cli(["changelog", join(work, "before.yaml"), CONTRACT, "--output-format", "json"]);
+    const start = log.stdout.indexOf("{");
+    if (log.status !== 0 || start < 0) stop(`data:compat failed - the Data Contract CLI could not compare the contracts\n${(log.stderr || log.stdout).trim()}`);
+    const report = JSON.parse(log.stdout.slice(start)) as { summary?: typeof changes };
+    if (!Array.isArray(report.summary)) stop("data:compat failed - the Data Contract CLI's changelog is not in the form this gate reads (no `summary`); the pinned version changed it");
+    changes = report.summary!.filter((change) => change.path !== "version");
+    // It exits 0 when no reader breaks and 1 when one would; anything else is the CLI failing.
+    const judged = cli(["breaking", join(work, "before.yaml"), CONTRACT]);
+    if (judged.status !== 0 && judged.status !== 1) stop(`data:compat failed - the Data Contract CLI could not judge the change\n${(judged.stderr || judged.stdout).trim()}`);
+    breaking = judged.status === 1;
+    verdict = judged.stdout.trim();
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
-  const breaking = changes.filter((change) => change.severity?.toLowerCase() === "error");
 
   const parse = (version: string | undefined) => /^(\d+)\.(\d+)\.(\d+)$/.exec(version ?? "")?.slice(1).map(Number);
   const to = parse(current.version) ?? stop(`data:compat failed\n  - version "${current.version}" is not a semantic version (MAJOR.MINOR.PATCH)`);
@@ -263,15 +272,15 @@ function compat(): void {
     minor: major > oldMajor || (major === oldMajor && minor > oldMinor),
     any: major > oldMajor || (major === oldMajor && (minor > oldMinor || (minor === oldMinor && patch > oldPatch))),
   };
-  const lines = changes.map((change) => `    ${change.severity?.toLowerCase() === "error" ? "breaking" : "        "}  ${change.change?.toLowerCase() ?? "changed"} ${change.path}${change.message ? ` - ${change.message}` : ""}`);
+  const lines = changes.map((change) => `    ${change.type ?? "changed"} ${change.path}`);
   const problems: string[] = [];
-  if (breaking.length > 0 && !(bumped.major || (oldMajor === 0 && bumped.minor))) {
+  if (breaking && !(bumped.major || (oldMajor === 0 && bumped.minor))) {
     problems.push(`the data contract has breaking changes but its version went from ${from} to ${current.version}; that needs a new ${oldMajor === 0 ? "minor version (the contract is still 0.x)" : "major version"}`);
   } else if (!bumped.any) {
     problems.push(`the data contract was edited but its version is still ${current.version}; every published edit needs a new version`);
   }
-  if (problems.length > 0) stop(["data:compat failed", ...problems.map((problem) => `  - ${problem}`), ...lines].join("\n"));
-  console.log([`data:compat ok - ${from} -> ${current.version}: ${breaking.length} breaking, ${changes.length - breaking.length} other changes`, ...lines].join("\n"));
+  if (problems.length > 0) stop(["data:compat failed", ...problems.map((problem) => `  - ${problem}`), ...(breaking ? [verdict] : lines)].join("\n"));
+  console.log([`data:compat ok - ${from} -> ${current.version}: ${breaking ? "breaking" : "nothing breaking"}, ${changes.length} changes`, ...lines].join("\n"));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

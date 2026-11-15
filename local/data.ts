@@ -7,7 +7,7 @@
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { parseDocument } from "yaml";
@@ -169,9 +169,12 @@ async function views(canReadS3: boolean): Promise<string> {
   console.error(`data: ${defined.length > 0 ? `views ${defined.join(", ")}` : "no views"} over s3://${bucket}/${prefix}${quiet.length > 0 ? `; nothing has landed yet for ${quiet.join(", ")}` : ""}`);
   const file = resolve(".local", `data-${where}.sql`);
   mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, lines.join("\n") + "\n");
-  // It holds the credentials the views read with.
-  chmodSync(file, 0o600);
+  // It holds the credentials the views read with: readable by nobody else, and gone when the task ends,
+  // however it ends - an interrupt meant for a query must not stop this before it has tidied up.
+  rmSync(file, { force: true });
+  writeFileSync(file, lines.join("\n") + "\n", { mode: 0o600 });
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => {});
+  process.on("exit", () => rmSync(file, { force: true }));
   return file;
 }
 

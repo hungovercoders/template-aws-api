@@ -78,6 +78,10 @@ Other accounts read the bucket when the stack is deployed with
 writes a file: 300 by default, and it must be well inside the contract's
 `latency`. The local stack uses 0, so a test does not wait.
 
+A deploy never deletes a bucket that holds events: moving the data to
+another bucket, or dropping the contract, fails until the old bucket has
+been emptied by hand. Shortening `retention` does delete data.
+
 With CI deploying (`docs/deploying.md`), the deploy role may manage only the
 buckets the contract names: apply `infra/bootstrap` again after adding a
 server to it.
