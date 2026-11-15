@@ -12,7 +12,7 @@ import {
   waitUntilEventBusActive,
 } from "@aws-sdk/client-eventbridgev2";
 import { CreateEventSourceMappingCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { type Gap, lambdaFunction, queue, received, role, sleep, terraform } from "../lib.ts";
+import { type Gap, invocations, lambdaFunction, queue, received, role, sleep, terraform } from "../lib.ts";
 
 const events = new EventBridgeV2Client({ maxAttempts: 1 });
 const notImplemented = (error: unknown) => (error as Error).name === "NotImplemented";
@@ -84,8 +84,13 @@ export const gaps: Gap[] = [
       );
       await sleep(3000);
       await new DynamoDBClient({}).send(new PutItemCommand({ TableName: name, Item: { pk: { S: "a" } } }));
-      // On AWS the batch is given up on after its second try and a record of it sent here.
-      return (await received(failures.url, 45)).length === 0;
+      // On AWS the batch is tried twice, then given up on and a record of it sent to the queue.
+      // A third try with nothing in the queue is the emulator going past the limit.
+      for (const until = Date.now() + 60_000; Date.now() < until; ) {
+        if ((await received(failures.url, 2)).length > 0) return false;
+        if ((await invocations(name)) >= 3) return true;
+      }
+      throw new Error(`after a minute the function had been tried ${await invocations(name)} times and nothing was handed on: the mapping may not be delivering at all`);
     },
   },
   {
@@ -163,8 +168,9 @@ export const gaps: Gap[] = [
     async test() {
       const applied = await terraform("eventsv2-terraform");
       if (applied.ok) return false;
-      if (/awscc_eventsv2_/.test(applied.output)) return true;
-      throw new Error(`the apply failed somewhere else\n${applied.output.trim().slice(-1500)}`);
+      // Cloud Control not knowing the type at all is the gap; any other failure is the test's to explain.
+      if (/TypeNotFoundException/.test(applied.output) && /awscc_eventsv2_/.test(applied.output)) return true;
+      throw new Error(`the apply failed another way\n${applied.output.trim().slice(-1500)}`);
     },
   },
 ];

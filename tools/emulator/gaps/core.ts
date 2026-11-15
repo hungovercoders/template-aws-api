@@ -56,10 +56,13 @@ export const gaps: Gap[] = [
         new CreateRouteCommand({ ApiId: made.ApiId, RouteKey: "GET /probe", Target: `integrations/${integration.IntegrationId}`, AuthorizationType: "JWT", AuthorizerId: authorizer.AuthorizerId }),
       );
       await api.send(new CreateStageCommand({ ApiId: made.ApiId, StageName: "$default", AutoDeploy: true }));
+      // Through the emulator, whatever host the API's own endpoint names: a release may name AWS there, as it does for queues.
+      const emulator = process.env.AWS_ENDPOINT_URL ?? "";
+      const base = new URL(made.ApiEndpoint ?? "").host === new URL(emulator).host ? made.ApiEndpoint : `${emulator}/_aws/execute-api/${made.ApiId}`;
       const call = (headers: Record<string, string>) =>
-        fetch(`${made.ApiEndpoint}/probe`, { headers }).then(
+        fetch(`${base}/probe`, { headers }).then(
           (response) => response.status,
-          (error: Error) => Promise.reject(new Error(`could not call ${made.ApiEndpoint}/probe: ${(error.cause as Error | undefined)?.message ?? error.message}`)),
+          (error: Error) => Promise.reject(new Error(`could not call ${base}/probe: ${(error.cause as Error | undefined)?.message ?? error.message}`)),
         );
       // The authorizer must be in force before its leniency means anything.
       const unsigned = await call({});
@@ -106,7 +109,7 @@ export const gaps: Gap[] = [
     kind: "workaround",
     gap: "A queue's URL names sqs.<region>.amazonaws.com, not the emulator, so a client that follows the URL calls AWS.",
     then: "Every SQS client is made with `useQueueUrlAsEndpoint: false`. Make them with no option.",
-    where: ["src/lib/consumer.ts", "local/queue.ts", "local/events.ts"],
+    where: ["src/lib/consumer.ts", "src/lib/forwarder.ts", "steps/messages.ts", "local/queue.ts", "local/events.ts"],
     async test() {
       const made = await queue("gap-queue-url-host");
       return new URL(made.url).host !== new URL(process.env.AWS_ENDPOINT_URL ?? "").host;

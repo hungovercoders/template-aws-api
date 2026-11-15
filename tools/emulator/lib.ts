@@ -2,11 +2,12 @@
 // tests need - a role, a function, a queue, a Terraform apply. Every test
 // runs against one emulator that `gaps.ts` started empty, and names what it
 // creates after its own gap so tests never meet.
+import { CloudWatchLogsClient, FilterLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
 import { CreateFunctionCommand, LambdaClient, waitUntilFunctionActiveV2 } from "@aws-sdk/client-lambda";
 import { CreateRoleCommand, IAMClient, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateQueueCommand, GetQueueAttributesCommand, ReceiveMessageCommand, SQSClient } from "@aws-sdk/client-sqs";
-import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { type ChildProcess, spawn } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { crc32 } from "node:zlib";
 
@@ -89,6 +90,18 @@ export async function lambdaFunction(name: string, roleArn: string, code: string
   return made.FunctionArn!;
 }
 
+/** How many times a function has been started, from its log: the proof that something did invoke it. */
+export async function invocations(name: string): Promise<number> {
+  const logs = new CloudWatchLogsClient({});
+  try {
+    const found = await logs.send(new FilterLogEventsCommand({ logGroupName: `/aws/lambda/${name}`, filterPattern: '"START RequestId"' }));
+    return (found.events ?? []).filter((event) => event.message?.startsWith("START RequestId")).length;
+  } catch (error) {
+    if ((error as Error).name === "ResourceNotFoundException") return 0;
+    throw error;
+  }
+}
+
 export async function queue(name: string, attributes: Record<string, string> = {}, tags?: Record<string, string>): Promise<{ url: string; arn: string }> {
   const made = await sqs.send(new CreateQueueCommand({ QueueName: name, Attributes: attributes, tags }));
   const read = await sqs.send(new GetQueueAttributesCommand({ QueueUrl: made.QueueUrl, AttributeNames: ["QueueArn"] }));
@@ -108,48 +121,74 @@ export async function received(url: string, seconds: number, enough = 1): Promis
 
 export type Applied = { ok: boolean; timedOut: boolean; output: string };
 
-/** Where the providers `terraform -chdir=infra init` downloaded are, so a test's own init fetches nothing. */
-export const PROVIDERS = resolve("infra", ".terraform", "providers");
 const WORK = resolve(".local", "emulator-gaps");
+// Whatever is applying now, so a test that ran out of time does not go on working against the emulator the next one uses.
+const applying = new Set<ChildProcess>();
 
-function run(args: string[], cwd: string, seconds: number): Promise<Applied> {
+/** Stop every Terraform a test left running. Terraform is asked first, so it takes its provider with it. */
+export function stopTerraform(): void {
+  for (const child of applying) {
+    child.kill("SIGTERM");
+    setTimeout(() => child.kill("SIGKILL"), 5000).unref();
+  }
+}
+
+// Providers come from the ones `terraform -chdir=infra init` already downloaded,
+// at the versions infra/ is locked to. One that infra/ does not use (a removed
+// component took it) is downloaded once, into a cache beside the copies.
+function cliConfig(): string {
+  const mirror = resolve("infra", ".terraform", "providers");
+  const cache = join(WORK, "plugin-cache");
+  mkdirSync(cache, { recursive: true });
+  const path = join(WORK, "terraform.rc");
+  const methods = existsSync(mirror) ? `  filesystem_mirror {\n    path = ${JSON.stringify(mirror)}\n  }\n  direct {}` : "  direct {}";
+  writeFileSync(path, `plugin_cache_dir = ${JSON.stringify(cache)}\nprovider_installation {\n${methods}\n}\n`);
+  return path;
+}
+
+function run(args: string[], cwd: string, seconds: number, env: NodeJS.ProcessEnv = {}): Promise<Applied> {
   return new Promise((done) => {
-    const child = spawn("terraform", args, { cwd, env: { ...process.env, TF_IN_AUTOMATION: "1" }, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("terraform", args, { cwd, env: { ...process.env, TF_IN_AUTOMATION: "1", TF_CLI_CONFIG_FILE: cliConfig(), ...env }, stdio: ["ignore", "pipe", "pipe"] });
+    applying.add(child);
     let output = "";
     let timedOut = false;
     child.stdout.on("data", (chunk) => (output += chunk));
     child.stderr.on("data", (chunk) => (output += chunk));
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill("SIGKILL");
+      child.kill("SIGTERM");
+      setTimeout(() => child.kill("SIGKILL"), 5000).unref();
     }, seconds * 1000);
-    child.on("error", (error) => {
+    const finish = (ok: boolean, extra = "") => {
       clearTimeout(timer);
-      done({ ok: false, timedOut, output: `${output}\n${error.message}` });
-    });
-    child.on("exit", (code) => {
-      clearTimeout(timer);
-      done({ ok: code === 0, timedOut, output });
-    });
+      applying.delete(child);
+      done({ ok, timedOut, output: output + extra });
+    };
+    child.on("error", (error) => finish(false, `\n${error.message}`));
+    child.on("exit", (code) => finish(code === 0 && !timedOut));
   });
 }
 
 /**
  * Apply `tools/emulator/terraform/<id>/` to the emulator, in a copy under
  * .local/ so nothing is left in the tree. `again` applies once more with those
- * variables. A test reads `output` to tell its gap from any other failure.
+ * variables; `debug` adds the provider's own log to the output, for a test
+ * that has to see which call it made. A test reads `output` to tell its gap
+ * from any other failure, and finds it afterwards in the copy's apply.log.
  */
-export async function terraform(id: string, options: { seconds?: number; again?: string[] } = {}): Promise<Applied> {
+export async function terraform(id: string, options: { seconds?: number; again?: string[]; debug?: boolean } = {}): Promise<Applied> {
   const dir = join(WORK, id);
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(WORK, { recursive: true });
   cpSync(resolve("tools", "emulator", "terraform", id), dir, { recursive: true });
-  const init = await run(["init", "-input=false", "-no-color", `-plugin-dir=${PROVIDERS}`], dir, 120);
-  if (!init.ok) throw new Error(`terraform init failed for ${id}\n${init.output.trim()}`);
+  const lock = resolve("infra", ".terraform.lock.hcl");
+  if (existsSync(lock)) cpSync(lock, join(dir, ".terraform.lock.hcl"));
+  const init = await run(["init", "-input=false", "-no-color"], dir, 300);
+  if (!init.ok) throw new Error(`terraform init failed for ${id}\n${init.output.trim().slice(-1500)}`);
   const apply = ["apply", "-auto-approve", "-input=false", "-no-color"];
-  let applied = await run(apply, dir, options.seconds ?? 90);
-  if (applied.ok && options.again) applied = await run([...apply, ...options.again.map((variable) => `-var=${variable}`)], dir, options.seconds ?? 90);
-  // Kept beside the copy, for whoever wonders why a test said what it said.
+  const env = options.debug ? { TF_LOG: "DEBUG" } : {};
+  let applied = await run(apply, dir, options.seconds ?? 90, env);
+  if (applied.ok && options.again) applied = await run([...apply, ...options.again.map((variable) => `-var=${variable}`)], dir, options.seconds ?? 90, env);
   writeFileSync(join(dir, "apply.log"), applied.output);
   return applied;
 }

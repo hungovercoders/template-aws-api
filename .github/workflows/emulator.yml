@@ -1,14 +1,19 @@
-# When a pull request moves the AWS Emulator pin (EMULATOR_VERSION in
-# Taskfile.yml), say which of the emulator's gaps are still there. The gates
-# catch a release that makes something worse; this catches one that makes
-# something better, so a workaround does not outlive its gap.
+# When the AWS Emulator pin (EMULATOR_VERSION in Taskfile.yml) moves, say
+# which of the emulator's gaps are still there. The gates catch a release that
+# makes something worse; this catches one that makes something better, so a
+# workaround does not outlive its gap.
 #
-# A gap that has closed never fails the pull request. It opens an issue naming
-# what can now be removed. The job is red only when a test could not tell.
+# On the pull request that moves the pin it reports, on the checks page. Once
+# the pin has moved on main it raises an issue for each gap that has closed,
+# naming what can now be removed. A closed gap never fails anything: the job
+# is red only when a test could not tell.
 name: emulator
 
 on:
   pull_request:
+    paths: [Taskfile.yml]
+  push:
+    branches: [main]
     paths: [Taskfile.yml]
   workflow_dispatch:
 
@@ -22,7 +27,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write # to open an issue for a gap that has closed
+      issues: write # to raise an issue for a gap that has closed
     steps:
       - uses: actions/checkout@v7
         with:
@@ -32,21 +37,27 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
         run: |
-          if [ "$EVENT" = "workflow_dispatch" ] ||
-            git diff "origin/$BASE...HEAD" -- Taskfile.yml | grep -q '^[+-]  EMULATOR_VERSION:'; then
+          case "$EVENT" in
+            workflow_dispatch) range="" ;;
+            pull_request) range="origin/$BASE...HEAD" ;;
+            *) range="$BEFORE..HEAD" ;;
+          esac
+          if [ -z "$range" ] || git diff "$range" -- Taskfile.yml | grep -q '^[+-]  EMULATOR_VERSION:'; then
             echo "moved=true" >> "$GITHUB_OUTPUT"
           else
             echo "The emulator pin did not move: nothing to test."
           fi
       - uses: jdx/mise-action@v5
         if: steps.pin.outputs.moved == 'true'
-      - name: Test every gap on the proposed emulator
+      - name: Test every gap
         if: steps.pin.outputs.moved == 'true'
         run: task emulator:gaps
-      - name: Open an issue for each gap that has closed
-        # A pull request from a fork has no token that may write issues; its summary above still says.
-        if: steps.pin.outputs.moved == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+      - name: Raise an issue for each gap that has closed
+        # Not from a pull request: its pin may never be merged. And even when a
+        # test could not tell, for the gaps that did close.
+        if: ${{ !cancelled() && steps.pin.outputs.moved == 'true' && github.event_name != 'pull_request' && hashFiles('.local/emulator-gaps.json') != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: node --import tsx tools/emulator/gaps.ts --issues

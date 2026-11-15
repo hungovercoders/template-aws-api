@@ -192,7 +192,7 @@ that needs them fails there as a `Runtime.ImportModuleError`.
 
 "Known from" says what shows each row: a gate, or a gap in code font. A gap
 is something the emulator cannot do yet, with a test that says so:
-`task emulator:gaps -- --list` lists them, with what each one costs the
+`task emulator:gaps:list` lists them, with what each one costs the
 template and the files that carry it.
 
 A request takes tens of milliseconds, so the scenarios and the fuzz run take
@@ -210,8 +210,9 @@ is why the version is pinned; see
 The gates say whether a release made anything worse. `task emulator:gaps`
 says whether it made anything better: it tests every gap on the pinned
 emulator and reports "still needed" or "the gap has closed". The `emulator`
-workflow runs it on the pull request that moves the pin. A closed gap never
-blocks the merge; it opens an issue naming what can now be removed.
+workflow runs it on the pull request that moves the pin, and again once the
+pin has moved on `main`. A closed gap never blocks the merge; on `main` it
+raises an issue naming what can now be removed.
 
 What is left for a person:
 

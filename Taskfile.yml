@@ -501,10 +501,20 @@ tasks:
     generates:
       - tools/emulator/node_modules/.package-lock.json
 
-  emulator:gaps:
-    desc: What AWS Emulator cannot do yet that this repository works around, lives with or waits for - tests each on the pinned emulator and says "still needed" or "the gap has closed" (-- --list lists them, -- <id> tests one; Linux and CI)
-    deps: [install, emulator:install, emulator:gaps:install]
+  emulator:gaps:list:
+    desc: List what AWS Emulator cannot do yet that this repository works around, lives with or waits for - each gap, what the template does about it and in which files; needs no emulator
     cmds:
+      # One after another: each is an npm install, and two at once fight.
+      - task: install
+      - task: emulator:gaps:install
+      - node tools/emulator/gaps.ts --list
+
+  emulator:gaps:
+    desc: Test each emulator gap on the pinned AWS Emulator and say "still needed" or "the gap has closed" - run when EMULATOR_VERSION moves (-- <id> tests one; Linux and CI)
+    cmds:
+      - task: install
+      - task: emulator:gaps:install
+      - task: emulator:install
       - npx tsc -p tools/emulator
       - node tools/emulator/gaps.ts {{.CLI_ARGS}}
 

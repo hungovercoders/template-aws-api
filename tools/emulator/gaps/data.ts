@@ -12,10 +12,11 @@ export const gaps: Gap[] = [
     then: 'infra/data.tf makes the bucket with `awscc_s3_bucket`, through Cloud Control. Make it an `aws_s3_bucket` (a `moved` block cannot cross providers: `terraform state rm` and `import` for a deployed stack).',
     where: ["infra/data.tf"],
     async test() {
-      const applied = await terraform("s3-control", { seconds: 45 });
+      // The provider retries the call for minutes, so the test stops it early and reads its log for that call.
+      const applied = await terraform("s3-control", { seconds: 45, debug: true });
       if (applied.ok) return false;
-      if (applied.timedOut || /s3control|S3 Control/i.test(applied.output)) return true;
-      throw new Error(`the apply failed another way\n${applied.output.trim().slice(-1500)}`);
+      if (/retrying request S3 Control\/ListTagsForResource/.test(applied.output)) return true;
+      throw new Error(`the apply failed, and not on S3 Control\n${applied.output.trim().slice(-1500)}`);
     },
   },
   {
