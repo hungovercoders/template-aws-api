@@ -44,6 +44,7 @@ const SKELETON = [
   "test/consumers.test.ts",
   "test/forwarder.test.ts",
   "test/data.test.ts",
+  "test/tags.test.ts",
   "docs/data.md",
   "infra/",
   // The template's own skills. Skills copied from elsewhere are held by
@@ -52,7 +53,8 @@ const SKELETON = [
   ".claude/skills/write-spec/",
 ];
 // A tool package's dependencies move with Renovate, like the root package.json, which is not skeleton either.
-const NOT_SOURCE = /(^|\/)\.terraform(\/|\.lock\.hcl$)|\.tfstate|^tools\/[^/]+\/package(-lock)?\.json$/;
+// The tags' values are the API's own to set.
+const NOT_SOURCE = /(^|\/)\.terraform(\/|\.lock\.hcl$)|\.tfstate|^tools\/[^/]+\/package(-lock)?\.json$|^infra\/tags\.auto\.tfvars\.json$/;
 
 // Routine version bumps are not skeleton changes: pins are read as "some version".
 function normalised(path: string, text: string): string {
