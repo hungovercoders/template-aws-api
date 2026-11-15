@@ -211,6 +211,98 @@ data "aws_iam_policy_document" "deploy" {
   }
   # component:consume:end
 
+  # component:publish:start
+  # Published events: the bus, its archive, rule and log, the forwarder
+  # function, its role and its mapping to the table's stream, and the queue
+  # of events that could not be published (infra/publish.tf).
+  statement {
+    sid     = "Events"
+    actions = ["events:*"]
+    resources = [
+      "arn:${local.partition}:events:${var.region}:${local.account}:event-bus/${var.name}",
+      # On the stack's own bus, or on an existing one it was told to use.
+      "arn:${local.partition}:events:${var.region}:${local.account}:rule/*/${var.name}-*",
+      "arn:${local.partition}:events:${var.region}:${local.account}:archive/${var.name}",
+    ]
+  }
+
+  # An existing bus is only read.
+  statement {
+    sid       = "EventBusRead"
+    actions   = ["events:DescribeEventBus", "events:ListTagsForResource"]
+    resources = ["arn:${local.partition}:events:${var.region}:${local.account}:event-bus/*"]
+  }
+
+  # A log group's resource policy has no ARN to name.
+  statement {
+    sid       = "EventLogPolicy"
+    actions   = ["logs:PutResourcePolicy", "logs:DeleteResourcePolicy", "logs:DescribeResourcePolicies"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "EventLog"
+    actions   = ["logs:*"]
+    resources = ["arn:${local.partition}:logs:${var.region}:${local.account}:log-group:/aws/events/${var.name}*"]
+  }
+
+  statement {
+    sid       = "Unpublished"
+    actions   = ["sqs:*"]
+    resources = ["arn:${local.partition}:sqs:${var.region}:${local.account}:${var.name}-unpublished"]
+  }
+
+  statement {
+    sid       = "Forwarder"
+    actions   = ["lambda:*"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-forwarder"]
+  }
+
+  statement {
+    sid       = "ForwarderMapping"
+    actions   = ["lambda:CreateEventSourceMapping", "lambda:UpdateEventSourceMapping", "lambda:DeleteEventSourceMapping"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringLike"
+      variable = "lambda:FunctionArn"
+      values   = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-forwarder"]
+    }
+  }
+
+  statement {
+    sid       = "ForwarderMappingRead"
+    actions   = ["lambda:GetEventSourceMapping", "lambda:ListEventSourceMappings"]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "ForwarderMappingTags"
+    actions   = ["lambda:TagResource", "lambda:UntagResource", "lambda:ListTags"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:event-source-mapping:*"]
+  }
+
+  statement {
+    sid = "ForwarderRole"
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:GetRole",
+      "iam:PassRole",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
+    ]
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-forwarder"]
+  }
+  # component:publish:end
+
   # The Lambda's execution role. Managing a role means this role can decide
   # what the Lambda is allowed to do - review changes to infra/ accordingly.
   statement {

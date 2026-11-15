@@ -21,6 +21,12 @@ They exist from the first deploy; you only choose where they notify.
 | `<name>-consumer-errors` | Any error of the consumer function in 5 minutes | An unhandled error, a timeout or out of memory |
 | `<name>-consumer-throttles` | Any throttled invocation of the consumer in 5 minutes | The concurrency limit was reached |
 <!-- component:consume:end -->
+<!-- component:publish:start -->
+| `<name>-outbox-age` | The oldest event waiting to be published is over a minute old | The forwarder is failing, throttled or behind |
+| `<name>-unpublished` | Any event set aside as unpublishable | The bus refused an event, and subscribers have not had it |
+| `<name>-forwarder-errors` | Any error of the forwarder function in 5 minutes | An unhandled error, a timeout or out of memory |
+| `<name>-event-delivery-failed` | Any failed delivery from the bus to a target in 5 minutes | A rule's target is refusing events |
+<!-- component:publish:end -->
 
 Each alarm notifies when it fires and again when it recovers. Routing:
 
@@ -197,3 +203,48 @@ timeout or out of memory. The messages it held are offered again.
 **Means** the consumer was refused concurrency. Messages wait; none is lost.
 See `lambda-throttles`: the cause and the remedy are the same.
 <!-- component:consume:end -->
+
+<!-- component:publish:start -->
+## Events
+
+An operation writes each event to the table with the change it is about. The
+forwarder (`/aws/lambda/<name>-forwarder`) puts it on the bus and logs one
+JSON line, `event`, with `event_id`, `event_type`, `trace_id` and `outcome`:
+`published`, `retrying` or `set_aside` (with the `reason`). `ENV=aws task
+events:tail` follows what is on the bus; its archive can replay a period.
+
+### unpublished
+
+**Means** the bus will never take an event as it is, and it was set aside
+for 14 days. The change it describes happened; subscribers do not know.
+
+1. `ENV=aws task events:unpublished` shows each event and its `reason`.
+2. Fix what the reason names - usually an event larger than the bus takes
+   (256 KB), which is a change to the event.
+3. `ENV=aws task events:retry` publishes them; each leaves once it is on the
+   bus. Subscribers get them late and out of order, which they are promised.
+
+### outbox-age
+
+**Means** events are written but not reaching the bus. None is lost: they
+wait in the table, in order, and nothing behind the first is published.
+
+1. `ENV=aws task outbox:list` shows what is waiting.
+2. The forwarder's `retrying` lines carry the error: the bus throttling or
+   down, or the forwarder's permission to it. `forwarder-errors` and
+   `lambda-throttles` explain the rest. Right after a deploy: redeploy the
+   previous commit.
+3. Fixed within a day: the backlog publishes on its own. Later than that,
+   the table's stream has let go of them: `ENV=aws task events:retry`
+   publishes what has waited in the outbox for over five minutes.
+
+### forwarder-errors
+
+**Means** the forwarder failed outright. Its batch is offered again, so an
+event may be published twice; subscribers are promised that.
+
+### event-delivery-failed
+
+**Means** the bus could not deliver to a rule's target - this stack's only
+target is the event log. A subscriber's own rule is theirs to watch.
+<!-- component:publish:end -->

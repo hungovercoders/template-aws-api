@@ -115,6 +115,22 @@ operation from `context.caller` and answer 403 with a problem.
 Real tokens are verified only on AWS. The local test caller proves your
 routes and rules, not your identity provider's configuration.
 
+<!-- component:publish:start -->
+## Events
+
+The stack makes its own event bus, named after it, with an archive of 30
+days (`-var event_archive_days=N`; 0 for none) and a log of everything
+published (`event_log_days`, 1 by default: it is for looking, not keeping).
+
+- **An existing bus.** `-var event_bus_name=<name>` publishes to a bus you
+  already run instead. The archive and the log are still made, and hold
+  only this API's events.
+- **Subscribers in other accounts.** `-var 'event_subscriber_accounts=["123456789012"]'`
+  lets each account put its own rules on the bus. A subscriber in this
+  account needs nothing: it adds a rule matching `source` `/<name>` and the
+  `detail-type` it wants, which is the event's `type`.
+<!-- component:publish:end -->
+
 ## Logging and CORS
 
 - **Logging.** The router writes one JSON line per request - `request_id`,

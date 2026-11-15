@@ -6,43 +6,16 @@
 // ENV=local (the default) is the stack `task dev` keeps up; ENV=aws is the
 // deployed stack, with your AWS credentials.
 import { GetQueueAttributesCommand, ReceiveMessageCommand, SendMessageCommand, SQSClient, StartMessageMoveTaskCommand } from "@aws-sdk/client-sqs";
-import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { stackOutputs } from "./outputs.ts";
 
 const fail = (message: string): never => {
   console.error(message);
   process.exit(1);
 };
 
-type Outputs = { queue_url?: string; queue_arn?: string; dead_letter_queue_url?: string };
-function outputs(): Outputs {
-  if ((process.env.ENV ?? "local") === "aws") {
-    const run = spawnSync("terraform", ["-chdir=infra", "output", "-json"], { encoding: "utf8" });
-    if (run.status !== 0) fail(`queue: could not read the deployed stack's outputs\n${run.stderr.trim()}`);
-    return Object.fromEntries(Object.entries(JSON.parse(run.stdout) as Record<string, { value: string }>).map(([name, output]) => [name, output.value]));
-  }
-  if (!existsSync(".local/stack.json")) fail("queue: the local stack is not up. Run `task dev` in another terminal, or use ENV=aws for the deployed stack.");
-  const stack = JSON.parse(readFileSync(".local/stack.json", "utf8")) as { env?: Record<string, string>; outputs?: Outputs };
-  const emulator = stack.env ?? {};
-  // The local stack is on an emulator. Never let a request meant for it go to
-  // AWS: without an endpoint to send to, stop.
-  if (!emulator.AWS_ENDPOINT_URL && !process.env.AWS_ENDPOINT_URL) {
-    fail("queue: `task dev` was started against an emulator of your own (AWS_ENDPOINT_URL). Set the same AWS_ENDPOINT_URL here, with its credentials and certificate.");
-  }
-  // Its endpoint, credentials and certificate. Node reads the certificate when
-  // it starts, so this starts again with the stack's settings in place.
-  if (emulator.AWS_ENDPOINT_URL && process.env.NODE_EXTRA_CA_CERTS !== emulator.NODE_EXTRA_CA_CERTS) {
-    const env = { ...process.env, ...emulator };
-    // Real credentials must never sign requests while the emulator is the target.
-    for (const name of ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_PROFILE"]) delete env[name];
-    const again = spawnSync(process.execPath, process.argv.slice(1), { stdio: "inherit", env });
-    process.exit(again.status ?? 1);
-  }
-  return stack.outputs ?? {};
-}
-
-const { queue_url: queue, queue_arn: queueArn, dead_letter_queue_url: deadLetterQueue } = outputs();
+const { queue_url: queue, queue_arn: queueArn, dead_letter_queue_url: deadLetterQueue } = stackOutputs("queue");
 if (!queue || !queueArn || !deadLetterQueue) fail("queue: the stack has no queue; it has no async input");
 // Through the configured endpoint, not the host in the queue's URL: AWS Emulator gives its queues URLs that name AWS itself.
 const sqs = new SQSClient({ useQueueUrlAsEndpoint: false });
@@ -72,12 +45,13 @@ if (command === "send") {
   await counts(deadLetterQueue!, "dead-letter queue");
   // Nothing is hidden or taken, and nothing consumes this queue, so reading it costs a message nothing.
   const seen = new Set<string>();
-  for (let reads = 0; reads < 20; reads++) {
+  // A read is a sample of the queue, and may repeat one: stop only when several in a row bring nothing new.
+  for (let reads = 0, nothingNew = 0; reads < 200 && nothingNew < 3; reads++) {
     const page = await sqs.send(
       new ReceiveMessageCommand({ QueueUrl: deadLetterQueue!, MaxNumberOfMessages: 10, VisibilityTimeout: 0, WaitTimeSeconds: 1, MessageAttributeNames: ["All"], MessageSystemAttributeNames: ["SentTimestamp"] }),
     );
     const fresh = (page.Messages ?? []).filter((message) => !seen.has(message.MessageId ?? ""));
-    if (fresh.length === 0) break;
+    nothingNew = fresh.length === 0 ? nothingNew + 1 : 0;
     for (const message of fresh) {
       seen.add(message.MessageId ?? "");
       const reason = message.MessageAttributes?.reason?.StringValue;
