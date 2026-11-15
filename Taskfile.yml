@@ -16,6 +16,18 @@ vars:
   # only changes what it sends or checks in a commit; it runs through uvx.
   SCHEMATHESIS_VERSION: 4.33.4
   MOCK_PORT: '{{.MOCK_PORT | default "4010"}}'
+  # component:data:start
+  # The version of the Open Data Contract Standard specs/datacontract.yaml is
+  # written in: the one place it is chosen. Moving to the next is this line,
+  # the contract's apiVersion, and whatever `task data:lint` then says.
+  ODCS_VERSION: v3.2.0
+  # The Data Contract CLI lints, compares and tests the data contract; DuckDB
+  # queries the data and Harlequin browses it, on the same DuckDB. Exact
+  # versions; all three run through uvx.
+  DATACONTRACT_CLI_VERSION: 1.2.10
+  DUCKDB_VERSION: 2.0.0
+  HARLEQUIN_VERSION: 2.17.0
+  # component:data:end
 
 env:
   # cucumber and the scripts load TypeScript directly.
@@ -210,6 +222,69 @@ tasks:
     cmds:
       - node local/events.ts retry
   # component:publish:end
+
+  # component:data:start
+  data:generate:
+    desc: Write into specs/datacontract.yaml what the AsyncAPI contract decides - a schema object for every event the API publishes, each property's type and whether it is required. What a person wrote is kept; with no file yet, it starts one
+    deps: [generate]
+    env:
+      ODCS_VERSION: '{{.ODCS_VERSION}}'
+    cmds:
+      - node scripts/data.ts generate
+
+  data:lint:
+    desc: Gate - the data contract is valid ODCS (the Data Contract CLI) and meets the house rules (rules/datacontract.yaml) and this API's own (.spectral.datacontract.yaml); warnings fail
+    deps: [install]
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - |
+        set -e
+        test -f specs/datacontract.yaml || { echo "data:lint - no specs/datacontract.yaml, so the events this API publishes are not kept as data"; exit 0; }
+        uvx --from "datacontract-cli[duckdb]=={{.DATACONTRACT_CLI_VERSION}}" datacontract lint specs/datacontract.yaml
+        rules=rules/datacontract.yaml; test -f .spectral.datacontract.yaml && rules=.spectral.datacontract.yaml
+        npx spectral lint specs/datacontract.yaml --ruleset "$rules" --fail-severity warn
+
+  data:check:
+    desc: Gate - the data contract is of the pinned ODCS version, describes every event the AsyncAPI contract says the API publishes exactly as it has them, and says where the data is kept, for how long and how fresh
+    deps: [generate]
+    env:
+      ODCS_VERSION: '{{.ODCS_VERSION}}'
+    cmds:
+      - node scripts/data.ts check
+
+  data:compat:
+    desc: Gate - changes to the data contract since the last published one are listed (the Data Contract CLI), and its version is bumped to match (breaking needs a major)
+    deps: [install]
+    env:
+      DATACONTRACT_CLI_VERSION: '{{.DATACONTRACT_CLI_VERSION}}'
+    cmds:
+      - node scripts/data.ts compat
+
+  data:test:
+    desc: Gate - the events that landed in S3 keep the data contract, schema and quality rules (the Data Contract CLI). In acceptance it tests what the scenarios published, every one of which must have landed; ENV=aws tests the deployed stack's recent data
+    env:
+      DATACONTRACT_CLI_VERSION: '{{.DATACONTRACT_CLI_VERSION}}'
+    cmds:
+      - node local/data.ts test
+
+  data:query:
+    desc: Query the events kept in S3 with SQL through DuckDB, a view per event already defined - task data:query -- "select * from beer_rated"; with no SQL, its shell (ENV=local|aws, default local)
+    interactive: true
+    env:
+      DUCKDB_VERSION: '{{.DUCKDB_VERSION}}'
+    cmds:
+      - node local/data.ts query {{.CLI_ARGS}}
+
+  data:browse:
+    desc: Browse the events kept in S3 in Harlequin, with the same views (ENV=local|aws, default local)
+    interactive: true
+    env:
+      DUCKDB_VERSION: '{{.DUCKDB_VERSION}}'
+      HARLEQUIN_VERSION: '{{.HARLEQUIN_VERSION}}'
+    cmds:
+      - node local/data.ts browse
+  # component:data:end
 
   component:list:
     desc: The template's optional components, and whether this repository has each

@@ -10,6 +10,12 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.7"
     }
+    # component:data:start
+    awscc = {
+      source  = "hashicorp/awscc"
+      version = "~> 1.0"
+    }
+    # component:data:end
   }
 
   # Local state by default. Configure a remote backend before sharing a stack:
