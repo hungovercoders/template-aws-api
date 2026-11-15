@@ -56,6 +56,24 @@ export class ApiWorld extends World {
 
 setWorldConstructor(ApiWorld);
 
+/**
+ * Wait for something that happens after the API has answered - a message
+ * handled, an event published. The assertion is tried until it passes; when
+ * time runs out its last failure is the step's failure. Never a sleep: a
+ * scenario waits exactly as long as the API takes.
+ */
+export async function eventually<T>(assertion: () => Promise<T> | T, { timeout = 15_000, every = 200 } = {}): Promise<T> {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    try {
+      return await assertion();
+    } catch (error) {
+      if (Date.now() + every > deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, every));
+    }
+  }
+}
+
 // Scenarios are independent: each starts from an empty table.
 Before(async function (this: ApiWorld) {
   assert.ok(this.base, "BASE_URL is not set - run the scenarios with `task features`, which brings up the stack");

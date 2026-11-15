@@ -8,10 +8,13 @@ files) is the requirement; `task ci` is the definition of done.
   the business logic the specs describe: `steps/`, `src/operations/`,
   `src/domain/`, `src/store/` and their tests.
 <!-- component:consume:start -->
-- A message the API receives is a `receive` operation in
-  `specs/asyncapi.yaml`; its logic is one function in `src/consumers/`. The
-  queue, validation, duplicates and retries are the skeleton's.
+- A message the API receives is a `receive` operation in `specs/asyncapi.yaml`
+  and one function in `src/consumers/`; the queue and retries are the skeleton's.
 <!-- component:consume:end -->
+<!-- component:publish:start -->
+- An event the API publishes is a `send` operation there: write `outbox(event)`
+  in the transaction that makes the change; never call the event bus yourself.
+<!-- component:publish:end -->
 - `task skeleton:check` fails if a skeleton file differs from `skeleton.lock`.
   Undo the change; do not run `task skeleton:lock` or edit the lock unless the
   user has asked for a skeleton change.
@@ -30,12 +33,10 @@ files) is the requirement; `task ci` is the definition of done.
   skill.
 - A skill is the instructions in `.claude/skills/<name>/SKILL.md`. If your
   tool does not load skills itself, read that file and follow it.
-- `skills.json` lists every skill in `.claude/skills/` - the template's,
-  those copied from elsewhere (AWS's, and any added for this API) - and the
-  ones the template offers. Never edit a copied skill or add an unlisted
-  one; `task skills:check` fails. Before working
-  with a service or tool that has no skill here, ask the user whether one
-  should be added (`task skills:add`); never add one unasked.
+- `skills.json` lists every skill in `.claude/skills/` and those the template
+  offers. Never edit a copied skill or add an unlisted one (`task
+  skills:check`). Before working with a service or tool that has no skill
+  here, ask the user whether to add one (`task skills:add`); never unasked.
 - Use the `aws-emulator` skill before deciding AWS Emulator cannot do
   something, when a call to it fails to connect or sign, and when a new AWS
   service enters `infra/`. Where a copied skill and this repository disagree,

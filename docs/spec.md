@@ -173,6 +173,13 @@ A change the rules cannot place is listed and treated as breaking until a
 person has looked. So the gate never passes a breaking change, and now and
 then asks for a major version where a minor one would have done.
 <!-- component:asyncapi:end -->
+<!-- component:publish:start -->
+**What a subscriber is promised.** An event is published if and only if the
+change it describes was made: both are one write. It is delivered **at least
+once**, and events about one thing **may arrive out of order** - so a
+subscriber tells a repeat by the event's `id` and orders by its `time`. Say
+so in the contract's `info.description`.
+<!-- component:publish:end -->
 
 ## Try the contract before it is built
 

@@ -19,11 +19,10 @@ Your job is to make `task ci` green without changing what the specs say.
 
 ## Generate before you write
 
-A principle, and it outranks convenience: **anything a command can derive
-from the specs is produced by that command, never written by you.** Generated
-output is the same every time, costs nothing and cannot drift from the spec.
-Your judgement is for what no tool can derive - the behaviour inside each
-operation and each step.
+**Anything a command can derive from the specs is produced by that command,
+never written by you**: generated output is the same every time and cannot
+drift from the spec. Your judgement is for what no tool can derive - the
+behaviour inside each operation and each step.
 
 | Derived from the specs by a command | Command |
 | --- | --- |
@@ -36,13 +35,12 @@ operation and each step.
 
 So: never write or edit a route table, a type that mirrors the contract or an
 operation's signature by hand, and never write a step definition from
-scratch - start from the one `task scaffold` generated. (Merging and renaming
-generated steps is expected; see workflow step 5.) Use the
-types from `src/generated/api.d.ts` (`components["schemas"]["Thing"]`) rather
-than declaring your own, and re-run the command when the specs change. Before
-creating any file, ask whether a command already produces it. If you find
-yourself writing something mechanical that no command covers, say so in your
-report - it is a gap in the template, to be closed with a generator.
+scratch - start from the one `task scaffold` generated (merging and renaming
+them is expected; see workflow step 5). Use the types from
+`src/generated/api.d.ts` (`components["schemas"]["Thing"]`) rather than
+declaring your own, and re-run the command when the specs change. Before
+creating any file, ask whether a command already produces it. Something
+mechanical that no command covers is a gap in the template: report it.
 
 ## The skeleton is already built - do not build it again
 
@@ -64,11 +62,10 @@ fails if any skeleton file differs from `skeleton.lock`. If it fails, undo
 your change to the file it names. Never run `task skeleton:lock` yourself and
 never edit `skeleton.lock` - accepting a skeleton change is the user's decision.
 
-Do not regenerate, restructure, "improve" or replace anything else, and do not
-add a framework, another router, validator, test runner or build tool. If the
-skeleton genuinely cannot express something the specs need (for example a
-table index), make the smallest change and tell the user what you changed and
-why - it is probably something the template should gain for every API.
+Do not regenerate, restructure, "improve" or replace anything else, or add a
+framework, another router, validator, test runner or build tool. If the
+skeleton cannot express something the specs need (a table index, say), make
+the smallest change and tell the user what and why: the template may need it.
 
 ## Rules
 
@@ -81,8 +78,8 @@ why - it is probably something the template should gain for every API.
      reasonable choice, carry on, and list every such choice in your final
      report.
 2. **Never weaken a gate.** The gates are how you find out whether you are
-   right; they give the same answer every time. Do not edit `Taskfile.yml`, `cucumber.mjs`,
-   `scripts/`, `rules/house.yaml`, `.spectral.yaml`,
+   right; they give the same answer every time. Do not edit `Taskfile.yml`,
+   `cucumber.mjs`, `scripts/`, `rules/house.yaml`, `.spectral.yaml`,
    `test/routes.test.ts`, `.github/workflows/ci.yml`, `local/`
    or the contract checks in `steps/world.ts` and `src/lib/contract.ts`; do not
    skip, tag out or mark scenarios pending.
@@ -114,6 +111,9 @@ it tells you exactly what is missing.
    <!-- component:consume:start -->
    For a `receive` operation in `specs/asyncapi.yaml`, also follow [messages.md](messages.md).
    <!-- component:consume:end -->
+   <!-- component:publish:start -->
+   For a `send` operation there, also follow [events.md](events.md).
+   <!-- component:publish:end -->
 2. **`task spec:check` and `task spec:lint`** must pass before you write code.
    If `spec:check` fails the spec is incomplete (an operation with no
    scenario, an unknown tag, an invalid document); if `spec:lint` fails the

@@ -105,6 +105,12 @@ resource "aws_dynamodb_table" "this" {
     enabled = true
   }
 
+  # component:publish:start
+  # Every new outbox item reaches the forwarder through the table's stream (infra/publish.tf).
+  stream_enabled   = true
+  stream_view_type = "NEW_IMAGE"
+  # component:publish:end
+
   # component:consume:start
   # The record of each message handled removes itself (src/lib/consumer.ts).
   # The attribute is the consumer's own, so no item of the API's can be caught by it.
