@@ -77,7 +77,9 @@
         "steps/events.ts",
         "local/events.ts",
         "test/forwarder.test.ts",
-        ".claude/skills/implement-api/events.md"
+        ".claude/skills/implement-api/events.md",
+        "tools/emulator/gaps/publish.ts",
+        "tools/emulator/terraform/eventsv2-terraform/"
       ],
       "gates": {
         "generate": [
@@ -102,7 +104,10 @@
         "test/data.test.ts",
         "docs/data.md",
         ".claude/skills/write-spec/data.md",
-        ".claude/skills/implement-api/data.md"
+        ".claude/skills/implement-api/data.md",
+        "tools/emulator/gaps/data.ts",
+        "tools/emulator/terraform/s3-control/",
+        "tools/emulator/terraform/cloud-control-bucket-settings/"
       ],
       "gates": {
         "spec": [
