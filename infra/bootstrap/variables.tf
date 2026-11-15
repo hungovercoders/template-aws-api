@@ -19,3 +19,33 @@ variable "create_oidc_provider" {
   type        = bool
   default     = true
 }
+
+variable "domain" {
+  description = "The business domain that owns the API; `task aws:bootstrap` reads it from infra/tags.auto.tfvars.json."
+  type        = string
+
+  validation {
+    condition     = trimspace(var.domain) != ""
+    error_message = "The `domain` tag has no value. Say which business domain owns this API in infra/tags.auto.tfvars.json."
+  }
+}
+
+variable "team" {
+  description = "The team that owns the API; `task aws:bootstrap` reads it from infra/tags.auto.tfvars.json."
+  type        = string
+
+  validation {
+    condition     = trimspace(var.team) != ""
+    error_message = "The `team` tag has no value. Say which team owns this API in infra/tags.auto.tfvars.json."
+  }
+}
+
+variable "repo" {
+  description = "The URL of the repository; `task aws:bootstrap` reads it from the git remote, as every apply of the stack does."
+  type        = string
+
+  validation {
+    condition     = can(regex("^https?://", var.repo))
+    error_message = "The `repo` tag has no value. Apply through `task aws:bootstrap`, which reads it from the git remote, or pass -var repo=<the repository's URL>."
+  }
+}
