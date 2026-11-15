@@ -161,7 +161,8 @@ const overrides = await emulatorEnv();
 // Locally a scenario should not wait as long as production would make a
 // message wait: a failing message is offered again, and given up on, in
 // seconds. Terraform ignores a TF_VAR_ for a variable the stack does not have.
-const quick = { TF_VAR_consume_timeout: "5", TF_VAR_consume_visibility_timeout: "5", TF_VAR_consume_max_receives: "2" };
+// Firehose writes each event as it arrives, so a test of the data does not wait for a buffer.
+const quick = { TF_VAR_consume_timeout: "5", TF_VAR_consume_visibility_timeout: "5", TF_VAR_consume_max_receives: "2", TF_VAR_data_buffer_seconds: "0" };
 const env = { ...quick, ...process.env, ...overrides };
 if (overrides.AWS_ENDPOINT_URL) {
   // Real credentials must never sign requests while the emulator is the target.

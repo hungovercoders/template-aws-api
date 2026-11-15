@@ -56,6 +56,42 @@
       ],
       "depNameTemplate": "schemathesis",
       "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
+      "description": "[component:data] The Data Contract CLI, run through uvx by the data:* tasks",
+      "managerFilePatterns": [
+        "/^Taskfile\\.yml$/"
+      ],
+      "matchStrings": [
+        "DATACONTRACT_CLI_VERSION: (?<currentValue>[0-9.]+)"
+      ],
+      "depNameTemplate": "datacontract-cli",
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
+      "description": "[component:data] DuckDB, run through uvx by task data:query and inside Harlequin",
+      "managerFilePatterns": [
+        "/^Taskfile\\.yml$/"
+      ],
+      "matchStrings": [
+        "DUCKDB_VERSION: (?<currentValue>[0-9.]+)"
+      ],
+      "depNameTemplate": "duckdb-cli",
+      "datasourceTemplate": "pypi"
+    },
+    {
+      "customType": "regex",
+      "description": "[component:data] Harlequin, run through uvx by task data:browse",
+      "managerFilePatterns": [
+        "/^Taskfile\\.yml$/"
+      ],
+      "matchStrings": [
+        "HARLEQUIN_VERSION: (?<currentValue>[0-9.]+)"
+      ],
+      "depNameTemplate": "harlequin",
+      "datasourceTemplate": "pypi"
     }
   ],
   "packageRules": [
