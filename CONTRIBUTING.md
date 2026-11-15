@@ -27,6 +27,9 @@ removal alike. Nothing is changed in the code alone.
 <!-- component:consume:start -->
 | Take a new kind of message | Add its scenarios and a `receive` operation to `specs/asyncapi.yaml`; `task scaffold` writes the stub in `src/consumers/`; implement it |
 <!-- component:consume:end -->
+<!-- component:publish:start -->
+| Publish a new event, or publish one in a new case | Add its scenarios and a `send` operation to `specs/asyncapi.yaml`; `task generate` writes its function; write `outbox(event)` in the transaction of the change |
+<!-- component:publish:end -->
 | Use a capability the API removed | `task component:add -- <name>` restores it from the template, with what it needs; then the spec first, as for any change |
 | Update a dependency | Renovate proposes it; `task ci` decides. When it moves a skill source in `skills.json`, run `task skills:fetch` on its branch and push |
 | Work with a service the API integrates with | Ask whether a skill for it should be added; with the owner's agreement, `task skills:add`. A skill every API needs is a change to the template instead |

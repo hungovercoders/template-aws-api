@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { asyncOperations } from "../src/generated/async-operations.ts";
 import type { CloudEvent } from "../src/lib/cloudevents.ts";
+import { eventually } from "./world.ts";
 
 // The queue is reached through the endpoint the stack configures, not the host
 // in its URL: AWS Emulator gives its queues URLs that name AWS itself.
@@ -45,22 +46,8 @@ export async function deliver(operationId: string, body: unknown): Promise<void>
   delivered.add(operationId);
 }
 
-/**
- * Wait for something a message causes. The assertion is tried until it
- * passes; when time runs out its last failure is the step's failure. Never a
- * sleep: a scenario waits exactly as long as the API takes.
- */
-export async function eventually<T>(assertion: () => Promise<T> | T, { timeout = 15_000, every = 200 } = {}): Promise<T> {
-  const deadline = Date.now() + timeout;
-  for (;;) {
-    try {
-      return await assertion();
-    } catch (error) {
-      if (Date.now() + every > deadline) throw error;
-      await new Promise((resolve) => setTimeout(resolve, every));
-    }
-  }
-}
+/** Wait for something a message causes: the assertion is tried until it passes. Never sleep. */
+export { eventually };
 
 /**
  * Wait until the queue is empty and nothing is being handled: every message

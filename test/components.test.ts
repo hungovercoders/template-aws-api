@@ -132,6 +132,17 @@ test("removing a component takes its files, sections, rules and skills, and the 
   expect(again.output).toContain("already removed");
 });
 
+test("what was generated for the components there were is cleared when one is removed or restored", () => {
+  const dir = api("generated");
+  write(dir, "src/generated/demo.ts", "export {};\n");
+  expect(run(dir, "components.ts", "remove", "demo-data").status).toBe(0);
+  expect(existsSync(join(dir, "src/generated"))).toBe(false);
+  commit(dir);
+  write(dir, "src/generated/demo.ts", "export {};\n");
+  expect(run(dir, "components.ts", "add", "demo-data", "--from", template).status).toBe(0);
+  expect(existsSync(join(dir, "src/generated"))).toBe(false);
+});
+
 test("a removed component's file that comes back is caught by the skeleton gate", () => {
   const dir = api("stray");
   run(dir, "components.ts", "remove", "demo-data");
