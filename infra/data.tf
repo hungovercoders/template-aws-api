@@ -60,6 +60,8 @@ resource "awscc_s3_bucket" "data" {
   count = local.data_count
 
   bucket_name = local.data_location.bucket
+  # Cloud Control has no default tags: they are given by name.
+  tags = [for key, value in local.tags : { key = key, value = value }]
 }
 
 resource "aws_s3_bucket_public_access_block" "data" {

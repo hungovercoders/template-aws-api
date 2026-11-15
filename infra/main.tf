@@ -25,8 +25,9 @@ terraform {
 provider "aws" {
   region = var.region
 
+  # Whose every resource is (tags.tf).
   default_tags {
-    tags = { service = var.name }
+    tags = local.tags
   }
 }
 
