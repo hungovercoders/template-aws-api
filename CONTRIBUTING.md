@@ -26,14 +26,18 @@ removal alike. Nothing is changed in the code alone.
 | Rename or reshape data | Change the contract; the generated types make the compiler find every use |
 <!-- component:consume:start -->
 | Take a new kind of message | Add its scenarios and a `receive` operation to `specs/asyncapi.yaml`; `task scaffold` writes the stub in `src/consumers/`; implement it |
+| Stop taking a message | Delete its scenarios and its `receive` operation (breaking for whoever sends it: a new major version of the AsyncAPI contract); delete its file in `src/consumers/`, which nothing uses any more, and the steps `steps:check` then calls unused |
 <!-- component:consume:end -->
 <!-- component:publish:start -->
 | Publish a new event, or publish one in a new case | Add its scenarios and a `send` operation to `specs/asyncapi.yaml`; `task generate` writes its function; write `outbox(event)` in the transaction of the change |
+| Change an event that is already published | A change subscribers would notice is a new event: add it with a type ending `.v2` and publish both for as long as they need. Remove `.v1` later, as below |
+| Stop publishing an event | Delete its scenarios and its `send` operation (breaking: a new major version of the AsyncAPI contract); `task typecheck` then finds every place it was written |
 <!-- component:publish:end -->
 <!-- component:data:start -->
-| Change an event that is kept as data, or what is promised of the data | The event first, as above; `task data:generate` carries it into `specs/datacontract.yaml`. Owner, classification, retention and freshness change there, with a new version (`docs/data.md`) |
+| Change an event that is kept as data, or what is promised of the data | The event first, as above; `task data:generate` carries what was added or changed into `specs/datacontract.yaml`, and names what is no longer published for you to remove - breaking for whoever reads the data: a new major version. Owner, classification, retention and freshness change there, with a new version (`docs/data.md`) |
 <!-- component:data:end -->
 | Use a capability the API removed | `task component:add -- <name>` restores it from the template, with what it needs; then the spec first, as for any change |
+| Change who owns the API | `domain` and `team` in `infra/tags.auto.tfvars.json`; the next deploy re-tags the stack, and `task aws:bootstrap` the deploy role and state bucket. The data contract names its own `team` |
 | Update a dependency | Renovate proposes it; `task ci` decides. When it moves a skill source in `skills.json`, run `task skills:fetch` on its branch and push |
 | Work with a service the API integrates with | Ask whether a skill for it should be added; with the owner's agreement, `task skills:add`. A skill every API needs is a change to the template instead |
 
@@ -87,7 +91,9 @@ skeleton every API shares.
    that matters is `template`: every gate, with the example laid over your
    change.
 3. **Merge it down** `main` → `example/spec` → `example/implementation`, and
-   confirm `example/implementation` is green.
+   confirm `example/implementation` is green. After a change to a generator,
+   run it on `example/spec` (`task readme:generate`, `task http:generate`)
+   and commit what it writes: the gates there fail until you have.
 
 | Branch | Is | CI |
 | --- | --- | --- |
