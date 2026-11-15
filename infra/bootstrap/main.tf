@@ -35,6 +35,18 @@ locals {
   oidc_arn  = var.create_oidc_provider ? aws_iam_openid_connect_provider.github[0].arn : "arn:${local.partition}:iam::${local.account}:oidc-provider/token.actions.githubusercontent.com"
 }
 
+# component:data:start
+# The buckets the data contract names, one for each of its S3 servers: the
+# only buckets, besides the state's, the deploy role may manage. Apply the
+# bootstrap again when the contract gains a server.
+locals {
+  data_contract_file = "${path.module}/../../specs/datacontract.yaml"
+  data_buckets = fileexists(local.data_contract_file) ? [
+    for server in try(yamldecode(file(local.data_contract_file)).servers, []) : regex("^s3://([^/]+)/", server.location)[0] if try(server.type, "") == "s3"
+  ] : []
+}
+# component:data:end
+
 # --- Terraform state ----------------------------------------------------------
 
 resource "aws_s3_bucket" "state" {
@@ -302,6 +314,56 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-forwarder"]
   }
   # component:publish:end
+
+  # component:data:start
+  # The events as data: the bucket, the Firehose stream that writes to it and
+  # the role the rule and the stream use (infra/data.tf). The rule itself is
+  # covered by the published events' statement above.
+  #
+  # The bucket is made through Cloud Control, which has no resource of its
+  # own to name; what it may touch is held by the S3 statement after it.
+  statement {
+    sid       = "CloudControl"
+    actions   = ["cloudformation:CreateResource", "cloudformation:GetResource", "cloudformation:UpdateResource", "cloudformation:DeleteResource", "cloudformation:GetResourceRequestStatus"]
+    resources = ["*"]
+  }
+
+  dynamic "statement" {
+    for_each = length(local.data_buckets) > 0 ? [1] : []
+
+    content {
+      sid       = "DataBucket"
+      actions   = ["s3:*"]
+      resources = flatten([for bucket in local.data_buckets : ["arn:${local.partition}:s3:::${bucket}", "arn:${local.partition}:s3:::${bucket}/*"]])
+    }
+  }
+
+  statement {
+    sid       = "DataStream"
+    actions   = ["firehose:*"]
+    resources = ["arn:${local.partition}:firehose:${var.region}:${local.account}:deliverystream/${var.name}-data"]
+  }
+
+  statement {
+    sid = "DataRole"
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:GetRole",
+      "iam:PassRole",
+      "iam:UpdateAssumeRolePolicy",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
+    ]
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-data"]
+  }
+  # component:data:end
 
   # The Lambda's execution role. Managing a role means this role can decide
   # what the Lambda is allowed to do - review changes to infra/ accordingly.
