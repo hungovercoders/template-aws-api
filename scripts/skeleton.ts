@@ -29,9 +29,11 @@ const SKELETON = [
   "local/",
   "src/handler.ts",
   "src/consumer.ts",
+  "src/forwarder.ts",
   "src/lib/",
   "steps/world.ts",
   "steps/messages.ts",
+  "steps/events.ts",
   "test/routes.test.ts",
   "test/log.test.ts",
   "test/components.test.ts",
@@ -40,6 +42,7 @@ const SKELETON = [
   "test/trace.test.ts",
   "test/consumer.test.ts",
   "test/consumers.test.ts",
+  "test/forwarder.test.ts",
   "infra/",
   // The template's own skills. Skills copied from elsewhere are held by
   // `task skills:check` instead, so adding or updating one is not a skeleton change.

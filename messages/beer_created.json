@@ -1,0 +1,13 @@
+{
+  "specversion": "1.0",
+  "id": "id",
+  "source": "source",
+  "type": "com.hungovercoders.beer_catalogue.beer.created.v1",
+  "time": "2026-01-01T00:00:00Z",
+  "data": {
+    "beer_id": "beer id",
+    "name": "name",
+    "style": "style",
+    "abv": 0
+  }
+}

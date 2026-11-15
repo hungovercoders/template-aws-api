@@ -16,13 +16,22 @@ A brewery's beer catalogue. Signed-in staff add the beers they brew, keep the de
 | `update_beer` | `PATCH /beers/{beer_id}` | Signed in | Change a beer's details |
 | `rate_beer` | `POST /beers/{beer_id}/ratings` | Anyone | Rate a beer |
 
-Messages and events are version 0.1.0 of [their own contract](specs/asyncapi.yaml), with an [example of each](messages).
+Messages and events are version 0.2.0 of [their own contract](specs/asyncapi.yaml), with an [example of each](messages).
 
 ## Messages it receives
 
 | Operation | On | What it does |
 | --- | --- | --- |
 | `receive_beer_rating` | `beer-ratings` | Record a rating that was submitted elsewhere |
+
+## Events it publishes
+
+| Operation | On | What it does |
+| --- | --- | --- |
+| `publish_beer_created` | `beer-events` | A beer was added to the catalogue |
+| `publish_beer_updated` | `beer-events` | A beer's details were changed |
+| `publish_beer_retired` | `beer-events` | A beer was retired from the catalogue |
+| `publish_beer_rated` | `beer-events` | A beer was rated |
 
 ## Working on it
 

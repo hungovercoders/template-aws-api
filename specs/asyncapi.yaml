@@ -1,10 +1,13 @@
 asyncapi: 3.1.0
 info:
   title: Beer Catalogue messages
-  version: 0.1.0
+  version: 0.2.0
   description: >-
-    The messages the Beer Catalogue accepts. Ratings also arrive from
-    elsewhere - a taproom's app - on the catalogue's queue.
+    The messages the Beer Catalogue accepts and the events it publishes.
+    Ratings also arrive from elsewhere - a taproom's app - on the catalogue's
+    queue. Whatever happens to a beer is published as an event. An event is
+    delivered at least once, and events about one beer may arrive out of
+    order: tell a repeat by the event's id, and order by its time.
 channels:
   beer_ratings:
     address: beer-ratings
@@ -12,7 +15,47 @@ channels:
     messages:
       beer_rating_submitted:
         $ref: "#/components/messages/beer_rating_submitted"
+  beer_events:
+    address: beer-events
+    description: What happened to the beers in the catalogue.
+    messages:
+      beer_created:
+        $ref: "#/components/messages/beer_created"
+      beer_updated:
+        $ref: "#/components/messages/beer_updated"
+      beer_retired:
+        $ref: "#/components/messages/beer_retired"
+      beer_rated:
+        $ref: "#/components/messages/beer_rated"
 operations:
+  publish_beer_created:
+    action: send
+    summary: A beer was added to the catalogue
+    channel:
+      $ref: "#/channels/beer_events"
+    messages:
+      - $ref: "#/channels/beer_events/messages/beer_created"
+  publish_beer_updated:
+    action: send
+    summary: A beer's details were changed
+    channel:
+      $ref: "#/channels/beer_events"
+    messages:
+      - $ref: "#/channels/beer_events/messages/beer_updated"
+  publish_beer_retired:
+    action: send
+    summary: A beer was retired from the catalogue
+    channel:
+      $ref: "#/channels/beer_events"
+    messages:
+      - $ref: "#/channels/beer_events/messages/beer_retired"
+  publish_beer_rated:
+    action: send
+    summary: A beer was rated
+    channel:
+      $ref: "#/channels/beer_events"
+    messages:
+      - $ref: "#/channels/beer_events/messages/beer_rated"
   receive_beer_rating:
     action: receive
     summary: Record a rating that was submitted elsewhere
@@ -29,7 +72,119 @@ components:
       contentType: application/cloudevents+json
       payload:
         $ref: "#/components/schemas/BeerRatingSubmitted"
+    beer_created:
+      name: beer_created
+      title: Beer created
+      summary: A beer was added to the catalogue.
+      contentType: application/cloudevents+json
+      payload:
+        $ref: "#/components/schemas/BeerCreated"
+    beer_updated:
+      name: beer_updated
+      title: Beer updated
+      summary: A beer's name, style or strength was changed.
+      contentType: application/cloudevents+json
+      payload:
+        $ref: "#/components/schemas/BeerUpdated"
+    beer_retired:
+      name: beer_retired
+      title: Beer retired
+      summary: A beer was retired from the catalogue.
+      contentType: application/cloudevents+json
+      payload:
+        $ref: "#/components/schemas/BeerRetired"
+    beer_rated:
+      name: beer_rated
+      title: Beer rated
+      summary: A drinker scored a beer.
+      contentType: application/cloudevents+json
+      payload:
+        $ref: "#/components/schemas/BeerRated"
   schemas:
+    BeerDetails:
+      description: A beer as the catalogue describes it.
+      type: object
+      required: [beer_id, name, style, abv]
+      additionalProperties: false
+      properties:
+        beer_id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        style:
+          type: string
+          minLength: 1
+        abv:
+          description: Alcohol by volume, percent.
+          type: number
+          minimum: 0
+    BeerCreated:
+      allOf:
+        - $ref: "../tools/asyncapi/cloudevent.yaml#/CloudEvent"
+        - type: object
+          required: [data]
+          properties:
+            type:
+              type: string
+              const: com.hungovercoders.beer_catalogue.beer.created.v1
+            data:
+              $ref: "#/components/schemas/BeerDetails"
+    BeerUpdated:
+      allOf:
+        - $ref: "../tools/asyncapi/cloudevent.yaml#/CloudEvent"
+        - type: object
+          required: [data]
+          properties:
+            type:
+              type: string
+              const: com.hungovercoders.beer_catalogue.beer.updated.v1
+            data:
+              $ref: "#/components/schemas/BeerDetails"
+    BeerRetired:
+      allOf:
+        - $ref: "../tools/asyncapi/cloudevent.yaml#/CloudEvent"
+        - type: object
+          required: [data]
+          properties:
+            type:
+              type: string
+              const: com.hungovercoders.beer_catalogue.beer.retired.v1
+            data:
+              type: object
+              required: [beer_id, name]
+              additionalProperties: false
+              properties:
+                beer_id:
+                  type: string
+                  minLength: 1
+                name:
+                  description: The name it had when it was retired.
+                  type: string
+                  minLength: 1
+    BeerRated:
+      allOf:
+        - $ref: "../tools/asyncapi/cloudevent.yaml#/CloudEvent"
+        - type: object
+          required: [data]
+          properties:
+            type:
+              type: string
+              const: com.hungovercoders.beer_catalogue.beer.rated.v1
+            data:
+              type: object
+              required: [beer_id, score]
+              additionalProperties: false
+              properties:
+                beer_id:
+                  type: string
+                  minLength: 1
+                score:
+                  description: A whole number from 1 to 5.
+                  type: integer
+                  minimum: 1
+                  maximum: 5
     BeerRatingSubmitted:
       allOf:
         - $ref: "../tools/asyncapi/cloudevent.yaml#/CloudEvent"

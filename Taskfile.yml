@@ -175,6 +175,42 @@ tasks:
       - node local/queue.ts redrive
   # component:consume:end
 
+  # component:publish:start
+  publish:generate:
+    desc: Generate src/generated/events.ts - a typed function for every event the AsyncAPI contract says the API publishes (task generate runs it)
+    cmds:
+      - node scripts/publish.ts generate
+
+  publish:check:
+    desc: Gate - every event the AsyncAPI contract says the API publishes was seen published by a scenario in the last full feature run
+    cmds:
+      - node scripts/publish.ts check
+
+  events:tail:
+    desc: Follow the events the API publishes, as they are published - all of them, or one type (task events:tail -- <type>) (ENV=local|aws, default local)
+    deps: [install]
+    cmds:
+      - node local/events.ts tail {{.CLI_ARGS}}
+
+  outbox:list:
+    desc: Show the events written but not yet on the bus; none means the forwarder is up to date (ENV=local|aws)
+    deps: [install]
+    cmds:
+      - node local/events.ts outbox
+
+  events:unpublished:
+    desc: Show the events that could not be published and why each is there, without taking them (ENV=local|aws)
+    deps: [install]
+    cmds:
+      - node local/events.ts unpublished
+
+  events:retry:
+    desc: Publish the events that could not be published again, after fixing what stopped them; each leaves the list once it is on the bus. Also publishes what has waited in the outbox for over five minutes (ENV=local|aws)
+    deps: [install]
+    cmds:
+      - node local/events.ts retry
+  # component:publish:end
+
   component:list:
     desc: The template's optional components, and whether this repository has each
     deps: [install]
@@ -429,7 +465,7 @@ tasks:
     cmds:
       - rm -rf dist
       - >-
-        npx esbuild $(ls src/handler.ts src/consumer.ts 2>/dev/null) --bundle --platform=node --target=node22 --format=esm
+        npx esbuild $(ls src/handler.ts src/consumer.ts src/forwarder.ts 2>/dev/null) --bundle --platform=node --target=node22 --format=esm
         --outdir=dist --out-extension:.js=.mjs --external:@aws-sdk/* --log-level=warning
 
   infra:validate:

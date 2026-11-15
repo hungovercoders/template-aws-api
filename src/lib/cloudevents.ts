@@ -103,6 +103,19 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
     },
 
     /**
+     * What is wrong with something that was published: nothing, for an event
+     * the contract says this API publishes and that matches it. For whoever
+     * reads the bus - the scenarios hold every event they see to this.
+     */
+    wrongWith(event: unknown): string[] {
+      const type = (event as { type?: unknown } | null)?.type;
+      if (typeof type !== "string") return ["it is not a CloudEvent: it has no type"];
+      const schema = schemas.send.get(type);
+      if (!schema) return [`"${type}" is not an event specs/asyncapi.yaml says this API publishes`];
+      return violationsOf(schema, event).map((violation) => `${violation.pointer || "/"} ${violation.message}`);
+    },
+
+    /**
      * A message received: the CloudEvent it is, held to the contract for its
      * type. Throws InvalidEvent for anything else, before any of your code
      * runs. The trace the message carries becomes the one in force, so what
