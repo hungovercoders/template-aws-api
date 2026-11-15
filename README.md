@@ -1,6 +1,14 @@
 # template-aws-api
 
+[![template](https://github.com/hungovercoders/template-aws-api/actions/workflows/template.yml/badge.svg?branch=main)](https://github.com/hungovercoders/template-aws-api/actions/workflows/template.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Use this template](https://img.shields.io/badge/use%20this-template-2ea44f.svg)](../../generate)
+
 **Describe your API. Get it built, tested and deployable on AWS.**
+
+[Start here](#start-here) · [Architecture](#the-architecture-you-get) · [What you get](#what-you-get) ·
+[Why a template](#why-a-template-not-a-prompt) · [How it works](#how-it-works) · [See it working](#see-it-working) ·
+[Tasks](#everyday-tasks) · [By hand](#writing-the-spec-by-hand) · [Layout](#where-things-are) · [Guides](#guides)
 
 A template for AWS Lambda APIs where you write only what makes the API
 yours: what it does, in plain-language scenarios, and what it looks like, in
