@@ -30,8 +30,13 @@ provider "aws" {
   }
 }
 
+# Kept the same as infra/tags.tf, so a service is one thing to whoever filters by a tag.
 locals {
-  tags = { domain = var.domain, team = var.team, service = var.name, repo = "https://github.com/${var.github_repository}" }
+  environment = try(regex("-(dev|test|staging|prod)$", var.name)[0], null)
+  tags = merge(
+    { domain = var.domain, team = var.team, service = var.name, repo = var.repo },
+    local.environment == null ? {} : { environment = local.environment },
+  )
 }
 
 data "aws_caller_identity" "current" {}
@@ -242,7 +247,7 @@ data "aws_iam_policy_document" "deploy" {
   # Making a group checks its query, which reads tags; nothing is changed by it.
   statement {
     sid       = "ResourceGroupQuery"
-    actions   = ["resource-groups:CreateGroup", "tag:GetResources", "cloudformation:DescribeStacks", "cloudformation:ListStackResources"]
+    actions   = ["tag:GetResources", "cloudformation:DescribeStacks", "cloudformation:ListStackResources"]
     resources = ["*"]
   }
 

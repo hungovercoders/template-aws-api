@@ -165,7 +165,7 @@ const overrides = await emulatorEnv();
 const quick = { TF_VAR_consume_timeout: "5", TF_VAR_consume_visibility_timeout: "5", TF_VAR_consume_max_receives: "2", TF_VAR_data_buffer_seconds: "0" };
 // The `repo` tag, from the git remote (scripts/tags.ts) - or this folder, where there is no remote to read.
 const remote = spawnSync(process.execPath, ["--import", "tsx", "scripts/tags.ts", "repo"], { encoding: "utf8" });
-const tags = { TF_VAR_repo: remote.status === 0 ? remote.stdout.trim() : "https://localhost/local" };
+const tags = { TF_VAR_repo: (remote.status === 0 && remote.stdout.trim()) || "https://localhost/local" };
 const env = { ...quick, ...tags, ...process.env, ...overrides };
 if (overrides.AWS_ENDPOINT_URL) {
   // Real credentials must never sign requests while the emulator is the target.
