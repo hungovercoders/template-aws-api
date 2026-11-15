@@ -7,7 +7,8 @@
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { parseDocument } from "yaml";
@@ -37,12 +38,10 @@ const s3 = new S3Client(emulator ? { forcePathStyle: true } : {});
 
 type SchemaObject = { name: string; physicalName?: string };
 const schemas = ((parseDocument(readFileSync(CONTRACT, "utf8")).toJS() as { schema?: SchemaObject[] }).schema ?? []).filter((object) => object.physicalName);
-/** Where the copy of the data is kept, as one JSON document per line, by event and day. */
-const copy = resolve(".local", "data", where);
-const UNDESCRIBED = "_undescribed";
+const nameOf = (type: string) => schemas.find((candidate) => candidate.physicalName === type)?.name;
 
 type Stored = { key: string; type: string; day: string };
-/** Everything under the prefix that is an event: <prefix>type=<event type>/dt=<day>/<file>. */
+/** Everything under the prefix that is an event: <prefix>type=<event type>/dt=<day>/<file>. Names only; nothing is read. */
 async function stored(): Promise<Stored[]> {
   const found: Stored[] = [];
   let token: string | undefined;
@@ -57,78 +56,115 @@ async function stored(): Promise<Stored[]> {
   return found;
 }
 
-/**
- * Bring the copy up to date: each object unzipped to <copy>/<event>/dt=<day>/<file>.json.
- * `days` keeps it to the most recent days. Returns the id of every event in the copy.
- */
-async function sync(days?: number): Promise<Set<string>> {
-  const since = days ? new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10) : "";
-  const ids = new Set<string>();
-  for (const object of (await stored()).filter((candidate) => candidate.day >= since)) {
-    const name = schemas.find((candidate) => candidate.physicalName === object.type)?.name ?? UNDESCRIBED;
-    const file = join(copy, name, `dt=${object.day}`, `${object.key.split("/").pop()!.replace(/\.gz$/, "")}.json`);
-    if (!existsSync(file)) {
-      const body = await (await s3.send(new GetObjectCommand({ Bucket: bucket, Key: object.key }))).Body!.transformToByteArray();
-      mkdirSync(dirname(file), { recursive: true });
-      writeFileSync(file, object.key.endsWith(".gz") ? gunzipSync(body) : body);
-    }
-    for (const line of readFileSync(file, "utf8").split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        ids.add(String((JSON.parse(line) as { id?: unknown }).id));
-      } catch {
-        // Not JSON: the contract test will say so.
-      }
-    }
-  }
-  return ids;
-}
+const read = async (key: string) => {
+  const body = await (await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }))).Body!.transformToByteArray();
+  return key.endsWith(".gz") ? gunzipSync(body) : Buffer.from(body);
+};
 
-const files = (name: string) =>
-  existsSync(join(copy, name))
-    ? readdirSync(join(copy, name), { recursive: true })
-        .map(String)
-        .filter((file) => file.endsWith(".json"))
-    : [];
+/**
+ * A copy of the data on this machine - only ever made when it cannot be read
+ * where it is, and never kept: a private directory outside the repository,
+ * removed when the task ends, however it ends.
+ */
+function temporary(): string {
+  const dir = mkdtempSync(join(tmpdir(), "data-")); // readable by this user alone
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => process.exit(1));
+  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
+  return dir;
+}
+async function copyTo(dir: string, objects: Stored[]): Promise<void> {
+  for (const object of objects) {
+    const file = join(dir, nameOf(object.type) ?? "_undescribed", `dt=${object.day}`, `${object.key.split("/").pop()!.replace(/\.gz$/, "")}.json`);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, await read(object.key), { mode: 0o600 });
+  }
+}
+const REAL_DATA = `That would put a copy of real data on this machine. Read it where it is instead`;
 
 async function test(): Promise<void> {
-  rmSync(copy, { recursive: true, force: true });
-  // What the scenarios published (steps/events.ts): the data is complete when each of them has landed.
-  const expected: string[] = inAcceptance && existsSync(".local/event-ids-published.json") ? JSON.parse(readFileSync(".local/event-ids-published.json", "utf8")) : [];
   const days = where === "aws" ? Number(process.env.DATA_DAYS ?? 2) : undefined;
-  let ids = await sync(days);
-  for (const deadline = Date.now() + 60_000; expected.some((id) => !ids.has(id)) && Date.now() < deadline; ) {
+  const since = days ? new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10) : "";
+  const recent = async () => (await stored()).filter((object) => object.day >= since);
+
+  // What the scenarios published (steps/events.ts): the data is complete when each of them has landed.
+  // They are the scenarios' own events, read here in memory to find their ids; nothing is written down.
+  const expected: string[] = inAcceptance && existsSync(".local/event-ids-published.json") ? JSON.parse(readFileSync(".local/event-ids-published.json", "utf8")) : [];
+  const ids = new Set<string>();
+  const seen = new Set<string>();
+  let objects = await recent();
+  for (const deadline = Date.now() + 60_000; expected.length > 0; ) {
+    for (const object of objects.filter((candidate) => !seen.has(candidate.key))) {
+      seen.add(object.key);
+      for (const line of (await read(object.key)).toString("utf8").split("\n")) {
+        try {
+          if (line.trim()) ids.add(String((JSON.parse(line) as { id?: unknown }).id));
+        } catch {
+          // Not JSON: the contract test will say so.
+        }
+      }
+    }
+    if (expected.every((id) => ids.has(id)) || Date.now() > deadline) break;
     await new Promise((done) => setTimeout(done, 1_000));
-    ids = await sync(days);
+    objects = await recent();
   }
+
   const problems: string[] = [];
   const missing = expected.filter((id) => !ids.has(id));
   if (missing.length > 0) problems.push(`${missing.length} of the ${expected.length} events the scenarios published never landed in s3://${bucket}/${prefix} (the first: ${missing[0]})`);
-  if (files(UNDESCRIBED).length > 0) problems.push(`events landed of a type the data contract does not describe: ${files(UNDESCRIBED).length} files, kept in ${join(copy, UNDESCRIBED)}`);
-  const withData = schemas.filter((object) => files(object.name).length > 0);
+  const undescribed = [...new Set(objects.filter((object) => !nameOf(object.type)).map((object) => object.type))];
+  if (undescribed.length > 0) problems.push(`events landed of a type the data contract does not describe: ${undescribed.join(", ")}`);
+  const withData = schemas.filter((object) => objects.some((landed) => landed.type === object.physicalName));
   const without = schemas.filter((object) => !withData.includes(object));
   // The scenarios publish every event (publish:check), so after them none may be missing. Any other time a quiet event is not a fault.
   if (inAcceptance && expected.length > 0) problems.push(...without.map((object) => `no ${object.name} event landed, so its part of the contract was not tested`));
   if (problems.length > 0) fail(["data:test failed", ...problems.map((problem) => `  - ${problem}`)].join("\n"));
   if (withData.length === 0) return console.log(`data:test - nothing has landed in s3://${bucket}/${prefix}${days ? ` in the last ${days} days` : ""}, so there is nothing to test`);
 
-  // The contract as written, pointed at the copy and limited to the events that have data.
-  const doc = parseDocument(readFileSync(CONTRACT, "utf8"));
-  doc.set("servers", [{ server: "copy", type: "local", path: `${copy}/{model}/*/*.json`, format: "json", delimiter: "new_line" }]);
-  const contract = doc.toJS() as { schema: SchemaObject[] };
-  doc.set(
-    "schema",
-    contract.schema
-      .filter((object) => withData.some((kept) => kept.name === object.name))
-      // The copy is laid out by the object's name; the CLI would look for it by physicalName.
-      .map((object) => ({ ...object, physicalName: object.name })),
-  );
-  const file = resolve(".local", "datacontract.test.yaml");
-  writeFileSync(file, doc.toString({ lineWidth: 0 }));
+  // Plain JSON is tested where it is. The Data Contract CLI cannot read a gzipped file, so those are unpacked first.
+  const zipped = objects.some((object) => object.key.endsWith(".gz"));
+  let copy: string | undefined;
+  if (zipped) {
+    if (where === "aws" && process.env.DATA_COPY !== "yes") {
+      fail(
+        [
+          `data:test - the data in s3://${bucket}/${prefix} is gzipped (data_compression = GZIP), and the Data Contract CLI can only test gzipped data from an unpacked copy.`,
+          `  ${REAL_DATA}: deploy with data_compression = UNCOMPRESSED.`,
+          "  Or, if this data may be on this machine for the length of the test: DATA_COPY=yes. The copy is private and is removed when the test ends.",
+        ].join("\n"),
+      );
+    }
+    copy = temporary();
+    await copyTo(copy, objects);
+  }
+
+  // One contract for each event that has data: the contract as written, pointed at where that event's data is.
+  const dir = resolve(".local", "datacontract.test");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const contract = parseDocument(readFileSync(CONTRACT, "utf8")).toJS() as { schema: SchemaObject[] };
+  // A deployed stack is tested on its recent days (DATA_DAYS says how many), each day's data by itself.
+  type Place = { object: SchemaObject; label: string; server: Record<string, string> };
+  const places = withData.flatMap((object): Place[] => {
+    if (copy) return [{ object, label: object.name, server: { type: "local", path: `${copy}/${object.name}/*/*.json` } }];
+    const at = (day: string) => ({ type: "s3", location: `s3://${bucket}/${prefix}type=${object.physicalName}/${day}/*`, ...(emulator ? { endpointUrl: emulator } : {}) });
+    if (!days) return [{ object, label: object.name, server: at("*") }];
+    const landed = [...new Set(objects.filter((candidate) => candidate.type === object.physicalName).map((candidate) => candidate.day))].sort();
+    return landed.map((day) => ({ object, label: `${object.name}.${day}`, server: at(`dt=${day}`) }));
+  });
+  const contracts = places.map(({ object, label, server }) => {
+    const doc = parseDocument(readFileSync(CONTRACT, "utf8"));
+    doc.set("servers", [{ server: "data", ...server, format: "json", delimiter: "new_line" }]);
+    // The CLI names the table it reads after physicalName; the place is already said.
+    doc.set("schema", [{ ...contract.schema.find((candidate) => candidate.name === object.name)!, physicalName: object.name }]);
+    const file = join(dir, `${label}.yaml`);
+    writeFileSync(file, doc.toString({ lineWidth: 0 }));
+    return file;
+  });
   const version = process.env.DATACONTRACT_CLI_VERSION ?? fail("data: DATACONTRACT_CLI_VERSION is not set - run this through `task data:test`");
-  const run = spawnSync("uvx", ["--from", `datacontract-cli[duckdb]==${version}`, "datacontract", "test", file, "--server", "copy"], { stdio: "inherit" });
-  if (run.status !== 0) fail(`data:test failed - the data in s3://${bucket}/${prefix} does not keep ${CONTRACT} (above). The copy that was tested is in ${copy}`);
-  console.log(`data:test ok - ${ids.size} events in s3://${bucket}/${prefix} keep the data contract${without.length > 0 ? `; no data yet for ${without.map((object) => object.name).join(", ")}` : ""}`);
+  const run = spawnSync("uvx", ["--from", `datacontract-cli[duckdb,s3]==${version}`, "python", "local/data_test.py", "data", ...contracts], { stdio: "inherit" });
+  if (run.status !== 0) fail(`data:test failed - the data in s3://${bucket}/${prefix} does not keep ${CONTRACT} (above)`);
+  const how = copy ? "from an unpacked copy that has been removed" : "where it is";
+  console.log(`data:test ok - the data in s3://${bucket}/${prefix} keeps the data contract, tested ${how}: ${withData.length} events' data${without.length > 0 ? `; none yet for ${without.map((object) => object.name).join(", ")}` : ""}`);
 }
 
 const quote = (text: string) => `'${text.replace(/'/g, "''")}'`;
@@ -139,7 +175,8 @@ const quote = (text: string) => `'${text.replace(/'/g, "''")}'`;
  */
 async function views(canReadS3: boolean): Promise<string> {
   const lines: string[] = [];
-  const present = new Set((await stored()).map((object) => object.type));
+  const objects = await stored();
+  const present = new Set(objects.map((object) => object.type));
   let source: (object: SchemaObject) => string;
   // Reading S3 needs DuckDB's httpfs extension, which it downloads the first time.
   if (canReadS3) {
@@ -151,11 +188,16 @@ async function views(canReadS3: boolean): Promise<string> {
     const at = emulator ? `, ENDPOINT ${quote(new URL(emulator).host)}, URL_STYLE 'path', USE_SSL ${emulator.startsWith("https")}` : "";
     const session = credentials.sessionToken ? `, SESSION_TOKEN ${quote(credentials.sessionToken)}` : "";
     lines.push(`CREATE OR REPLACE SECRET data (TYPE s3, KEY_ID ${quote(credentials.accessKeyId)}, SECRET ${quote(credentials.secretAccessKey)}${session}, REGION ${quote(region)}${at});`);
-    source = (object) => `read_json(${quote(`s3://${bucket}/${prefix}type=${object.physicalName}/*/*`)}, format='newline_delimited', compression='gzip', hive_partitioning=true, union_by_name=true)`;
+    // Plain or gzipped: DuckDB tells by the file's name.
+    source = (object) => `read_json(${quote(`s3://${bucket}/${prefix}type=${object.physicalName}/*/*`)}, format='newline_delimited', hive_partitioning=true, union_by_name=true)`;
   } else {
-    // Where it cannot be downloaded (a proxy that only passes HTTPS), the data is copied here and read from disk.
-    console.error(`data: DuckDB could not install its httpfs extension here, so the data is copied to ${copy} and read from there.`);
-    await sync(where === "aws" ? Number(process.env.DATA_DAYS ?? 30) : undefined);
+    // Where the extension cannot be downloaded (a proxy that only passes HTTPS), the data can only be read from a copy.
+    if (where === "aws") {
+      fail(`data: DuckDB could not install its httpfs extension here, which is what reads S3. ${REAL_DATA}: run this where DuckDB can reach extensions.duckdb.org, or install the extension by hand (https://duckdb.org/docs/stable/extensions/httpfs/overview).`);
+    }
+    const copy = temporary();
+    console.error("data: DuckDB could not install its httpfs extension here, so the local stack's data is read from a copy that is removed when this ends.");
+    await copyTo(copy, objects);
     source = (object) => `read_json(${quote(`${copy}/${object.name}/*/*.json`)}, format='newline_delimited', hive_partitioning=true, union_by_name=true)`;
   }
   const defined: string[] = [];
@@ -173,7 +215,7 @@ async function views(canReadS3: boolean): Promise<string> {
   // however it ends - an interrupt meant for a query must not stop this before it has tidied up.
   rmSync(file, { force: true });
   writeFileSync(file, lines.join("\n") + "\n", { mode: 0o600 });
-  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) process.on(signal, () => {});
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) if (process.listenerCount(signal) === 0) process.on(signal, () => {});
   process.on("exit", () => rmSync(file, { force: true }));
   return file;
 }
