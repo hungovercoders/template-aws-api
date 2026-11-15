@@ -11,9 +11,10 @@
 // The Data Contract CLI does the rest: `task data:lint` (valid ODCS) and
 // `task data:test` (the data that landed keeps the contract).
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { isMap, isSeq, parseDocument, type Document, type YAMLMap, type YAMLSeq } from "yaml";
 import { merged, type Schema } from "./sample.ts";
 import { baseline, show } from "./spec-baseline.ts";
@@ -283,7 +284,8 @@ function compat(): void {
   console.log([`data:compat ok - ${from} -> ${current.version}: ${breaking ? "breaking" : "nothing breaking"}, ${changes.length} changes`, ...lines].join("\n"));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run as a script, wherever the checkout is and however it was reached - not when a test imports it.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   try {
     const [command] = process.argv.slice(2);
     if (command === "generate") generate();

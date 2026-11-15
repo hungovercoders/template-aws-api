@@ -42,8 +42,13 @@ jobs:
           git fetch origin example/implementation
           # Everything an API owns comes from the example...
           git checkout origin/example/implementation -- README.md specs http/contract.http messages src/operations src/consumers src/domain src/store steps test
+          # Its tags are its own too. Until the example has said them, the proof says them for it.
+          if git cat-file -e origin/example/implementation:infra/tags.auto.tfvars.json 2>/dev/null; then
+            git checkout origin/example/implementation -- infra/tags.auto.tfvars.json
+          fi
+          task tags > /dev/null || echo '{ "domain": "brewing", "team": "catalogue" }' > infra/tags.auto.tfvars.json
           # ...and everything the skeleton owns stays as proposed here.
-          git checkout HEAD -- steps/world.ts steps/messages.ts steps/events.ts test/consumer.test.ts test/consumers.test.ts test/forwarder.test.ts test/data.test.ts test/routes.test.ts test/log.test.ts test/components.test.ts test/asyncapi.test.ts test/cloudevents.test.ts test/trace.test.ts
+          git checkout HEAD -- steps/world.ts steps/messages.ts steps/events.ts test/consumer.test.ts test/consumers.test.ts test/forwarder.test.ts test/data.test.ts test/tags.test.ts test/routes.test.ts test/log.test.ts test/components.test.ts test/asyncapi.test.ts test/cloudevents.test.ts test/trace.test.ts
       - run: task ci
       - name: AWS Emulator log
         if: failure()

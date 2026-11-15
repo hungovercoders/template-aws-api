@@ -23,6 +23,20 @@ terraform {
 
 provider "aws" {
   region = var.region
+
+  # The same tags as the stack this account setup is for (infra/tags.tf).
+  default_tags {
+    tags = local.tags
+  }
+}
+
+# Kept the same as infra/tags.tf, so a service is one thing to whoever filters by a tag.
+locals {
+  environment = try(regex("-(dev|test|staging|prod)$", var.name)[0], null)
+  tags = merge(
+    { domain = var.domain, team = var.team, service = var.name, repo = var.repo },
+    local.environment == null ? {} : { environment = local.environment },
+  )
 }
 
 data "aws_caller_identity" "current" {}
@@ -222,6 +236,20 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-consumer"]
   }
   # component:consume:end
+
+  # The resource group that gathers the service (infra/tags.tf), and no other.
+  statement {
+    sid       = "ResourceGroup"
+    actions   = ["resource-groups:*"]
+    resources = ["arn:${local.partition}:resource-groups:${var.region}:${local.account}:group/${var.name}"]
+  }
+
+  # Making a group checks its query, which reads tags; nothing is changed by it.
+  statement {
+    sid       = "ResourceGroupQuery"
+    actions   = ["tag:GetResources", "cloudformation:DescribeStacks", "cloudformation:ListStackResources"]
+    resources = ["*"]
+  }
 
   # component:publish:start
   # Published events: the bus, its archive, rule and log, the forwarder
