@@ -87,6 +87,36 @@
           "publish:check"
         ]
       }
+    },
+    "data": {
+      "title": "Events as data: every published event is kept in S3 through Firehose, under an ODCS data contract (specs/datacontract.yaml) that drives the infrastructure and tests the data",
+      "needs": [
+        "publish"
+      ],
+      "files": [
+        "infra/data.tf",
+        "scripts/data.ts",
+        "local/data.ts",
+        "rules/datacontract.yaml",
+        "test/data.test.ts",
+        "docs/data.md",
+        ".claude/skills/write-spec/data.md"
+      ],
+      "gates": {
+        "spec": [
+          "data:lint",
+          "data:check",
+          "data:compat"
+        ],
+        "ci": [
+          "data:lint",
+          "data:check",
+          "data:compat"
+        ],
+        "acceptance": [
+          "data:test"
+        ]
+      }
     }
   }
 }

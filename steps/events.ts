@@ -109,7 +109,11 @@ AfterAll(async function () {
       count = now;
       if (quiet < 2) await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    held(await published(runBegan));
+    const all = await published(runBegan);
+    held(all);
+    // Which events they were, for a gate that follows them further than the bus.
+    mkdirSync(".local", { recursive: true });
+    writeFileSync(".local/event-ids-published.json", JSON.stringify(all.map((event) => event.id)) + "\n");
   }
   mkdirSync(".local", { recursive: true });
   writeFileSync(".local/events-published.json", JSON.stringify([...seen].sort(), null, 2) + "\n");
