@@ -262,7 +262,7 @@ tasks:
       - node scripts/data.ts compat
 
   data:test:
-    desc: Gate - the events that landed in S3 keep the data contract, schema and quality rules (the Data Contract CLI). In acceptance it tests what the scenarios published, every one of which must have landed; ENV=aws tests the deployed stack's recent data
+    desc: Gate - the events that landed in S3 keep the data contract, schema and quality rules (the Data Contract CLI), tested where they are - nothing is copied. In acceptance it tests what the scenarios published, every one of which must have landed; ENV=aws tests the deployed stack's last DATA_DAYS days (2). Gzipped data (data_compression = GZIP) can only be tested from a copy - made for the local stack, and for ENV=aws only with DATA_COPY=yes - which is private and removed when the test ends
     env:
       DATACONTRACT_CLI_VERSION: '{{.DATACONTRACT_CLI_VERSION}}'
     cmds:

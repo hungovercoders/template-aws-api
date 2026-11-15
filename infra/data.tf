@@ -1,6 +1,6 @@
 # The events as data: every event the API publishes is also kept in S3, where
 # analysts and other systems read it long after it was sent. A rule on the
-# bus sends each to Firehose, which writes it as one line of gzipped JSON -
+# bus sends each to Firehose, which writes it as one line of JSON -
 # the whole CloudEvent - under
 #   <prefix>type=<event type>/dt=<date>/
 #
@@ -19,6 +19,17 @@ variable "data_buffer_seconds" {
   description = "How long Firehose gathers events before it writes a file. Longer means fewer, larger files; it must be well inside the freshness the data contract promises."
   type        = number
   default     = 300
+}
+
+variable "data_compression" {
+  description = "How Firehose writes each file: UNCOMPRESSED, so the data can be tested and read where it is, or GZIP, about a fifth of the size, for a volume where storage matters more - the data contract test then has to unpack a copy to read it."
+  type        = string
+  default     = "UNCOMPRESSED"
+
+  validation {
+    condition     = contains(["UNCOMPRESSED", "GZIP"], var.data_compression)
+    error_message = "data_compression is UNCOMPRESSED or GZIP."
+  }
 }
 
 variable "data_reader_accounts" {
@@ -195,7 +206,7 @@ resource "aws_kinesis_firehose_delivery_stream" "data" {
     prefix = "${local.data_location.prefix}type=!{partitionKeyFromQuery:type}/dt=!{timestamp:yyyy-MM-dd}/"
     # What cannot be placed - not JSON, or with no type - is kept apart, never dropped.
     error_output_prefix = "errors/!{firehose:error-output-type}/dt=!{timestamp:yyyy-MM-dd}/"
-    compression_format  = "GZIP"
+    compression_format  = var.data_compression
     buffering_interval  = var.data_buffer_seconds
     buffering_size      = 64
 
@@ -326,6 +337,11 @@ output "data_bucket" {
 output "data_prefix" {
   description = "The prefix under which they are kept, as type=<event type>/dt=<date>/."
   value       = local.data_location.prefix
+}
+
+output "data_compression" {
+  description = "How the files are written: UNCOMPRESSED or GZIP."
+  value       = local.data_enabled ? var.data_compression : ""
 }
 
 output "data_stream" {

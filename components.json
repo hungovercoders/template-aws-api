@@ -97,6 +97,7 @@
         "infra/data.tf",
         "scripts/data.ts",
         "local/data.ts",
+        "local/data_test.py",
         "rules/datacontract.yaml",
         "test/data.test.ts",
         "docs/data.md",
