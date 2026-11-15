@@ -101,7 +101,8 @@
         "rules/datacontract.yaml",
         "test/data.test.ts",
         "docs/data.md",
-        ".claude/skills/write-spec/data.md"
+        ".claude/skills/write-spec/data.md",
+        ".claude/skills/implement-api/data.md"
       ],
       "gates": {
         "spec": [

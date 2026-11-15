@@ -61,6 +61,37 @@ const asyncSection = (title: string, received: boolean) => {
     : [`## ${title}`, "", "| Operation | On | What it does |", "| --- | --- | --- |", ...list.map((op) => `| \`${op.id}\` | \`${cell(op.on)}\` | ${cell(op.summary)} |`), ""];
 };
 
+// Events kept as data have a third contract, specs/datacontract.yaml: who owns
+// the data, how long it is kept and how fresh it is belong on the front page.
+type Data = { version?: string; team?: { name?: string } | unknown; slaProperties?: { property?: string; value?: unknown; unit?: string }[] };
+const DATA = "specs/datacontract.yaml";
+const dataContract = existsSync(DATA) && existsSync("docs/data.md") ? (parseYaml(readFileSync(DATA, "utf8")) as Data) : undefined;
+const UNITS: Record<string, string> = { s: "second", m: "minute", h: "hour", d: "day", y: "year" };
+const promised = (property: string) => {
+  const sla = dataContract?.slaProperties?.find((entry) => entry.property === property);
+  return sla && UNITS[sla.unit ?? ""] ? `${sla.value} ${UNITS[sla.unit!]}${sla.value === 1 ? "" : "s"}` : undefined;
+};
+const dataSection = () => {
+  if (!dataContract) return [];
+  const team = (dataContract.team as { name?: string } | undefined)?.name;
+  const facts = [team && `owned by the ${cell(team)} team`, promised("retention") && `kept for ${promised("retention")}`, promised("latency") && `there to read within ${promised("latency")}`].filter(Boolean);
+  return [
+    "## Events kept as data",
+    "",
+    `Every event it publishes is also kept in S3, under version ${dataContract.version} of a [data contract](${DATA})${facts.length > 0 ? `: ${facts.join(", ")}` : ""}.`,
+    "See [events as data](docs/data.md) for how it is tested and queried.",
+    "",
+  ];
+};
+// The tasks of the parts this API has, beside the ones every API has.
+const received = () => asyncOperations.some((operation) => operation.received);
+const published = () => asyncOperations.some((operation) => !operation.received);
+const ownTasks = () => [
+  ...(received() ? ["| `task queue:send -- <message>` | Send it one of the example messages in `messages/` |"] : []),
+  ...(published() ? ["| `task events:tail` | Follow the events it publishes |"] : []),
+  ...(dataContract ? ['| `task data:query -- "<sql>"` | Query the events kept in S3, a view for each |'] : []),
+];
+
 const cell = (text: string) => text.replace(/\|/g, "\\|").replace(/\s+/g, " ").trim();
 const block = [
   START,
@@ -79,6 +110,7 @@ const block = [
   ...(asyncOperations.length > 0 ? [`Messages and events are version ${asyncContract?.info?.version} of [their own contract](${ASYNC}), with an [example of each](messages).`, ""] : []),
   ...asyncSection("Messages it receives", true),
   ...asyncSection("Events it publishes", false),
+  ...dataSection(),
   "## Working on it",
   "",
   "| Task | What it does |",
@@ -86,6 +118,7 @@ const block = [
   "| `task dev` | Run the API on AWS Emulator; prints its URL and a token |",
   "| `task http` | Send it the requests in `http/contract.http` |",
   "| `task mock` | Serve the contract as a mock, with nothing implemented |",
+  ...ownTasks(),
   "| `task ci` | Every gate, in order: the definition of done |",
   "",
   "What this API does is decided by its spec. To change it, change the",

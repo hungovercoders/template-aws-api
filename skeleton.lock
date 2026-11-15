@@ -1,11 +1,13 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-09aade2b584f1dc7b285ff3d8c64b104a6a9d574b13475521c6e56c5557ec766  .claude/skills/implement-api/SKILL.md
+79df295038de8c21a700aa4f57fe8cbf9c3d30e09e207960d40f5d3b3b7d093b  .claude/skills/implement-api/SKILL.md
 790fc67b2b3ad398429530c8f7d3b07f2409bd83dfab3a14130a09959b8dbba4  .claude/skills/implement-api/SKILL.md#consume
 796ebb03caf74dd871839e0897fa4b3079226e554b58a6b985ec7d40a68ac3ed  .claude/skills/implement-api/SKILL.md#publish
+612d4985a97754e33492e0182ce7e6e5dfdaf7a03219693958e8fa5a5f525e3d  .claude/skills/implement-api/SKILL.md#data
+1f96dc35ae98da765037c537bb8b32c5e3967ab840084ff5d4a9726d2a3f4800  .claude/skills/implement-api/data.md
 afd9d13fdeb9e62345a1711df59c4134713d0013efa78f2e3c9c740d327ac0cb  .claude/skills/implement-api/events.md
 c39beab28af8a4b4d9bfcb5fed46d92ad17de25aeb3a963f7bffd95d6a90d744  .claude/skills/implement-api/messages.md
-809faa65fcdfa557cd853c4e90498fbe8ffec3ae7958a0d9f54e40fa8c7c3a9f  .claude/skills/write-spec/SKILL.md
+34df85080dbf5cf9d8f2b175873bf095c7aebe5ea7e58b66c6fbe588386cf7b9  .claude/skills/write-spec/SKILL.md
 2c48077bb752c09ddc9ca4fbe82babcaafd94268db977646f25f7d72356c2db2  .claude/skills/write-spec/SKILL.md#consume
 8c8e59e4d1bdbfab4903c824b1aac36157701daa4fad35aeb83fad6cbd7bc417  .claude/skills/write-spec/SKILL.md#publish
 5f5f1efac824f787aa025e7b243393f93f3696fef0026eb602119588c76efe55  .claude/skills/write-spec/SKILL.md#data
@@ -17,7 +19,7 @@ e96e0dac4fb54ae87fa9304a912489a51a6d497944142778da9289b885a00b80  Taskfile.yml
 2ec0aa4479b59780f1ae10b0a145f467bbe1aa15dcd41811f13b0fc1f3c9fd98  Taskfile.yml#asyncapi
 1af8ea7c7bd03571f8f46b342f71fdc7af187378d404b96f31b773b1dc8eca94  Taskfile.yml#consume
 f51ceff32c367903d7edba081b4a2a39dac1cd7109a005778968aa53774095c6  Taskfile.yml#publish
-d29e26c8847ce5475bc742666b0111f33a275725ba21c3571781772c24832441  components.json
+4f490e9f70b59ec847a48a923f0bb2eeac71f72762ff0d8ecb194c0ca33d90ba  components.json
 6cade406af2dc8c0d818e28e193903a87ecec74ad116b91178915289edbab5a6  cucumber.mjs
 cd0c7ccdce9864abf36a75c8b3e10dd997edc292ddb87198a3ceb032b01b92a4  docs/data.md
 67c594fc663bb8e459c948440a875581fb2107e17cc952e47bf244d3176297a0  infra/alarms.tf
@@ -60,7 +62,7 @@ d275b8c10e94823d8b2f79c94d07f7dba5711bea1bdbb22cf208e025978de674  scripts/check.
 4e803e391343ab19c21c5baf094846afe15c9d15b5ba805ddffe14561ce96eb7  scripts/generate.ts
 10e14287c62930769933b1b6d560fdf05c39cd36e6fb83fc6ad58bff02f256c9  scripts/http-generate.ts
 9395bf14739b2e1d43d153ae90a42562f5438e4e401c26e0080f228a2b6367a6  scripts/publish.ts
-232b495095b163cb920d9bce141c8ca22c5dbab6af80102d5d989d01c1c2617a  scripts/readme.ts
+fd9d933f8b8f877d51448d8e0cf0438b8e7a8da5d14d68177d2709716e64812f  scripts/readme.ts
 64e984d919a1aab94fe2eed22cda48c5ce8514ea2217a7d42992a0fd7da71bfa  scripts/responses-check.ts
 2cf398d55755e8724fd51460c015ed6c5f49dc8df417b1d887ac08998648d86d  scripts/sample.ts
 57f443a1ded0a7ec53532c496569c22de49e90855c1658762c5af331cb666d53  scripts/scaffold.ts

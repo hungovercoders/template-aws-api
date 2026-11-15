@@ -133,7 +133,7 @@ is checked on every run.
 ## AWS Emulator
 
 Local runs and CI use [AWS Emulator](https://docs.aws.amazon.com/emulator/latest/userguide/what-is-service.html)
-for DynamoDB. `local/stack.mjs` starts it, points the AWS SDK at it using the
+for the whole stack, not only its table. `local/stack.mjs` starts it, points the AWS SDK at it using the
 credentials and certificate it writes to `~/.aws/emulator/<port>/`, runs the
 task, and stops it. Emulated resources live in memory only.
 
@@ -175,7 +175,7 @@ from scratch and throws it away:
 | Queue | The SQS queue and dead-letter queue that apply created; the emulator hands each batch to the consumer function, offers a failed message again and dead-letters it after its tries | Emulated. Locally a message gets two tries five seconds apart, not three at a minute |
 <!-- component:consume:end -->
 <!-- component:publish:start -->
-| Events | The table's stream, the forwarder function, the event bus and the rule that logs every event, as apply created them; scenarios read the log | Emulated. The stream's retry limit is ignored there, which is why the forwarder sets failures aside itself |
+| Events | The table's stream, the forwarder function, the event bus and the rule that logs every event, as apply created them; scenarios read the log | Emulated. The scenarios only take the path where every event is published. That the stream starts a batch again from an event that failed, as it does on AWS, is not tested there |
 <!-- component:publish:end -->
 <!-- component:data:start -->
 | Data | The rule, the Firehose stream and the bucket apply created; `data:test` reads what Firehose wrote | Emulated. The bucket is made through Cloud Control because the emulator has no S3 Control; Firehose emits no metrics there, so its two alarms never change state |
@@ -192,8 +192,8 @@ dependency that needs them fails there as a `Runtime.ImportModuleError`.
 
 A request takes tens of milliseconds, so the scenarios and the fuzz run take
 tens of seconds each. Bringing the stack up takes longer than either: about
-half a minute, 25 seconds more for each queue a component adds, and
-about a minute more for the bucket of an API with a data contract. When a run fails, `local/stack.mjs` prints the
+two minutes with every component present. Each queue takes 25 seconds and
+the data bucket about a minute, in parallel; without them, half a minute. When a run fails, `local/stack.mjs` prints the
 function's log if the AWS CLI is installed.
 
 A new emulator release can change a response to match AWS more closely, which

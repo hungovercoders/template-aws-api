@@ -2,9 +2,10 @@
 
 **Bring your own business logic.** Everything every Lambda API needs - routing,
 request validation, error responses, the DynamoDB client, local emulation, the
-test harness, CI, infrastructure, deployment - is solved here once. The only
-thing you bring is what makes your API *yours*: BDD feature files that say what
-it does and an OpenAPI contract that says what it looks like.
+test harness, CI, infrastructure, deployment - is solved here once. So is what
+many need: taking messages from a queue, publishing events, and keeping those
+events as data. The only thing you bring is what makes your API *yours*: BDD
+feature files that say what it does and contracts that say what it looks like.
 
 > **CI on this branch is red on purpose.** `main` is the skeleton: no contract,
 > no features, no implemented Lambda. `task ci` fails until you add a spec and
@@ -16,40 +17,36 @@ The skeleton is the same for every API you will build, so it should be built
 once - not regenerated, slightly differently, by AI each time.
 
 - **Known problems are solved up front.** How a Lambda is routed, validated,
-  tested, emulated and deployed is not a per-project question. Answering it
-  once, in a template, costs nothing to reuse. Asking an agent to answer it
-  again costs tokens and review time on every project, and returns a
-  different answer each time.
+  tested, emulated and deployed is not a per-project question. Asking an
+  agent to answer it again costs tokens and review time on every project,
+  and returns a different answer each time.
 - **AI works only on what is new.** The agent's whole job is the business
-  logic: the step definitions and one small function per operation. Less to
-  generate is less to pay for, less to review and less to go wrong.
+  logic: the step definitions and one small function per operation.
 - **The spec is the prompt *and* the test.** The same feature files and
-  contract that tell the agent what to build are executed against what it
-  built. The agent is not asked whether it is finished - `task ci` tells it,
-  with the same answer every time, exactly which scenario or contract rule is
-  not yet met.
+  contracts that tell the agent what to build are executed against what it
+  built. `task ci` says whether it is finished, with the same answer every
+  time, and exactly which scenario or contract rule is not yet met.
 - **Generate before you write.** Anything a command can derive from the spec
   is produced by that command: types, the route table, a typed stub for every
-  operation, a pending step for every sentence, a request for every
-  operation. Generated output is identical every time, free, and cannot drift
-  from the spec. AI is used only where no deterministic tool exists - the
-  behaviour inside each operation and step.
+  operation, a pending step for every sentence. Generated output is identical
+  every time, free, and cannot drift from the spec.
 - **Every API looks the same.** Same layout, same tasks, same gates, same
   deployment. Anyone - or any agent - who has seen one has seen them all.
 
 | Solved once, in the template | You bring | AI resolves, checked by the gates |
 | --- | --- | --- |
-| Lambda entry point and router | `specs/openapi.yaml` - the contract | `steps/*.ts` - glue for your feature sentences |
-| Request validation against the contract | `specs/features/*.feature` - the behaviour | `src/operations/*.ts` - one function per operation |
-| Authentication, from the contract's `security` | | |
-| RFC 9457 error responses | | `src/domain/`, `src/store/` - your rules and data access |
-| Types, route table, operation and step outlines generated from the spec | | |
-| The whole stack on AWS Emulator: API Gateway, authorizer, Lambda, DynamoDB | | |
-| Contract-checking test harness, fuzzing | | |
-| Contract linting to shared standards | | |
-| mise, Taskfile, GitHub Actions CI | | |
-| Terraform: Lambda, HTTP API, DynamoDB | | |
-| Standard alarms and structured logs | | |
+| Lambda entry point, router, request validation, RFC 9457 errors | `specs/openapi.yaml` - the contract | `src/operations/*.ts` - one function per operation |
+| Authentication, from the contract's `security` | `specs/features/*.feature` - the behaviour | `steps/*.ts` - glue for your feature sentences |
+| Types, route table, operation and step outlines generated from the spec | | `src/domain/`, `src/store/` - your rules and data access |
+| A queue, its dead-letter queue, retries and duplicates | `specs/asyncapi.yaml` - messages and events | `src/consumers/*.ts` - one function per message |
+| Events published with the change they describe, as CloudEvents on EventBridge | | One line in the write: `outbox(event)` |
+| Events kept in S3 and tested against a data contract; DuckDB and Harlequin to query them | `specs/datacontract.yaml` - owner, retention, sensitivity | |
+| The whole stack on AWS Emulator; contract-checking harness; fuzzing | | |
+| Terraform, alarms with a runbook, structured logs, tags on every resource | Who owns it: `domain` and `team` | |
+| mise, Taskfile, GitHub Actions CI, contract linting to shared standards | | |
+
+The queue, the events and the data are optional components: an API that does
+not need one removes it, and can bring it back later (`task component:list`).
 
 If you find yourself asking AI to write a router, a test harness, a pipeline
 or Terraform for an API built from this template, stop: it is already here.
@@ -81,15 +78,20 @@ specs/openapi.yaml ──┬─► request validation inside the Lambda
                      ├─► response validation on every call the features make
                      └─► generated fuzz requests (schemathesis)
 
+specs/asyncapi.yaml ─┬─► every message and event validated as a CloudEvent
+   (messages, events)└─► a typed stub per message, a typed function per event
+
+specs/datacontract.yaml ─► the bucket, its retention and freshness alarm
+   (events as data)        (Terraform reads it), and a test of what landed
+
 specs/features/*.feature ──► cucumber, strict, against the built Lambda
    (the behaviour)           on infra/ applied to AWS Emulator
 ```
 
-The same two files are both the instructions for building the API and the
-tests that prove it was built. Nothing is mocked, and what is tested is what
-ships: the features call `dist/handler.mjs` - the deployed bundle - over HTTP,
-and it talks to a DynamoDB table that the project's own Terraform created on
-[AWS Emulator](https://github.com/aws/aws-emulator).
+The same files are both the instructions for building the API and the tests
+that prove it was built. Nothing is mocked, and what is tested is what ships:
+the features call the deployed bundle through the stack the project's own
+Terraform created on [AWS Emulator](https://github.com/aws/aws-emulator).
 
 ## Use it
 
@@ -100,8 +102,9 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
    [Using this repository as a template](#using-this-repository-as-a-template))
    and run `mise install`.
 2. **Add your spec.** In Claude Code, `/write-spec` works through it with
-   you: it asks for your requirements, drafts the features and contract, and
-   checks them against the gates. Or write it by hand:
+   you: it asks for your requirements and which optional components the API
+   needs, drafts the features and contracts, and checks them against the
+   gates. Or write it by hand:
    - Replace `specs/openapi.yaml` with your contract. Every operation needs an
      `operationId`. Document error responses with the `Problem` schema already
      in the file - it is the error body the router emits.
@@ -113,8 +116,7 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
    - `task spec:check` tells you when the spec is complete enough to build
      from, and `task spec:lint` that it meets the standards.
    - `task readme:generate` then replaces this README with one that
-     describes your API, written from the contract. From here on the
-     repository is your API, not the template.
+     describes your API, written from the contracts.
    - `task mock` serves the contract as a mock API, and `ENV=mock task http`
      sends it a request for each operation, so you and your consumers can
      call it and react to its shape before anything is built
@@ -127,9 +129,9 @@ Prerequisites: [mise](https://mise.jdx.dev). It installs everything else
 
    The skill (`.claude/skills/implement-api`) reads the spec, runs
    `task scaffold` to generate everything that follows from it, fills in the
-   steps and operations, and works gate by gate until `task ci` is
-   green. It may not edit `specs/`, weaken a gate or rebuild the skeleton. You can follow the same
-   steps by hand - they are written out in the skill.
+   steps and operations, and works gate by gate until `task ci` is green. It
+   may not edit `specs/`, weaken a gate or rebuild the skeleton. You can
+   follow the same steps by hand - they are written out in the skill.
 4. **Deploy, when you are ready.** Opt-in: `task deploy NAME=my-api` from your
    machine, or bring your AWS account so CI deploys `main` (see [Deploy](docs/deploying.md#deploy)).
 
@@ -147,38 +149,37 @@ description; these are the ones you start with:
 | `task http` | Send requests to the mock, the local stack or a deployed API |
 | `task features` | The feature files, through AWS Emulator's API Gateway to the built Lambda |
 | `task dev` | The API on AWS Emulator, kept running; prints its URL and a token |
+| `task queue:send`, `task events:tail`, `task data:query` | Send it a message, follow the events it publishes, query the events kept in S3 |
 | `task deploy` | Apply the stack to AWS (opt-in) |
 
 ## Layout
 
 ```
 specs/
-  openapi.yaml          the contract            ← you write
-  features/             the behaviour           ← you write
+  openapi.yaml          the HTTP contract             ← you write
+  asyncapi.yaml         messages and events           ← you write, if it has any
+  datacontract.yaml     the events as data            ← generated, then you complete it
+  features/             the behaviour                 ← you write
 src/
-  operations/           one file per operation  ← implemented from the spec
-  handler.ts            the Lambda entry point
-  lib/                  router, contract validation, problem responses, DynamoDB client
-  generated/            types, runtime contract, route table (task generate; not committed)
-steps/
-  world.ts              HTTP client that holds every response to the contract
-  *.ts                  step definitions        ← implemented from the spec
-local/                  AWS Emulator runner, Terraform apply, local callers, table reset
-infra/                  Terraform: Lambda, HTTP API, DynamoDB
+  operations/           one file per operation        ← implemented from the spec
+  consumers/            one file per message received ← implemented from the spec
+  handler.ts            the Lambda entry points (consumer.ts, forwarder.ts beside it)
+  lib/                  router, contract validation, problems, DynamoDB, queue, outbox
+  generated/            types, runtime contracts, route table (task generate; not committed)
+steps/                  step definitions ← implemented; world.ts, messages.ts, events.ts are the harness
+messages/               an example of every message and event (generated)
+local/                  AWS Emulator runner, Terraform apply, the tasks for the queue, events and data
+infra/                  Terraform: API, Lambda, table, and each component's file; tags.auto.tfvars.json ← you say
 infra/bootstrap/        opt-in, one-off: state bucket and GitHub deploy role
 docs/                   guides, each for one reader at one moment; runbook.md for alarms
 AGENTS.md               instructions for coding agents; CLAUDE.md imports it
 CONTRIBUTING.md         how the API is changed: spec first, then implementation
-SECURITY.md             how to report a vulnerability
 skeleton.lock           what the skeleton is; skeleton:check fails if it changes
 components.json         the optional parts an API can remove and restore (task component:list)
-rules/house.yaml        contract standards shared by every API
-.spectral.yaml          contract rules for this API ← you add
+rules/                  contract standards shared by every API; .spectral.yaml for this one's ← you add
 http/                   .http requests for exploring by hand; contract.http is generated
-scripts/                generate, scaffold, spec:check and http:generate
-.claude/skills/write-spec/      the skill that helps you write the spec
-.claude/skills/implement-api/   the skill that drives an implementation
-.claude/skills/aws-*/           AWS's own skills, copied in and kept current (task skills:fetch)
+scripts/, tools/        the generators and gates
+.claude/skills/         write-spec and implement-api; AWS's own skills, copied in and kept current
 skills.json             where each copied skill came from, and the ones offered ← you add
 ```
 
@@ -190,7 +191,7 @@ reading, not for building on.
 
 Then, in your new repository:
 
-- Write your spec, then run `task adopt` once. It removes what is only about
+- Write your spec ([Use it](#use-it)), then run `task adopt` once. It removes what is only about
   the template (its self-test workflow, its branch ruleset, the template
   sections of `CONTRIBUTING.md` and `SECURITY.md`), replaces this README
   with one that describes your API, and installs the pre-push hook.
@@ -198,8 +199,6 @@ Then, in your new repository:
   the implementation, for the whole life of the API.
 - Change the copyright line in `LICENSE` if the code is not MIT or not yours
   to license that way.
-- Add your spec and carry on from [Use it](#use-it). CI is red until the spec
-  is implemented, and green from then on.
 
 ## Guides
 

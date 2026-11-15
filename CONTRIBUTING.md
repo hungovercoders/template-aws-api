@@ -26,14 +26,18 @@ removal alike. Nothing is changed in the code alone.
 | Rename or reshape data | Change the contract; the generated types make the compiler find every use |
 <!-- component:consume:start -->
 | Take a new kind of message | Add its scenarios and a `receive` operation to `specs/asyncapi.yaml`; `task scaffold` writes the stub in `src/consumers/`; implement it |
+| Stop taking a message | Delete its scenarios and its `receive` operation (breaking for whoever sends it: a new major version of the AsyncAPI contract); delete the consumer and the steps the gates then call unused |
 <!-- component:consume:end -->
 <!-- component:publish:start -->
 | Publish a new event, or publish one in a new case | Add its scenarios and a `send` operation to `specs/asyncapi.yaml`; `task generate` writes its function; write `outbox(event)` in the transaction of the change |
+| Change an event that is already published | A change subscribers would notice is a new event: add it with a type ending `.v2` and publish both for as long as they need. Remove `.v1` later, as below |
+| Stop publishing an event | Delete its scenarios and its `send` operation (breaking: a new major version of the AsyncAPI contract); `task typecheck` then finds every place it was written |
 <!-- component:publish:end -->
 <!-- component:data:start -->
 | Change an event that is kept as data, or what is promised of the data | The event first, as above; `task data:generate` carries it into `specs/datacontract.yaml`. Owner, classification, retention and freshness change there, with a new version (`docs/data.md`) |
 <!-- component:data:end -->
 | Use a capability the API removed | `task component:add -- <name>` restores it from the template, with what it needs; then the spec first, as for any change |
+| Change who owns the API | `domain` and `team` in `infra/tags.auto.tfvars.json`; the next deploy re-tags every resource |
 | Update a dependency | Renovate proposes it; `task ci` decides. When it moves a skill source in `skills.json`, run `task skills:fetch` on its branch and push |
 | Work with a service the API integrates with | Ask whether a skill for it should be added; with the owner's agreement, `task skills:add`. A skill every API needs is a change to the template instead |
 
