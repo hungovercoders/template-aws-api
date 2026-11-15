@@ -77,7 +77,9 @@ flowchart TB
 | Events on a bus | out | `specs/asyncapi.yaml`, `send` | yes |
 | Events as data in S3 | out | `specs/datacontract.yaml` | yes |
 
-Each part brings its Terraform, alarms, logs and tags. An optional one can be removed and restored: `task component:list`.
+Each part brings its Terraform, alarms, logs and tags. An API that does not
+need an optional part removes it, and can bring it back later:
+`task component:list`.
 
 ## What you get
 
@@ -121,6 +123,10 @@ should be built once, not regenerated slightly differently by AI each time.
   comes from that command: identical every time, and it cannot drift.
 - **Every API looks the same.** Seen one, seen them all.
 
+If you catch yourself asking AI for a router, a test harness or a pipeline
+here, stop: it exists. If something every API needs is missing, add it to
+the template once, not to one API.
+
 ## How it works
 
 ```
@@ -139,6 +145,15 @@ specs/datacontract.yaml ─► the bucket, its retention and freshness alarm
 specs/features/*.feature ──► cucumber, strict, against the built Lambda
    (the behaviour)           on infra/ applied to AWS Emulator
 ```
+
+Who writes what:
+
+| You bring | The template has | The agent writes |
+| --- | --- | --- |
+| `specs/openapi.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
+| `specs/asyncapi.yaml`, if it has messages or events | The queue, the outbox, the event bus | `src/consumers/`, and `outbox(event)` in a write |
+| `specs/datacontract.yaml`: owner, retention, sensitivity | The bucket, delivery, the data test | |
+| Who owns it: `domain` and `team` | Tags and a resource group | |
 
 ## See it working
 
@@ -179,10 +194,19 @@ start with:
 
 ## Writing the spec by hand
 
-Replace `specs/openapi.yaml`, add feature files to `specs/features/` with
-each scenario tagged `@operation:<operationId>`, and run `task spec:check`.
-[The spec](docs/spec.md#writing-and-changing-the-spec) has the rest,
-including [trying the contract as a mock](docs/spec.md#try-the-contract-before-it-is-built).
+`/write-spec` is the quick way. To do it yourself:
+
+- Replace `specs/openapi.yaml` with your contract. Every operation needs an
+  `operationId`; error responses use the `Problem` schema already in the file.
+- Add feature files to `specs/features/`, each scenario tagged with the
+  operations it covers: `@operation:<operationId>`.
+- Rules for this API alone go in `.spectral.yaml`
+  ([Contract standards](docs/spec.md#contract-standards)).
+- `task spec:check` says when the spec is complete enough to build from;
+  `task spec:lint` that it meets the standards.
+- `task mock` and `ENV=mock task http` let you and your consumers call the
+  contract before anything is built
+  ([Try the contract before it is built](docs/spec.md#try-the-contract-before-it-is-built)).
 
 ## Where things are
 
@@ -195,10 +219,14 @@ steps/                  glue for your feature sentences      ← written from th
 src/lib/, src/handler.ts  router, validation, DynamoDB, queue, outbox: the template's
 infra/                  Terraform; tags.auto.tfvars.json     ← you say who owns it
 local/                  runs the stack on AWS Emulator; the queue, event and data tasks
+docs/                   one guide per reader; runbook.md for alarms
+messages/, http/        examples of every message; requests to explore by hand
 rules/, .spectral.yaml  contract standards: shared, and this API's ← you add
 .claude/skills/         write-spec, implement-api, and AWS's own skills (skills.json)
+scripts/, tools/        the generators and checks
 AGENTS.md               instructions for coding agents
 CONTRIBUTING.md         how the API is changed: spec first, then implementation
+skeleton.lock, components.json  what the template is, and its optional parts
 ```
 
 ## Guides
