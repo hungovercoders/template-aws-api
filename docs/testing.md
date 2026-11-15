@@ -163,32 +163,37 @@ task, and stops it. Emulated resources live in memory only.
 Every run of `features`, `contract:fuzz` or `acceptance` builds this stack
 from scratch and throws it away:
 
-| Layer | In the tests | Same as production? |
-| --- | --- | --- |
-| Lambda code | `dist/handler.mjs`, the esbuild bundle Terraform packages | Yes - the same file |
-| Infrastructure | `infra/` applied to AWS Emulator with `terraform apply` | Same definitions; the emulator's control plane, not AWS's |
-| DynamoDB | The table that apply created, on AWS Emulator | Emulated |
-| API Gateway | The emulator's HTTP API: the routes apply created, each integrated with the function | Emulated |
-| Lambda runtime | The emulator runs the bundle as the function, on its Node 22 runtime | Emulated |
-| Authorizer | The emulator's JWT authorizer refuses a missing or malformed token and a wrong issuer or audience, and passes the claims to the function. It does not verify signatures | Partly |
+| Layer | In the tests | Same as production? | Known from |
+| --- | --- | --- | --- |
+| Lambda code | `dist/handler.mjs`, the esbuild bundle Terraform packages | Yes - the same file | the build |
+| Infrastructure | `infra/` applied to AWS Emulator with `terraform apply` | Same definitions; the emulator's control plane, not AWS's | every run applies it |
+| DynamoDB | The table that apply created, on AWS Emulator | Emulated | the scenarios |
+| API Gateway | The emulator's HTTP API: the routes apply created, each integrated with the function | Emulated | the scenarios |
+| Lambda runtime | The emulator runs the bundle as the function, on its Node 22 runtime | Emulated | the scenarios; `lambda-node-modules` |
+| Authorizer | The emulator's JWT authorizer refuses a missing or malformed token and a wrong issuer or audience, and passes the claims to the function. It does not verify signatures | Partly | the scenarios; `jwt-signature` |
 <!-- component:consume:start -->
-| Queue | The SQS queue and dead-letter queue that apply created; the emulator hands each batch to the consumer function, offers a failed message again and dead-letters it after its tries | Emulated. Locally a message gets two tries five seconds apart, not three at a minute |
+| Queue | The SQS queue and dead-letter queue that apply created; the emulator hands each batch to the consumer function, offers a failed message again and dead-letters it after its tries | Emulated. Locally a message gets two tries five seconds apart, not three at a minute | the scenarios |
 <!-- component:consume:end -->
 <!-- component:publish:start -->
-| Events | The table's stream, the forwarder function, the event bus and the rule that logs every event, as apply created them; scenarios read the log | Emulated. The scenarios only take the path where every event is published. That the stream starts a batch again from an event that failed, as it does on AWS, is not tested there |
+| Events | The table's stream, the forwarder function, the event bus and the rule that logs every event, as apply created them; scenarios read the log | Emulated. The scenarios only take the path where every event is published. That the stream starts a batch again from an event that failed, as it does on AWS, is not tested there | the scenarios; `stream-retry-limit` |
 <!-- component:publish:end -->
 <!-- component:data:start -->
-| Data | The rule, the Firehose stream and the bucket apply created; `data:test` reads what Firehose wrote | Emulated. The bucket is made through Cloud Control because the emulator has no S3 Control; Firehose emits no metrics there, so its two alarms never change state |
+| Data | The rule, the Firehose stream and the bucket apply created; `data:test` reads what Firehose wrote | Emulated. The bucket is made through Cloud Control because the emulator has no S3 Control; Firehose emits no metrics there, so its two alarms never change state | `task data:test`; `s3-control`, `firehose-metrics` |
 <!-- component:data:end -->
-| Tags | Every resource carries the stack's tags, and the emulator reports them: by resource, and through the tagging API | Emulated. The resource group is created, but lists only itself as a member there |
-| IAM | Not enforced the way AWS enforces it; the emulator's guide says not to test security on it | No |
+| Tags | Every resource carries the stack's tags, and the emulator reports them: by resource, and through the tagging API | Emulated. The resource group is created, but lists only itself as a member there | read by hand once (#58), not by a gate; `resource-group-members` |
+| IAM | Not enforced the way AWS enforces it; the emulator's guide says not to test security on it | No | AWS's guide |
 
 Nothing stands in for AWS: every request in a scenario or a fuzz run goes
 through the emulator's API Gateway to the function and on to its DynamoDB.
 What only a real deploy proves is token signatures, IAM and anything the
 emulator gets wrong. The emulator's Node runtime is not the whole of Node -
-`node:http`, `node:https` and `node:module` are missing in 1.0.365 - so a
-dependency that needs them fails there as a `Runtime.ImportModuleError`.
+`node:http`, `node:https` and `node:module` are missing - so a dependency
+that needs them fails there as a `Runtime.ImportModuleError`.
+
+"Known from" says what shows each row: a gate, or a gap in code font. A gap
+is something the emulator cannot do yet, with a test that says so:
+`task emulator:gaps -- --list` lists them, with what each one costs the
+template and the files that carry it.
 
 A request takes tens of milliseconds, so the scenarios and the fuzz run take
 tens of seconds each. Bringing the stack up takes longer than either: about
@@ -199,3 +204,20 @@ function's log if the AWS CLI is installed.
 A new emulator release can change a response to match AWS more closely, which
 is why the version is pinned; see
 [how fidelity changes affect your tests](https://docs.aws.amazon.com/emulator/latest/userguide/versioning.html).
+
+### When the emulator pin moves
+
+The gates say whether a release made anything worse. `task emulator:gaps`
+says whether it made anything better: it tests every gap on the pinned
+emulator and reports "still needed" or "the gap has closed". The `emulator`
+workflow runs it on the pull request that moves the pin. A closed gap never
+blocks the merge; it opens an issue naming what can now be removed.
+
+What is left for a person:
+
+- `task skills:update`, so the `aws-emulator` skill matches the release.
+- Close each issue the workflow opened, in a change of its own, and take the
+  gap out of `tools/emulator/gaps/` and its row here in the same change.
+- A new difference from AWS that a gate or a deploy turns up: add it to
+  `tools/emulator/gaps/` with a test, and report it at
+  [aws-emulator/issues](https://github.com/aws/aws-emulator/issues).

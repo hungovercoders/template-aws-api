@@ -490,6 +490,24 @@ tasks:
         docker run --rm --memory=2g --memory-swap=2g -p 127.0.0.1:{{.EMULATOR_PORT}}:{{.EMULATOR_PORT}} \
           -e HOME="$HOME" -e EMULATOR_TELEMETRY -v "$HOME/.aws/emulator:$HOME/.aws/emulator" aws-emulator -p {{.EMULATOR_PORT}}
 
+  emulator:gaps:install:
+    desc: Install the AWS clients the gap tests call - a package of their own in tools/emulator, so the API's install does not carry them
+    env:
+      NODE_OPTIONS: ''
+    cmds:
+      - npm ci --prefix tools/emulator
+    sources:
+      - tools/emulator/package-lock.json
+    generates:
+      - tools/emulator/node_modules/.package-lock.json
+
+  emulator:gaps:
+    desc: What AWS Emulator cannot do yet that this repository works around, lives with or waits for - tests each on the pinned emulator and says "still needed" or "the gap has closed" (-- --list lists them, -- <id> tests one; Linux and CI)
+    deps: [install, emulator:install, emulator:gaps:install]
+    cmds:
+      - npx tsc -p tools/emulator
+      - node tools/emulator/gaps.ts {{.CLI_ARGS}}
+
   dev:
     desc: Run the API on AWS Emulator and keep it up - prints its URL and a token; task http then talks to it
     deps: [build, emulator:install]
