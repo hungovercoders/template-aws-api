@@ -160,6 +160,35 @@ Order is not promised: a scenario must not depend on which of two messages
 is handled first.
 <!-- component:consume:end -->
 
+<!-- component:publish:start -->
+## Events the API publishes
+
+What other services are told is specified too: a scenario says when an
+event is published, and `specs/asyncapi.yaml` says what it is, as a `send`
+operation. Ask the user, and confirm:
+
+- **what others need to know happened** - name each event for the thing and
+  what happened to it, in the past tense: "a beer was retired". One event
+  for each thing that happens, not one "changed" event for all of them;
+- **what it carries.** Enough for a subscriber to act without calling back,
+  and nothing private: an event is read by services you do not know. Every
+  property is a promise, so start small; adding one later is not breaking;
+- **when it is not published** - a request that was refused changes
+  nothing, so it publishes nothing. Write that scenario;
+- **who subscribes**, if they know: another AWS account needs to be let in
+  (`event_subscriber_accounts`, `docs/deploying.md`).
+
+State the promise to the user, because it is the template's and not theirs
+to choose: an event is delivered at least once, and events about one thing
+may arrive out of order. Put it in the contract's `info.description`.
+
+Write a scenario for each event, tagged with its `send` operation and the
+operation that causes it, and one for a refused request. Then
+`task asyncapi:check`, `asyncapi:lint`, `asyncapi:compat` and
+`asyncapi:examples`. A published event has subscribers: a breaking change
+is a new type alongside the old one (`docs/spec.md`).
+<!-- component:publish:end -->
+
 ## Skills for this API
 
 `skills.json` lists the skills in this repository. The template brings the

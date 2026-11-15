@@ -5,9 +5,12 @@
   "type": "module",
   "description": "BDD and contract driven AWS Lambda API template.",
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.1169.0",
     "@aws-sdk/client-dynamodb": "^3.1169.0",
+    "@aws-sdk/client-eventbridge": "^3.1169.0",
     "@aws-sdk/client-sqs": "^3.1169.0",
     "@aws-sdk/lib-dynamodb": "^3.1169.0",
+    "@aws-sdk/util-dynamodb": "^3.996.9",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1"
   },

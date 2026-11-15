@@ -8,10 +8,15 @@
 // A beer and its name lock always change in one transaction, and every
 // write that depends on a beer's name is conditioned on that name still being
 // current, so a concurrent rename or retire can never strand a lock.
+// What happened is published from the same transaction as the change: each
+// write below carries an outbox item, so an event exists if and only if the
+// write did.
 import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand, type TransactWriteCommandInput } from "@aws-sdk/lib-dynamodb";
 import { nameKey, orderKey, type BeerChanges, type StoredBeer } from "../domain/beer.ts";
 import type { PageEnd } from "../domain/cursor.ts";
+import { beer_created, beer_rated, beer_retired, beer_updated } from "../generated/events.ts";
 import { dynamo, tableName } from "../lib/dynamo.ts";
+import { outbox } from "../lib/outbox.ts";
 
 export class NameTaken extends Error {}
 export class BeerNotFound extends Error {}
@@ -107,6 +112,7 @@ export function putNewBeer(beer: StoredBeer): Promise<void> {
         onConditionFailed: new NameTaken(),
       },
       { item: { Put: { TableName: tableName, Item: { ...beerKey(beer.id), ...indexed(beer), ...beer }, ConditionExpression: "attribute_not_exists(pk)" } } },
+      { item: outbox(beer_created({ beer_id: beer.id, name: beer.name, style: beer.style, abv: beer.abv }, beer.id)) },
     ]),
   );
 }
@@ -172,21 +178,23 @@ export function applyChanges(id: string, changes: BeerChanges, updated_at: strin
       ExpressionAttributeValues: { ...Object.fromEntries(Object.entries(next).map(([f, v]) => [`:${f}`, v])), ":expected_name": current.name },
     };
 
-    const takesNewLock = changes.name !== undefined && nameKey(changes.name) !== nameKey(current.name);
-    if (!takesNewLock) {
-      // Same lock (or no rename): one write, and it returns the beer as stored.
-      const { Attributes } = await dynamo.send(new UpdateCommand({ ...update, ReturnValues: "ALL_NEW" })).catch(staleIfConcurrent);
-      return fromItem(Attributes!);
-    }
+    const updated = { name: changes.name ?? current.name, style: changes.style ?? current.style, abv: changes.abv ?? current.abv };
+    const event = { item: outbox(beer_updated({ beer_id: id, ...updated }, id)) };
 
-    await transact([
-      {
-        item: { Put: { TableName: tableName, Item: { ...lockKey(changes.name!), beer_id: id }, ConditionExpression: "attribute_not_exists(pk)" } },
-        onConditionFailed: new NameTaken(),
-      },
-      { item: { Update: update }, onConditionFailed: STALE },
-      { item: { Delete: { TableName: tableName, Key: lockKey(current.name) } } },
-    ]);
+    const takesNewLock = changes.name !== undefined && nameKey(changes.name) !== nameKey(current.name);
+    await transact(
+      takesNewLock
+        ? [
+            {
+              item: { Put: { TableName: tableName, Item: { ...lockKey(changes.name!), beer_id: id }, ConditionExpression: "attribute_not_exists(pk)" } },
+              onConditionFailed: new NameTaken(),
+            },
+            { item: { Update: update }, onConditionFailed: STALE },
+            { item: { Delete: { TableName: tableName, Key: lockKey(current.name) } } },
+            event,
+          ]
+        : [{ item: { Update: update }, onConditionFailed: STALE }, event],
+    );
     // A transaction cannot return the item. Read it for its current ratings;
     // if it has been retired since, the update still happened, so answer with it.
     return (await readBeer(id)) ?? fromItem({ ...current, ...next });
@@ -211,28 +219,31 @@ export function deleteBeer(id: string): Promise<void> {
         onConditionFailed: STALE,
       },
       { item: { Delete: { TableName: tableName, Key: lockKey(current.name) } } },
+      { item: outbox(beer_retired({ beer_id: id, name: current.name }, id)) },
     ]);
   });
 }
 
 export function addRating(id: string, score: number, updated_at: string): Promise<StoredBeer> {
   return retrying(async () => {
-    try {
-      const { Attributes } = await dynamo.send(
-        new UpdateCommand({
-          TableName: tableName,
-          Key: beerKey(id),
-          ConditionExpression: "attribute_exists(pk)",
-          UpdateExpression: "ADD rating_count :one, rating_total :score SET updated_at = :updated_at",
-          ExpressionAttributeValues: { ":one": 1, ":score": score, ":updated_at": updated_at },
-          ReturnValues: "ALL_NEW",
-        }),
-      );
-      return fromItem(Attributes!);
-    } catch (error) {
-      if (is(error, "ConditionalCheckFailedException")) throw new BeerNotFound();
-      if (is(error, "TransactionConflictException")) throw new Stale();
-      throw error;
-    }
+    await transact([
+      {
+        item: {
+          Update: {
+            TableName: tableName,
+            Key: beerKey(id),
+            ConditionExpression: "attribute_exists(pk)",
+            UpdateExpression: "ADD rating_count :one, rating_total :score SET updated_at = :updated_at",
+            ExpressionAttributeValues: { ":one": 1, ":score": score, ":updated_at": updated_at },
+          },
+        },
+        onConditionFailed: new BeerNotFound(),
+      },
+      { item: outbox(beer_rated({ beer_id: id, score }, id)) },
+    ]);
+    // A transaction cannot return the item. Retired since: the rating still counted, but there is no beer to answer with.
+    const beer = await readBeer(id);
+    if (!beer) throw new BeerNotFound();
+    return beer;
   });
 }

@@ -31,6 +31,8 @@ type Skills = { skills: Entry[]; offered: Entry[] } & Record<string, unknown>;
 const readJson = <T>(path: string): T | null => (existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as T) : null);
 const writeJson = (path: string, value: unknown) => writeFileSync(path, JSON.stringify(value, null, 2) + "\n");
 
+const GENERATED = "src/generated";
+
 function git(args: string[], cwd?: string): string {
   const run = runGit(args, cwd);
   if (run.status !== 0) stop(`components: git ${args.join(" ")} failed\n${run.stderr.trim()}`);
@@ -44,6 +46,8 @@ function marked(name: string, kind: "start" | "removed"): string[] {
 }
 
 function record(names: Set<string>): void {
+  // What was generated was generated for the components there were: the next task makes it again.
+  rmSync(GENERATED, { recursive: true, force: true });
   if (names.size === 0) return rmSync(RECORD, { force: true });
   writeFileSync(RECORD, ["# Components this repository has removed. `task component:add -- <name>` restores one.", ...[...names].sort(), ""].join("\n"));
 }

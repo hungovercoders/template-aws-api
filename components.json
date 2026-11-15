@@ -62,6 +62,31 @@
           "consume:check"
         ]
       }
+    },
+    "publish": {
+      "title": "Published events: what the API does is published to EventBridge through an outbox, each a send operation of the AsyncAPI contract",
+      "needs": [
+        "asyncapi"
+      ],
+      "files": [
+        "infra/publish.tf",
+        "src/lib/outbox.ts",
+        "src/lib/forwarder.ts",
+        "src/forwarder.ts",
+        "scripts/publish.ts",
+        "steps/events.ts",
+        "local/events.ts",
+        "test/forwarder.test.ts",
+        ".claude/skills/implement-api/events.md"
+      ],
+      "gates": {
+        "generate": [
+          "publish:generate"
+        ],
+        "acceptance": [
+          "publish:check"
+        ]
+      }
     }
   }
 }

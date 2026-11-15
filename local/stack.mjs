@@ -141,8 +141,8 @@ function deploy(env) {
 // When the command failed, what the Lambda logged is the first thing to read.
 // Best effort: it needs the AWS CLI, and the emulator to have kept the logs.
 function lambdaLogs(env, group = "/aws/lambda/api-local") {
-  // The API's function, then any other the stack has (a queue consumer).
-  if (group === "/aws/lambda/api-local") lambdaLogs(env, "/aws/lambda/api-local-consumer");
+  // The API's function, then any other the stack has (a queue consumer, the forwarder).
+  if (group === "/aws/lambda/api-local") for (const other of ["consumer", "forwarder"]) lambdaLogs(env, `/aws/lambda/api-local-${other}`);
   const logs = spawnSync("aws", ["logs", "tail", group, "--since", "15m", "--format", "short"], { env, encoding: "utf8" });
   const lines = logs.status === 0 ? logs.stdout.trim().split("\n").filter(Boolean) : [];
   if (lines.length === 0) return;
