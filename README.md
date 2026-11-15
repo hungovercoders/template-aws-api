@@ -211,6 +211,9 @@ Each guide is for one reader at one moment. Read the one you need.
 | [Testing](docs/testing.md) | A gate fails, or you want to run or explore the API locally |
 | [Deploying](docs/deploying.md) | Putting an API on AWS; sign-in, CORS and CI deployment |
 | [Runbook](docs/runbook.md) | An alarm has fired |
+<!-- component:data:start -->
+| [Events as data](docs/data.md) | The events are kept in S3: their data contract, querying them, and their alarms |
+<!-- component:data:end -->
 
 Changing an API built on it, or the template itself:
 [CONTRIBUTING.md](CONTRIBUTING.md). Reporting a

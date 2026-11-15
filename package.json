@@ -16,6 +16,8 @@
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",
+    "@aws-sdk/client-s3": "^3.1169.0",
+    "@aws-sdk/credential-provider-node": "^3.972.97",
     "@cucumber/cucumber": "^13.3.0",
     "@stoplight/spectral-cli": "^6.17.1",
     "@types/aws-lambda": "^8.10.164",

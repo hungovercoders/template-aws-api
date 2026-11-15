@@ -189,6 +189,13 @@ operation that causes it, and one for a refused request. Then
 is a new type alongside the old one (`docs/spec.md`).
 <!-- component:publish:end -->
 
+<!-- component:data:start -->
+## The events as data
+
+Published events can also be kept in S3 under a data contract. Ask whether
+the user wants that; if so, follow [data.md](data.md).
+<!-- component:data:end -->
+
 ## Skills for this API
 
 `skills.json` lists the skills in this repository. The template brings the

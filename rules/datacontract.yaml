@@ -1,0 +1,58 @@
+# House rules for the data contract (specs/datacontract.yaml) of every API
+# built from this template: the same standards as rules/house.yaml holds the
+# OpenAPI contract to. `task data:lint` runs them after the Data Contract CLI
+# has said the file is valid ODCS; warnings fail. Rules for one API go in
+# .spectral.datacontract.yaml, which extends this file.
+rules:
+  # --- Naming: lower snake_case ---------------------------------------------
+  house-data-object-names-snake-case:
+    description: A schema object is named in lower snake_case, e.g. beer_rated; it is the name of the view the data is queried through.
+    message: 'Schema object "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$.schema[*].name"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  house-data-property-names-snake-case:
+    description: Property names are lower snake_case, e.g. beer_id.
+    message: 'Property "{{value}}" is not lower snake_case.'
+    severity: error
+    given: "$.schema[*]..properties[*].name"
+    then:
+      function: pattern
+      functionOptions:
+        match: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$"
+
+  # --- What a reader of the data has to be told -------------------------------
+  house-data-property-classified:
+    description: Every property says how sensitive it is - public, internal, confidential or restricted (personal data is at least confidential) - so nobody has to guess what may be shared.
+    message: "{{path}} has no classification, or one that is not public, internal, confidential or restricted."
+    severity: error
+    given: "$.schema[*]..properties[*]"
+    then:
+      - field: classification
+        function: truthy
+      - field: classification
+        function: enumeration
+        functionOptions:
+          values: [public, internal, confidential, restricted]
+
+  house-data-owner:
+    description: The contract names the team that owns the data - who to ask, and who decides a change.
+    message: "The contract has no team."
+    severity: error
+    given: "$"
+    then:
+      field: team
+      function: truthy
+
+  house-data-purpose:
+    description: The contract says what the data is for (description.purpose).
+    message: "The contract has no description.purpose."
+    severity: error
+    given: "$"
+    then:
+      field: description.purpose
+      function: truthy
