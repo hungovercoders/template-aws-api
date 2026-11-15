@@ -69,6 +69,14 @@
       "path": "skills/core-skills/aws-observability",
       "for": "Alarms, dashboards, logs and tracing beyond the template's standard alarms",
       "when": "The API is going to production and someone will be on call for it"
+    },
+    {
+      "name": "amazon-eventbridge-event-bus",
+      "source": "aws",
+      "path": "skills/specialized-skills/serverless-skills/amazon-eventbridge-event-bus",
+      "for": "The new EventBridge custom event bus: subscribers, ordered delivery, deduplication, retention and replay, CloudEvents published as they are",
+      "when": "The API's events are to move from the classic bus the template builds to the new bus, or a subscriber is being built on one",
+      "component": "publish"
     }
   ],
   "integrations": []
