@@ -37,7 +37,10 @@ export async function create_beer({ body }: Context<"create_beer">) {
 ```
 
 `task ci` then runs your scenarios against the real Lambda, on a local copy
-of AWS, and says whether it is finished.
+of AWS, and says whether it is finished. Here is the result running: a
+request, a refusal, and the event it published (real output, shortened).
+
+![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, and the published event is shown](.github/images/demo.gif)
 
 ## Start here
 
@@ -154,8 +157,6 @@ specs/features/*.feature ──► cucumber, strict, against the built Lambda
    (the behaviour)           on infra/ applied to AWS Emulator
 ```
 
-Who writes what:
-
 | You bring | The template has | The agent writes |
 | --- | --- | --- |
 | `specs/openapi.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
@@ -178,6 +179,10 @@ Compare them:
 looks like, and
 [`example/spec...example/implementation`](../../compare/example/spec...example/implementation)
 is what implementing one adds.
+
+`task ci` on `example/implementation` (selected lines):
+
+![task ci passing: every gate, 127 unit tests, 67 scenarios, the fuzz run and the data test](.github/images/task-ci.png)
 
 > **CI on `main` is red on purpose.** There is no spec to build yet, so
 > `task ci` fails until you add one. Changes to the template itself are
