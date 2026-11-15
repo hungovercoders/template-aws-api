@@ -61,7 +61,14 @@ data "aws_iam_policy_document" "subscribers" {
   statement {
     sid       = "Subscribe"
     actions   = ["events:PutRule", "events:DeleteRule", "events:DescribeRule", "events:PutTargets", "events:RemoveTargets", "events:ListTargetsByRule", "events:EnableRule", "events:DisableRule", "events:TagResource", "events:UntagResource"]
-    resources = ["arn:aws:events:${var.region}:*:rule/${var.name}/*"]
+    resources = ["arn:${data.aws_partition.current.partition}:events:${var.region}:*:rule/${var.name}/*"]
+
+    # Its own rules only: not another subscriber's, and not this stack's.
+    condition {
+      test     = "StringEqualsIfExists"
+      variable = "events:creatorAccount"
+      values   = ["$${aws:PrincipalAccount}"]
+    }
 
     principals {
       type        = "AWS"
@@ -231,10 +238,14 @@ resource "aws_lambda_event_source_mapping" "outbox" {
   function_name     = aws_lambda_function.forwarder.arn
   starting_position = "TRIM_HORIZON"
   batch_size        = 10
-  # The forwarder handles an event it cannot publish itself. These bound what
-  # is left: the forwarder failing outright, again and again.
+  # The forwarder puts aside an event the bus will never take, and says where
+  # to start again when a failure may pass. Nothing is given up on: a record
+  # is offered until it is dealt with or the stream lets go of it, a day on,
+  # and the outbox-age alarm says so long before. What is still in the table
+  # by then, `task events:retry` publishes.
+  function_response_types        = ["ReportBatchItemFailures"]
   bisect_batch_on_function_error = true
-  maximum_retry_attempts         = 10
+  maximum_retry_attempts         = -1
 
   # Only new outbox items: not the API's own data, and not the removal after.
   filter_criteria {

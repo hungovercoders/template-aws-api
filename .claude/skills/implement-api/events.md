@@ -5,8 +5,8 @@ workflow in `SKILL.md`; nothing there changes.
 
 The skeleton already carries an event from the table to the event bus: it
 reads what the operation wrote, puts it on the bus as the CloudEvent the
-contract describes, tries again when the bus refuses, and sets aside an
-event it cannot publish. Do not build any of that, and never call
+contract describes, tries again while the bus is failing, and sets aside an
+event the bus will never take. Do not build any of that, and never call
 EventBridge from an operation. You write one thing: the event, in the same
 transaction as the change it is about.
 
@@ -32,10 +32,12 @@ transaction as the change it is about.
    - One change, one event. A consumer of the queue that makes the same
      change calls the same store function, so it publishes the same event.
 4. Implement the steps with `steps/events.ts`:
-   - `eventually(type, where?)` waits for an event of that type the scenario
-     caused and returns it; narrow it with `where`, by `subject`. Never sleep.
-   - `never(type, where?)` waits until everything written has been
-     published, then asserts no such event was. Use it for a refused request.
+   - `eventPublished(type, where?)` waits for an event of that type the
+     scenario caused and returns it; narrow it with `where`, by `subject`.
+     Never sleep.
+   - `noEventPublished(type, where?)` waits until everything written has
+     been published, then asserts no such event was. Use it for a refused
+     request.
    - `published()` is every event since the scenario began; `forwarded()`
      waits until nothing is left to publish.
    - Every event published during a scenario is checked against the

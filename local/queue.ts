@@ -45,12 +45,13 @@ if (command === "send") {
   await counts(deadLetterQueue!, "dead-letter queue");
   // Nothing is hidden or taken, and nothing consumes this queue, so reading it costs a message nothing.
   const seen = new Set<string>();
-  for (let reads = 0; reads < 20; reads++) {
+  // A read is a sample of the queue, and may repeat one: stop only when several in a row bring nothing new.
+  for (let reads = 0, nothingNew = 0; reads < 200 && nothingNew < 3; reads++) {
     const page = await sqs.send(
       new ReceiveMessageCommand({ QueueUrl: deadLetterQueue!, MaxNumberOfMessages: 10, VisibilityTimeout: 0, WaitTimeSeconds: 1, MessageAttributeNames: ["All"], MessageSystemAttributeNames: ["SentTimestamp"] }),
     );
     const fresh = (page.Messages ?? []).filter((message) => !seen.has(message.MessageId ?? ""));
-    if (fresh.length === 0) break;
+    nothingNew = fresh.length === 0 ? nothingNew + 1 : 0;
     for (const message of fresh) {
       seen.add(message.MessageId ?? "");
       const reason = message.MessageAttributes?.reason?.StringValue;

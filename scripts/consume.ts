@@ -8,21 +8,9 @@
 // It reads what `task generate` wrote from the contract, so it needs no
 // AsyncAPI tooling of its own.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { operations, payloadType } from "../tools/asyncapi/operations.ts";
 
-type Operation = { id: string; action: string; address: string; messages: { name: string; type?: string }[] };
-const TABLE = "src/generated/async-operations.ts";
-// The file is `export const asyncOperations = <JSON> as const;`.
-function receives(): Operation[] {
-  if (!existsSync(TABLE)) return [];
-  const json = /export const asyncOperations = ([\s\S]*?) as const;/.exec(readFileSync(TABLE, "utf8"))?.[1];
-  return (JSON.parse(json ?? "[]") as Operation[]).filter((operation) => operation.action === "receive");
-}
-const pascal = (name: string) =>
-  name
-    .split(/[^A-Za-z0-9]+/)
-    .filter(Boolean)
-    .map((part) => part[0]!.toUpperCase() + part.slice(1))
-    .join("");
+const receives = () => operations("receive");
 const file = (id: string) => `src/consumers/${id}.ts`;
 
 function generate(): void {
@@ -49,11 +37,7 @@ function scaffold(): void {
   for (const operation of receives()) {
     if (existsSync(file(operation.id))) continue;
     // The payload's type is named after the schema it came from when it has one; the message's name otherwise.
-    const types = existsSync("src/generated/messages.d.ts") ? readFileSync("src/generated/messages.d.ts", "utf8") : "";
-    const names = operation.messages.map((message) => {
-      const byType = message.type && new RegExp(`export interface (\\w+) \\{[^}]*'type': '${message.type.replace(/\./g, "\\.")}'`).exec(types)?.[1];
-      return byType || pascal(message.name);
-    });
+    const names = operation.messages.map(payloadType);
     writeFileSync(
       file(operation.id),
       `import type { ${names.join(", ")} } from "../generated/messages.d.ts";

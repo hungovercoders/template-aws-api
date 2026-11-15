@@ -25,3 +25,8 @@ type TransactItem = NonNullable<TransactWriteCommandInput["TransactItems"]>[numb
 export function outbox(event: CloudEvent): TransactItem {
   return { Put: { TableName: tableName, Item: { ...outboxKey(event.id), event, written_at: new Date().toISOString() } } };
 }
+
+/** An event as an entry on the bus: the CloudEvent is the detail, and a rule can match on its type and source. */
+export function busEntry(event: Pick<CloudEvent, "source" | "type"> & Partial<CloudEvent>, busName: string | undefined) {
+  return { EventBusName: busName, Source: event.source, DetailType: event.type, Time: event.time ? new Date(event.time) : undefined, Detail: JSON.stringify(event) };
+}

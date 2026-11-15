@@ -205,7 +205,7 @@ tasks:
       - node local/events.ts unpublished
 
   events:retry:
-    desc: Publish the events that could not be published again, after fixing what stopped them; each leaves the list once it is on the bus (ENV=local|aws)
+    desc: Publish the events that could not be published again, after fixing what stopped them; each leaves the list once it is on the bus. Also publishes what has waited in the outbox for over five minutes (ENV=local|aws)
     deps: [install]
     cmds:
       - node local/events.ts retry

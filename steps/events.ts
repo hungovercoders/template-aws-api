@@ -11,6 +11,7 @@ import { asyncOperations } from "../src/generated/async-operations.ts";
 import { type CloudEvent, events } from "../src/lib/cloudevents.ts";
 import { dynamo, tableName } from "../src/lib/dynamo.ts";
 import { OUTBOX } from "../src/lib/outbox.ts";
+import { eventually } from "./world.ts";
 
 const logs = new CloudWatchLogsClient({});
 /** Set by local/stack.mjs from the stack's outputs. */
@@ -19,19 +20,20 @@ const publishes = (asyncOperations as readonly { action: string }[]).some((opera
 
 /** Every type a scenario saw published, for `task publish:check`. */
 const seen = new Set<string>();
-/** When the scenario began: an event is this scenario's if it happened since. */
-let began = 0;
+/** When the run began, and when the scenario did: an event is this scenario's if it happened since. */
+const runBegan = Date.now();
+let began = runBegan;
 
 /** Every event published since the scenario began, oldest first. */
-export async function published(): Promise<CloudEvent[]> {
+export async function published(since = began): Promise<CloudEvent[]> {
   const found: CloudEvent[] = [];
   let next: string | undefined;
   do {
     // A little before the scenario began: the log's clock is not the scenario's.
-    const page = await logs.send(new FilterLogEventsCommand({ logGroupName: group(), startTime: began - 60_000, nextToken: next }));
+    const page = await logs.send(new FilterLogEventsCommand({ logGroupName: group(), startTime: since - 60_000, nextToken: next }));
     for (const line of page.events ?? []) {
       const event = (JSON.parse(line.message ?? "{}") as { detail?: CloudEvent }).detail;
-      if (event && Date.parse(event.time) >= began) found.push(event);
+      if (event && Date.parse(event.time) >= since) found.push(event);
     }
     next = page.nextToken;
   } while (next);
@@ -39,65 +41,76 @@ export async function published(): Promise<CloudEvent[]> {
   return found.sort((a, b) => a.time.localeCompare(b.time));
 }
 
-async function tried<T>(assertion: () => Promise<T> | T, timeout: number, every = 200): Promise<T> {
-  const deadline = Date.now() + timeout;
-  for (;;) {
-    try {
-      return await assertion();
-    } catch (error) {
-      if (Date.now() + every > deadline) throw error;
-      await new Promise((resolve) => setTimeout(resolve, every));
-    }
-  }
-}
-
 /**
  * Wait for an event of a type to be published, and return it - the latest,
  * if there are several. `where` picks among them: (event) => event.subject === id.
  */
-export function eventually(type: string, where: (event: CloudEvent) => boolean = () => true, { timeout = 15_000 } = {}): Promise<CloudEvent> {
-  return tried(async () => {
-    const matching = (await published()).filter((event) => event.type === type && where(event));
-    assert.ok(matching.length > 0, `no ${type} event was published`);
-    return matching.at(-1)!;
-  }, timeout);
+export function eventPublished(type: string, where: (event: CloudEvent) => boolean = () => true, { timeout = 15_000 } = {}): Promise<CloudEvent> {
+  return eventually(
+    async () => {
+      const matching = (await published()).filter((event) => event.type === type && where(event));
+      assert.ok(matching.length > 0, `no ${type} event was published`);
+      return matching.at(-1)!;
+    },
+    { timeout },
+  );
 }
 
 /** Wait until nothing is left in the outbox: every event written so far has been dealt with. */
 export async function forwarded({ timeout = 15_000 } = {}): Promise<void> {
-  await tried(async () => {
-    const waiting = await dynamo.send(
-      new ScanCommand({ TableName: tableName, FilterExpression: "begins_with(pk, :outbox)", ExpressionAttributeValues: { ":outbox": OUTBOX }, ProjectionExpression: "pk", ConsistentRead: true }),
-    );
-    assert.equal(waiting.Items?.length ?? 0, 0, "events are still waiting in the outbox");
-  }, timeout);
+  await eventually(
+    async () => {
+      const waiting = await dynamo.send(
+        new ScanCommand({ TableName: tableName, FilterExpression: "begins_with(pk, :outbox)", ExpressionAttributeValues: { ":outbox": OUTBOX }, ProjectionExpression: "pk", ConsistentRead: true }),
+      );
+      assert.equal(waiting.Items?.length ?? 0, 0, "events are still waiting in the outbox");
+    },
+    { timeout },
+  );
 }
 
 /**
  * Assert that nothing of a type was published. Absence can only be shown by
  * waiting: for the outbox to empty, then a moment more for the bus to deliver.
  */
-export async function never(type: string, where: (event: CloudEvent) => boolean = () => true): Promise<void> {
+export async function noEventPublished(type: string, where: (event: CloudEvent) => boolean = () => true): Promise<void> {
   await forwarded();
   await new Promise((resolve) => setTimeout(resolve, 1_500));
   const matching = (await published()).filter((event) => event.type === type && where(event));
   assert.deepEqual(matching, [], `a ${type} event was published`);
 }
 
+const held = (found: CloudEvent[]) => {
+  for (const event of found) assert.deepEqual(events.wrongWith(event), [], `the published ${event.type} event broke the contract:\n  ${JSON.stringify(event)}`);
+};
+
 Before(function () {
   began = Date.now();
 });
 
 // Everything published during the scenario is what the contract says it is.
+// The next scenario empties the table, so this one's events leave it first.
 After(async function () {
   if (!publishes) return;
   await forwarded();
-  for (const event of await published()) {
-    assert.deepEqual(events.wrongWith(event), [], `the published ${event.type} event broke the contract:\n  ${JSON.stringify(event)}`);
-  }
+  held(await published());
 });
 
-AfterAll(function () {
+// The bus delivers to the log a moment after the forwarder is done, so an
+// event no step waited for can arrive after its scenario. Once the log has
+// gone quiet, everything published in the run is held to the contract and
+// counted for `task publish:check`.
+AfterAll(async function () {
+  if (publishes && process.env.EVENT_LOG_GROUP) {
+    let count = -1;
+    for (let quiet = 0, tries = 0; quiet < 2 && tries < 20; tries++) {
+      const now = (await published(runBegan)).length;
+      quiet = now === count ? quiet + 1 : 0;
+      count = now;
+      if (quiet < 2) await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    held(await published(runBegan));
+  }
   mkdirSync(".local", { recursive: true });
   writeFileSync(".local/events-published.json", JSON.stringify([...seen].sort(), null, 2) + "\n");
 });

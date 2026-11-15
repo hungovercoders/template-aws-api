@@ -7,27 +7,15 @@
 // It reads what `task generate` wrote from the contract, so it needs no
 // AsyncAPI tooling of its own.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { operations, payloadType } from "../tools/asyncapi/operations.ts";
 
-type Operation = { id: string; action: string; address: string; messages: { name: string; type?: string }[] };
-const TABLE = "src/generated/async-operations.ts";
-function sends(): Operation[] {
-  if (!existsSync(TABLE)) return [];
-  const json = /export const asyncOperations = ([\s\S]*?) as const;/.exec(readFileSync(TABLE, "utf8"))?.[1];
-  return (JSON.parse(json ?? "[]") as Operation[]).filter((operation) => operation.action === "send");
-}
-const pascal = (name: string) =>
-  name
-    .split(/[^A-Za-z0-9]+/)
-    .filter(Boolean)
-    .map((part) => part[0]!.toUpperCase() + part.slice(1))
-    .join("");
+const sends = () => operations("send");
 
 function generate(): void {
-  const types = existsSync("src/generated/messages.d.ts") ? readFileSync("src/generated/messages.d.ts", "utf8") : "";
   // One function per message, named after it: beer_created(data, subject).
   const messages = new Map(sends().flatMap((operation) => operation.messages.filter((message) => message.type).map((message) => [message.name, message] as const)));
   const lines = [...messages.values()].map((message) => {
-    const named = new RegExp(`export interface (\\w+) \\{[^}]*'type': '${message.type!.replace(/\./g, "\\.")}'`).exec(types)?.[1] ?? pascal(message.name);
+    const named = payloadType(message);
     return [
       `/** ${message.type} - \`subject\` is what it happened to. Put the result in the transaction that makes the change: \`outbox(event)\`. */`,
       `export const ${message.name} = (data: ${named}["data"], subject?: string): ${named} => events.create<${named}>("${message.type}", data, subject);`,
