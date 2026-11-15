@@ -57,6 +57,12 @@ Each gate fails for one reason and says what it is:
   features. `test:unit` (`test/consumers.test.ts`) fails for a `receive`
   operation with no file in `src/consumers/`, or one that is still a stub.
 <!-- component:consume:end -->
+<!-- component:publish:start -->
+- **`publish:check`** - an event of the AsyncAPI contract (a `send`
+  operation) that no scenario saw published. Every event published while
+  the scenarios run is also held to the contract, looked at or not. Runs in
+  `acceptance`, after the features.
+<!-- component:publish:end -->
 - **`check`** - not a gate of its own: the fast gates above for the stage in
   `.stage`, which the pre-push hook runs (`task hooks:install`). `template`
   checks the skeleton and docs; `spec` adds the spec gates; `implemented`
@@ -158,6 +164,9 @@ from scratch and throws it away:
 <!-- component:consume:start -->
 | Queue | The SQS queue and dead-letter queue that apply created; the emulator hands each batch to the consumer function, offers a failed message again and dead-letters it after its tries | Emulated. Locally a message gets two tries five seconds apart, not three at a minute |
 <!-- component:consume:end -->
+<!-- component:publish:start -->
+| Events | The table's stream, the forwarder function, the event bus and the rule that logs every event, as apply created them; scenarios read the log | Emulated. The stream's retry limit is ignored there, which is why the forwarder sets failures aside itself |
+<!-- component:publish:end -->
 | IAM | Not enforced the way AWS enforces it; the emulator's guide says not to test security on it | No |
 
 Nothing stands in for AWS: every request in a scenario or a fuzz run goes
@@ -168,7 +177,8 @@ emulator gets wrong. The emulator's Node runtime is not the whole of Node -
 dependency that needs them fails there as a `Runtime.ImportModuleError`.
 
 A request takes tens of milliseconds, so the scenarios and the fuzz run take
-tens of seconds each. When a run fails, `local/stack.mjs` prints the
+tens of seconds each. Bringing the stack up takes longer than either: about
+half a minute, and 25 seconds more for each queue a component adds. When a run fails, `local/stack.mjs` prints the
 function's log if the AWS CLI is installed.
 
 A new emulator release can change a response to match AWS more closely, which
