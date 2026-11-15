@@ -8,9 +8,10 @@
 // Everything after it is yours and is never touched.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
+import { removed } from "./components-lib.ts";
 
 const README = "README.md";
-const START = "<!-- api:start - generated from specs/openapi.yaml by `task readme:generate`. Change the contract, not this block. -->";
+const START = "<!-- api:start - generated from the contracts in specs/ by `task readme:generate`. Change a contract, not this block. -->";
 const END = "<!-- api:end -->";
 const BLOCK = /<!-- api:start[\s\S]*?<!-- api:end -->/;
 const TEMPLATE = "https://github.com/hungovercoders/template-aws-api";
@@ -61,11 +62,14 @@ const asyncSection = (title: string, received: boolean) => {
     : [`## ${title}`, "", "| Operation | On | What it does |", "| --- | --- | --- |", ...list.map((op) => `| \`${op.id}\` | \`${cell(op.on)}\` | ${cell(op.summary)} |`), ""];
 };
 
+// What the API has is what its contracts say and its repository still carries: a
+// removed component's tasks and guides are not there to point at.
+const gone = removed();
 // Events kept as data have a third contract, specs/datacontract.yaml: who owns
 // the data, how long it is kept and how fresh it is belong on the front page.
-type Data = { version?: string; team?: { name?: string } | unknown; slaProperties?: { property?: string; value?: unknown; unit?: string }[] };
+type Data = { version?: string; team?: string | { name?: string }; slaProperties?: { property?: string; value?: unknown; unit?: string }[] };
 const DATA = "specs/datacontract.yaml";
-const dataContract = existsSync(DATA) && existsSync("docs/data.md") ? (parseYaml(readFileSync(DATA, "utf8")) as Data) : undefined;
+const dataContract = existsSync(DATA) && !gone.has("data") ? (parseYaml(readFileSync(DATA, "utf8")) as Data) : undefined;
 const UNITS: Record<string, string> = { s: "second", m: "minute", h: "hour", d: "day", y: "year" };
 const promised = (property: string) => {
   const sla = dataContract?.slaProperties?.find((entry) => entry.property === property);
@@ -73,22 +77,23 @@ const promised = (property: string) => {
 };
 const dataSection = () => {
   if (!dataContract) return [];
-  const team = (dataContract.team as { name?: string } | undefined)?.name;
-  const facts = [team && `owned by the ${cell(team)} team`, promised("retention") && `kept for ${promised("retention")}`, promised("latency") && `there to read within ${promised("latency")}`].filter(Boolean);
+  // A name, or an object that has one; any other shape is left to the contract to say.
+  const team = typeof dataContract.team === "string" ? dataContract.team : dataContract.team?.name;
+  const owner = team && `owned by ${/\bteam$/i.test(team.trim()) ? cell(team) : `the ${cell(team)} team`}`;
+  const facts = [owner, promised("retention") && `kept for ${promised("retention")}`, promised("latency") && `there to read within ${promised("latency")}`].filter(Boolean);
   return [
     "## Events kept as data",
     "",
-    `Every event it publishes is also kept in S3, under version ${dataContract.version} of a [data contract](${DATA})${facts.length > 0 ? `: ${facts.join(", ")}` : ""}.`,
+    `Every event it publishes is also kept in S3, under ${dataContract.version ? `version ${dataContract.version} of ` : ""}a [data contract](${DATA})${facts.length > 0 ? `: ${facts.join(", ")}` : ""}.`,
     "See [events as data](docs/data.md) for how it is tested and queried.",
     "",
   ];
 };
 // The tasks of the parts this API has, beside the ones every API has.
-const received = () => asyncOperations.some((operation) => operation.received);
-const published = () => asyncOperations.some((operation) => !operation.received);
+const has = (received: boolean, component: string) => !gone.has(component) && asyncOperations.some((operation) => operation.received === received);
 const ownTasks = () => [
-  ...(received() ? ["| `task queue:send -- <message>` | Send it one of the example messages in `messages/` |"] : []),
-  ...(published() ? ["| `task events:tail` | Follow the events it publishes |"] : []),
+  ...(has(true, "consume") ? ["| `task queue:send -- <message>` | Send it one of the example messages in `messages/` |"] : []),
+  ...(has(false, "publish") ? ["| `task events:tail` | Follow the events it publishes |"] : []),
   ...(dataContract ? ['| `task data:query -- "<sql>"` | Query the events kept in S3, a view for each |'] : []),
 ];
 
@@ -148,7 +153,7 @@ if (mode === "check") {
   if (current !== next) {
     console.error(
       BLOCK.test(current)
-        ? "readme:check failed\n  - the API section of README.md no longer matches the contract; run `task readme:generate` and commit it"
+        ? "readme:check failed\n  - the API section of README.md no longer matches the contracts in specs/; run `task readme:generate` and commit it"
         : "readme:check failed\n  - README.md still describes the template, but the contract now describes an API; run `task readme:generate` and commit it",
     );
     process.exit(1);

@@ -7,7 +7,7 @@
 Terraform in `infra/` creates the Lambda (Node 22, arm64), an API Gateway HTTP
 API with one route per contract operation, and a DynamoDB table. Operations
 the contract secures get a JWT authorizer ([Authentication](#authentication));
-the rest are open. Each optional component adds its own part, below.
+the rest are open. An optional component adds its own part, described with it.
 
 Deploying is **opt-in**. Nothing in `task ci` touches AWS, and the template
 works end to end without an AWS account.
