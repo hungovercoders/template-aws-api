@@ -1,6 +1,6 @@
 ---
 name: write-spec
-description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/openapi.yaml and the BDD feature files in specs/features - and to change that spec safely for the rest of the API's life. Use when asked to design, specify or define an API, and whenever an existing API should do something new, different or less, or has a bug - every such change starts here, before any code. Ends with a spec the gates accept and the user has approved; it does not implement.
+description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/openapi.yaml and the BDD feature files in specs/features, and where the API takes messages, publishes events or keeps them as data, the AsyncAPI contract and the data contract - and to change that spec safely for the rest of the API's life. Use when asked to design, specify or define an API, and whenever an existing API should do something new, different or less, or has a bug - every such change starts here, before any code. Ends with a spec the gates accept and the user has approved; it does not implement.
 ---
 
 # Write the spec with the user
