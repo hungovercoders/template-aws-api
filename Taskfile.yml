@@ -552,6 +552,21 @@ tasks:
       - terraform -chdir=infra/bootstrap init -backend=false -input=false
       - terraform -chdir=infra/bootstrap validate
 
+  tags:check:
+    desc: Gate - no resource in infra/ that can carry tags is created without them - the aws provider's default tags, or local.tags by name for any other provider
+    deps: [install]
+    cmds:
+      - terraform -chdir=infra init -backend=false -input=false > /dev/null
+      - terraform -chdir=infra/bootstrap init -backend=false -input=false > /dev/null
+      - node scripts/tags.ts check
+
+  tags:
+    desc: Show the tags every resource of a stack carries - domain, team, service, repo - and which are not yet set (NAME=<stack name>)
+    env:
+      NAME: '{{.NAME}}'
+    cmds:
+      - node scripts/tags.ts show
+
   ci:
     desc: Every gate, in order - the definition of done. Red until the contract and features are implemented.
     cmds:
@@ -567,6 +582,7 @@ tasks:
       - task: typecheck
       - task: steps:check
       - task: infra:validate
+      - task: tags:check
       - task: component:gates
       - task: acceptance
 
@@ -597,7 +613,11 @@ tasks:
       vars: [NAME, REPO]
     cmds:
       - terraform -chdir=infra/bootstrap init -input=false
-      - terraform -chdir=infra/bootstrap apply -var name={{.NAME}} -var github_repository={{.REPO}} {{.CLI_ARGS}}
+      # The same tags as the stack: the owner's from the committed file, `repo` from the git remote.
+      - |
+        set -e
+        repo="$(node scripts/tags.ts repo)"
+        terraform -chdir=infra/bootstrap apply -var-file=../tags.auto.tfvars.json -var name={{.NAME}} -var github_repository={{.REPO}} -var "repo=$repo" {{.CLI_ARGS}}
 
   deploy:
     desc: Build and deploy to AWS with Terraform (NAME=<stack name>; state in S3 when TF_STATE_BUCKET is set)
@@ -640,4 +660,7 @@ tasks:
         else
           terraform -chdir=infra init -input=false -reconfigure
         fi
+        # The `repo` tag is read from the git remote, never typed.
+        TF_VAR_repo="$(node scripts/tags.ts repo)"
+        export TF_VAR_repo
         terraform -chdir=infra {{.ACTION}} -input=false -var name={{.NAME}} ${AWS_REGION:+-var region=$AWS_REGION} {{.CLI_ARGS}}

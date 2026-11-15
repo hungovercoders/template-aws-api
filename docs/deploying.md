@@ -12,6 +12,23 @@ deployed without authentication; add an authorizer to the routes in
 Deploying is **opt-in**. Nothing in `task ci` touches AWS, and the template
 works end to end without an AWS account.
 
+### Tags
+
+Every resource carries four tags, so that in a shared account it says whose
+it is: `domain` and `team` (who owns it), `service` (the stack's name) and
+`repo` (this repository's URL, read from the git remote). A stack whose name
+ends `-dev`, `-test`, `-staging` or `-prod` also carries `environment`.
+
+`domain` and `team` are yours to say, once, in `infra/tags.auto.tfvars.json`;
+commit it. Nothing is applied - locally or to AWS - while either is empty,
+and `task tags` shows what a stack would carry. A resource group named after
+the stack gathers everything tagged with its `service`:
+`aws resource-groups list-group-resources --group-name <NAME>`.
+
+`task tags:check` fails for a resource that could carry the tags and would
+not: the AWS provider adds them to everything, and a resource of any other
+provider must be given `local.tags` by name.
+
 ### From your machine
 
 With AWS credentials in your shell:

@@ -158,7 +158,8 @@ it tells you exactly what is missing.
    - `task features -- --tags @operation:<operationId>` runs the scenarios
      tagged for one operation. Expect them to stay red until the operations
      they also use exist.
-7. **`task features`** - every scenario green, strict.
+7. **`task features`** - every scenario green, strict. First `task tags`: nothing is applied until `domain` and `team` are in
+   `infra/tags.auto.tfvars.json`. Ask the user for one that is missing - never guess; `service` and `repo` are derived.
    `task acceptance` then runs `responses:check`: a response the contract
    documents that no scenario received is a gap in the spec, not the code.
    Report it to the user; do not write a scenario or drop the response yourself.
@@ -336,13 +337,12 @@ not `instanceof`, and do not rely on a cancelled transaction's
 `CancellationReasons`: the codes are also at the end of its message.
 
 If the local stack cannot run where you are working, you can still run
-`task check` (every gate that needs nothing running), `task build`,
-`task infra:validate` and the cucumber dry run. You can also call `handler` from `dist/handler.mjs` directly to try
-requests that are refused before they reach DynamoDB: pass an event with
-`routeKey` (`"PATCH /things/{thing_id}"`), `pathParameters`, `body` and, for
-a secured operation, `requestContext.authorizer.jwt.claims.sub`. That is not done: say
-plainly in your report that the features and fuzz gates have not run, and
-leave them to CI.
+`task check`, `task build`, `task infra:validate` and the cucumber dry run,
+and call `handler` from `dist/handler.mjs` with an event (`routeKey`,
+`pathParameters`, `body`, and `requestContext.authorizer.jwt.claims.sub` for
+a secured operation) to try requests that are refused before they reach
+DynamoDB. That is not done: say plainly in your report that the features and
+fuzz gates have not run, and leave them to CI.
 
 ## What the gates prove
 
