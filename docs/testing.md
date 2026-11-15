@@ -50,6 +50,8 @@ Each gate fails for one reason and says what it is:
   never shows. Add the scenario, or remove the response. Runs in `acceptance`,
   after the features. Not required: 5XX, `default`, and a 400 on an operation
   that takes no input.
+- **`tags:check`** - a resource in `infra/` that can carry the stack's tags
+  would be created without them. Runs in `ci`, after `infra:validate`.
 <!-- component:consume:start -->
 - **`consume:check`** - a `receive` operation of the AsyncAPI contract that
   no scenario delivered a message to, so the contract says the API accepts
@@ -178,6 +180,7 @@ from scratch and throws it away:
 <!-- component:data:start -->
 | Data | The rule, the Firehose stream and the bucket apply created; `data:test` reads what Firehose wrote | Emulated. The bucket is made through Cloud Control because the emulator has no S3 Control; Firehose emits no metrics there, so its two alarms never change state |
 <!-- component:data:end -->
+| Tags | Every resource carries the stack's tags, and the emulator reports them: by resource, and through the tagging API | Emulated. The resource group is created, but lists only itself as a member there |
 | IAM | Not enforced the way AWS enforces it; the emulator's guide says not to test security on it | No |
 
 Nothing stands in for AWS: every request in a scenario or a fuzz run goes
