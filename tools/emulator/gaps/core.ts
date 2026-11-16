@@ -16,6 +16,14 @@ function strangersToken(issuer: string, audience: string): string {
   return `${unsigned}.${createSign("RSA-SHA256").update(unsigned).sign(privateKey).toString("base64url")}`;
 }
 
+// What a function body returns when it runs in the emulator's Lambda runtime.
+async function inRuntime(name: string, body: string): Promise<string> {
+  await lambdaFunction(name, await role(name), `export const handler = async () => { ${body} };`);
+  const invoked = await lambda.send(new InvokeCommand({ FunctionName: name }));
+  if (invoked.FunctionError) throw new Error(`the function failed: ${Buffer.from(invoked.Payload ?? []).toString()}`);
+  return String(JSON.parse(Buffer.from(invoked.Payload ?? []).toString()));
+}
+
 export const gaps: Gap[] = [
   {
     id: "lambda-node-modules",
@@ -33,6 +41,32 @@ export const gaps: Gap[] = [
       const missing = modules.filter((name) => loaded[name] !== "ok");
       for (const name of missing) if (!/Cannot find module/.test(loaded[name] ?? "")) throw new Error(`${name} failed another way: ${loaded[name]}`);
       return missing.length > 0;
+    },
+  },
+  {
+    id: "lambda-base64-decoding",
+    kind: "limit",
+    gap: "In the emulator's Node runtime, decoding malformed base64 or base64url throws (`Unknown encoding: base64`); Node decodes what it can and never throws.",
+    then: "The implement-api skill and docs/testing.md say to decode caller-supplied text inside try/catch, because a unit test on Node cannot see the difference. Take the warning out of both; the try/catch itself costs nothing and can stay.",
+    where: [".claude/skills/implement-api/SKILL.md", "docs/testing.md"],
+    async test() {
+      const answer = await inRuntime("gap-lambda-base64-decoding", `try { return "ok:" + Buffer.from("made-up", "base64url").length; } catch (error) { return "throws:" + error.message; }`);
+      if (answer.startsWith("ok:")) return false;
+      if (/Unknown encoding/.test(answer)) return true;
+      throw new Error(`decoding failed another way: ${answer}`);
+    },
+  },
+  {
+    id: "lambda-structured-clone",
+    kind: "limit",
+    gap: "The emulator's Node runtime has no `structuredClone`.",
+    then: "The implement-api skill and docs/testing.md say not to use it. Take the warning out of both.",
+    where: [".claude/skills/implement-api/SKILL.md", "docs/testing.md"],
+    async test() {
+      const answer = await inRuntime("gap-lambda-structured-clone", `return typeof structuredClone;`);
+      if (answer === "function") return false;
+      if (answer === "undefined") return true;
+      throw new Error(`typeof structuredClone was ${answer}`);
     },
   },
   {

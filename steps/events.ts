@@ -9,6 +9,9 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { asyncOperations } from "../src/generated/async-operations.ts";
 import { type CloudEvent, events } from "../src/lib/cloudevents.ts";
+
+// A step file imports this harness and never src/; the type of what it is handed comes with it.
+export type { CloudEvent };
 import { dynamo, tableName } from "../src/lib/dynamo.ts";
 import { OUTBOX } from "../src/lib/outbox.ts";
 import { eventually } from "./world.ts";
