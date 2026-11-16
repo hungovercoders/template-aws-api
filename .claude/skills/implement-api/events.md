@@ -19,7 +19,8 @@ transaction as the change it is about.
    the CloudEvent, with its id, time, source and trace filled in, and throws
    if `data` is not what the contract says. `subject` is the id of the thing
    it happened to.
-3. Write the event where the change is written, in `src/store/`:
+3. Write the event where the change is written, in `src/store/`
+   ([store.md](store.md) has the transaction's rules):
    - Add `outbox(event)` (`src/lib/outbox.ts`) as one more item of the
      `TransactWriteCommand` that makes the change. A change made with a
      single `PutCommand` or `UpdateCommand` becomes a transaction of two
