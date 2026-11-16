@@ -37,10 +37,10 @@ export async function create_beer({ body }: Context<"create_beer">) {
 ```
 
 `task ci` then runs your scenarios against the real Lambda, on a local copy
-of AWS, and says whether it is finished. Here is the result running: a
-request, a refusal, and the event it published (real output, shortened).
+of AWS, and says whether it is finished. Here it is running: a request, a
+refusal, the event published and that event queried in S3 (real output, shortened).
 
-![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, and the published event is shown](.github/images/demo.gif)
+![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, and the same event is read back from S3 with SQL](.github/images/demo.gif)
 
 ## Start here
 
