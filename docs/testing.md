@@ -169,7 +169,7 @@ from scratch and throws it away:
 | Infrastructure | `infra/` applied to AWS Emulator with `terraform apply` | Same definitions; the emulator's control plane, not AWS's | every run applies it |
 | DynamoDB | The table that apply created, on AWS Emulator | Emulated | the scenarios |
 | API Gateway | The emulator's HTTP API: the routes apply created, each integrated with the function | Emulated | the scenarios |
-| Lambda runtime | The emulator runs the bundle as the function, on its Node 22 runtime | Emulated | the scenarios; `lambda-node-modules` |
+| Lambda runtime | The emulator runs the bundle as the function, on its Node 22 runtime | Emulated | the scenarios; `lambda-node-modules`, `lambda-base64-decoding`, `lambda-structured-clone` |
 | Authorizer | The emulator's JWT authorizer refuses a missing or malformed token and a wrong issuer or audience, and passes the claims to the function. It does not verify signatures | Partly | the scenarios; `jwt-signature` |
 <!-- component:consume:start -->
 | Queue | The SQS queue and dead-letter queue that apply created; the emulator hands each batch to the consumer function, offers a failed message again and dead-letters it after its tries | Emulated. Locally a message gets two tries five seconds apart, not three at a minute | the scenarios |
@@ -188,7 +188,9 @@ through the emulator's API Gateway to the function and on to its DynamoDB.
 What only a real deploy proves is token signatures, IAM and anything the
 emulator gets wrong. The emulator's Node runtime is not the whole of Node -
 `node:http`, `node:https` and `node:module` are missing - so a dependency
-that needs them fails there as a `Runtime.ImportModuleError`.
+that needs them fails there as a `Runtime.ImportModuleError`. It has no
+`structuredClone`, and decoding malformed base64 throws there where Node
+does not, so a unit test can pass on code that answers 500 on the stack.
 
 "Known from" says what shows each row: a gate, or a gap in code font. A gap
 is something the emulator cannot do yet, with a test that says so:

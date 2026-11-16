@@ -93,7 +93,8 @@ the smallest change and tell the user what and why: the template may need it.
    or the contract checks in `steps/world.ts` and `src/lib/contract.ts`; do not
    skip, tag out or mark scenarios pending.
 3. **Steps go through the front door.** Step definitions call the API with
-   `this.call(...)` only - no importing `src/`, no reading the table. `call`
+   `this.call(...)` only - no reading the table, no importing `src/` (a type
+   included: the harness in `steps/` exports them). `call`
    already fails the step if a response breaks the contract, so steps assert
    behaviour - status, values, order, and what an error says is wrong - and
    leave the shape of bodies to the contract.
@@ -151,15 +152,17 @@ it tells you exactly what is missing.
    `return "pending"` with the calls and assertions, and give the arguments
    real names. The generator cannot tell that two sentences are one step, so:
    - sentences that differ only in wording ("a stout" / "an ipa", "1 rating" /
-     "2 ratings") arrive as separate stubs - merge them into one pattern;
+     "2 ratings") arrive as separate stubs - merge them into one pattern,
+     with cucumber's alternation (`a/an`) and optional text (`rating(s)`);
    - a sentence with a variable number of values ("rated 5, 4 and 4") needs a
      regular expression instead of a cucumber expression;
    - check for ambiguity after merging - two patterns that both match a
      sentence fail the run.
    Move the steps into files of your own naming and delete
    `steps/scaffold.ts` when it is empty; commit your step files.
-   `NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run` must report no
-   undefined and no ambiguous steps. See
+   `NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run` (after
+   `task scaffold`, which generates what the harness imports) must report
+   no undefined and no ambiguous steps. See
    [Writing steps](#writing-steps).
 6. **Implement the operations, in dependency order.** Scenarios rarely use
    one operation: most need a "create" in a Given and a "get" or "list" in a
@@ -322,22 +325,24 @@ sign, use the `aws-emulator` skill - but never upgrade it; its version is pinned
 
 The scenarios and the fuzz run call the API through AWS Emulator's API
 Gateway, authorizer and Lambda - the built bundle is the function. Its Node
-runtime lacks `node:http`, `node:https` and `node:module`: a dependency that
-needs one fails every request with `Runtime.ImportModuleError`. The function
-runs on the AWS SDK its runtime provides, so tell SDK errors by `error.name`,
-not `instanceof`, and do not rely on a cancelled transaction's
-`CancellationReasons`: the codes are also at the end of its message.
-`task emulator:gaps:list` names everything else the emulator cannot do yet
-that this repository lives with; read it before deciding the emulator, and
-not your code, is at fault.
+runtime is not the whole of Node, and a unit test cannot see the difference:
 
-If the local stack cannot run where you are working, you can still run
-`task check`, `task build`, `task infra:validate` and the cucumber dry run,
-and call `handler` from `dist/handler.mjs` with an event (`routeKey`,
-`pathParameters`, `body`, and `requestContext.authorizer.jwt.claims.sub` for
-a secured operation) to try requests that are refused before they reach
-DynamoDB. That is not done: say plainly in your report that the features and
-fuzz gates have not run, and leave them to CI.
+- no `node:http`, `node:https` or `node:module` - a dependency that needs
+  one fails every request with `Runtime.ImportModuleError`;
+- no `structuredClone`, and decoding malformed base64 throws: parse
+  anything a caller supplies inside try/catch;
+- it runs on the AWS SDK the runtime provides, so tell SDK errors by
+  `error.name`, not `instanceof` ([store.md](store.md) has the rest).
+
+When a task that uses the stack fails it prints what the functions logged,
+errors first (it needs the AWS CLI): read that before guessing why a request
+answered 500. `task emulator:gaps:list` names what else the emulator cannot
+do yet; read it before deciding the emulator, not your code, is at fault.
+
+If the local stack cannot run where you are working, `task check`,
+`task build`, `task infra:validate` and the cucumber dry run still do, and
+`handler` from `dist/handler.mjs` can be called with an event. That is not
+done: say so in your report, and leave the features and fuzz gates to CI.
 
 ## What the gates prove
 

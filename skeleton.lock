@@ -1,14 +1,14 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-c9fc5594245752020aaf2b5b390c5b94007fc19b95176b1beff3099dd657f7aa  .claude/skills/implement-api/SKILL.md
+5d21cab76b8ea0e93473c3c431a0b582f7b49d24fb39eed040a83af2e3541748  .claude/skills/implement-api/SKILL.md
 54a5faf05e3ec48ec69e1eb05f6592809aaeec8c9f5b0b1380477d6e58c6cedf  .claude/skills/implement-api/SKILL.md#asyncapi
 6bbdb0913e33b32b7c0ef245489fb3d3d4990e90b5288993d49d5b9054b01da4  .claude/skills/implement-api/SKILL.md#consume
 796ebb03caf74dd871839e0897fa4b3079226e554b58a6b985ec7d40a68ac3ed  .claude/skills/implement-api/SKILL.md#publish
 612d4985a97754e33492e0182ce7e6e5dfdaf7a03219693958e8fa5a5f525e3d  .claude/skills/implement-api/SKILL.md#data
 d9affeb587f1519d8ca004ba3c1d8029bb29631b4e33bcbe193cd9e8ab726cbe  .claude/skills/implement-api/data.md
-7d3adec8266ae750e645c5ebfe3a0d514724af4f474984ebd33720137326a2a4  .claude/skills/implement-api/events.md
+c6e087f0c16f5c225319cf01431d379b2257548c3499ccece4fac543a4bda196  .claude/skills/implement-api/events.md
 c39beab28af8a4b4d9bfcb5fed46d92ad17de25aeb3a963f7bffd95d6a90d744  .claude/skills/implement-api/messages.md
-3a6a7ba74b4dd8e5a9359556f98fa59db51fe6531d920d7626d9ac00a88d1f74  .claude/skills/implement-api/store.md
+c045e0b36baa4dfdf9bf4855b41bdadbb930932335ef684e585ecd68498c86fb  .claude/skills/implement-api/store.md
 870c96ce715f7e1c253e45535927d665db11f6e7ed266bc326607342eb6b96c4  .claude/skills/write-spec/SKILL.md
 2c48077bb752c09ddc9ca4fbe82babcaafd94268db977646f25f7d72356c2db2  .claude/skills/write-spec/SKILL.md#consume
 5df393315d4b38d6d9e1f99e73e2a9a8fbedef82060534459717be051162e421  .claude/skills/write-spec/SKILL.md#publish
@@ -90,7 +90,7 @@ cd31111b09d28a3c2fa6e122f1394d5ee03b9746e5cec93e4638a41db4917b36  src/handler.ts
 4e670142ed3266b3f204f29b97ef7ac0cbf13874ca9e2ee2c4a4278da2d3b560  src/lib/problem.ts
 a0ae69a5f345a66d93357864de62c2cd2bcc635257c6c44e5be0682240ab32d3  src/lib/router.ts
 f820da59b4a3728718b0da9836323c5d24224945c0b045af5e492a20fcb5937a  src/lib/trace.ts
-b8aae4d0e3b5f467c7f5d51a1afd56789fa8a2582fec41f51aa5fbe1bdee2cfc  steps/events.ts
+36ddc3cef9ec2ccacb89b41129ed2ac5d199694257778390cea7cdb34014c001  steps/events.ts
 4dcc477d55a91e831602eb3392dc64367605186deeb71fda2e057dde3514dcb6  steps/messages.ts
 0e5649888b7b82f2b76618000febe5f86d0c9c9d039f4b92bdeb0891723b68a7  steps/world.ts
 a59c3840e7fde5105e01fa96811b4951618add6468af6143d93a0f08a2265f1b  test/asyncapi.test.ts
@@ -109,7 +109,7 @@ c5ca3e0ec5be2af1f409b106aa8e48e763718ecbdba1cc157771833929da1f96  test/routes.te
 1de46748bb2d0d49f78bddb02ac7ac6b60625704bf222786f25f98d23b326008  tools/asyncapi/cloudevent.yaml
 dccbc78a11c11e1fcb67829aabb1e57442f3a38e0bc240be4c834b0fabecbaec  tools/asyncapi/operations.ts
 70f7bf4a19e890d9575e3546519447d6ad40513a11e19a81ef68dca8485f11f5  tools/emulator/gaps.ts
-0e843fdd0327887e8360433fb604eb84db5cff1fec01c17deec3356537e8660d  tools/emulator/gaps/core.ts
+71be9029f05355049803ec15bcfc08d1c37848d87904a2516bb87dd9f9d13a82  tools/emulator/gaps/core.ts
 3a3d02584802f0ae407248a2066c30a436985e1358eb576740cc85174c640263  tools/emulator/gaps/data.ts
 ae52ce8985f0827f49a1cdc59a1b44b449342021372d00d74e8cfab95e65a28c  tools/emulator/gaps/publish.ts
 8211d7293169e06f65395e281879e0db5ac8f958bdcb49add77c6cf246f02a89  tools/emulator/lib.ts

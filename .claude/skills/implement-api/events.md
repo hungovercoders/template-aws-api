@@ -54,6 +54,11 @@ arrive out of order. Do not write code or steps that depend on more: assert
 that an event was published, never that it was published exactly once after
 a retry, or before another.
 
+A sentence that says only one event of a kind was published is about what
+the API wrote, not how often the bus delivered it: wait with
+`eventPublished` and `forwarded()`, then count the distinct `id`s of that
+type in `published()`.
+
 ## On the local stack
 
 An event reaches the bus within a second or two of the write. `task

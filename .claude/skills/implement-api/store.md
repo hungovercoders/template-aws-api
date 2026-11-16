@@ -23,7 +23,10 @@ so a Query on an index returns whole items.
 - **Atomic changes** - `TransactWriteCommand` is available, here and on the
   emulator, and is the way to keep several items in step (a record and the
   item that makes its name unique). A failed condition raises
-  `TransactionCanceledException`, whose `CancellationReasons[i].Code` is
+  `TransactionCanceledException`. Its message ends with a code for each
+  item, in order - `... specific reasons [ConditionalCheckFailed, None]` -
+  and on AWS `CancellationReasons[i].Code` holds the same. Read the message:
+  the emulator's runtime leaves `CancellationReasons` off. The code is
   `ConditionalCheckFailed` for the item that failed.
 - **Concurrency** - any write, in or out of a transaction, can be refused
   because another transaction is touching the same item
