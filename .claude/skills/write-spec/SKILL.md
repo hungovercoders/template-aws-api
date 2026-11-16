@@ -9,11 +9,15 @@ The spec is the requirement. Everything downstream - types, routes, tests,
 the implementation itself - is derived from it, so a wrong spec is built
 faithfully. Your job is to help the user get it right.
 
-Two outputs, and nothing else:
+Its outputs, and nothing else:
 
-- **`specs/openapi.yaml`** - the contract: every operation, request and response.
 - **`specs/features/*.feature`** - the behaviour: what the API does, in the
-  user's business language.
+  user's business language, whichever way it is asked.
+- **`specs/openapi.yaml`** - the HTTP contract: every operation, request and
+  response.
+- **`specs/asyncapi.yaml`** - where the API takes messages or publishes
+  events - and **`specs/datacontract.yaml`** - where it keeps those events as
+  data. Each has a section below, present while the repository has that part.
 
 Stop when the spec is done. Implementing it is the `implement-api` skill.
 
@@ -180,7 +184,9 @@ operation. Ask the user, and confirm:
 - **when it is not published** - a request that was refused changes
   nothing, so it publishes nothing. Write that scenario;
 - **who subscribes**, if they know: another AWS account needs to be let in
-  (`event_subscriber_accounts`, `docs/deploying.md`).
+  (`event_subscriber_accounts`, `docs/deploying.md`). Tell them how a
+  subscriber reads an event: on the bus it is inside EventBridge's own
+  envelope, as `detail` (`docs/spec.md`).
 
 State the promise to the user, because it is the template's and not theirs
 to choose: an event is delivered at least once, and events about one thing
@@ -286,6 +292,10 @@ Do not ask the user about these; apply them.
   segments, string enum values. Schema names are PascalCase.
 - Authentication is a bearer JWT verified by API Gateway.
 - A request that breaks the contract gets `400` from the router.
+<!-- component:asyncapi:start -->
+- Every message and event is a CloudEvent 1.0 in structured JSON; a message
+  that breaks the contract is put aside, never handled.
+<!-- component:asyncapi:end -->
 
 ## Changing a spec
 
