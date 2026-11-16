@@ -34,6 +34,10 @@ If the user does not want the events kept, propose removing the component
      against real data, so only rules that are always true;
    - **who else reads it** - other AWS accounts are a deploy variable
      (`data_reader_accounts`), not part of the contract;
+   - **whether it is compressed** - also a deploy variable
+     (`data_compression`). Uncompressed is the default, so the data is
+     tested and queried where it is. Gzip costs less to store, and is then
+     tested from a temporary copy: say so if they ask for it;
    - optionally, **`context`**: how to use the data, for people and for AI
      readers. Offer it; nothing requires it.
 4. `task data:lint`, `task data:check` and `task data:compat` must pass.
