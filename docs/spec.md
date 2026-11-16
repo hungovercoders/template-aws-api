@@ -179,6 +179,13 @@ change it describes was made: both are one write. It is delivered **at least
 once**, and events about one thing **may arrive out of order** - so a
 subscriber tells a repeat by the event's `id` and orders by its `time`. Say
 so in the contract's `info.description`.
+
+**How a subscriber reads one.** The bus is EventBridge, which carries the
+CloudEvent inside its own envelope: the event is the envelope's `detail`,
+and the envelope's `source` and `detail-type` repeat the CloudEvent's
+`source` and `type` so a rule can match on them. The envelope has an `id`
+of its own; the one to tell a repeat by is `detail.id`. A subscriber that
+wants the CloudEvent alone gives its rule's target `input_path = "$.detail"`.
 <!-- component:publish:end -->
 <!-- component:data:start -->
 **The events as data.** Kept in S3, the events have a third contract,
