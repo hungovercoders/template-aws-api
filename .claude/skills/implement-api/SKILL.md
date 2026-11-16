@@ -5,10 +5,13 @@ description: Implement, or bring up to date, the AWS Lambda API described by the
 
 # Implement the API from its features and contract
 
-You are given two things, and they are the whole requirement:
+You are given the spec, and it is the whole requirement:
 
-- **`specs/openapi.yaml`** - the contract: every operation, request and response.
 - **`specs/features/*.feature`** - the behaviour: what the API does, in business language.
+- **`specs/openapi.yaml`** - the HTTP contract: every operation, request and response.
+- **`specs/asyncapi.yaml`** and **`specs/datacontract.yaml`**, where the API
+  has them: the messages it takes, the events it publishes, and those events
+  as data. Workflow step 1 says what to read for each.
 
 If the user passes paths to these files instead (`/implement-api <openapi> <features dir>`),
 copy them to `specs/openapi.yaml` and `specs/features/` first. That is the
@@ -32,6 +35,9 @@ behaviour inside each operation and each step.
 | A typed file for every operation, answering 501 until implemented | `task scaffold` |
 | A typed pending step for every sentence in the feature files | `task scaffold` |
 | A request for every operation, for exploring by hand | `task http:generate` |
+<!-- component:asyncapi:start -->
+| For `specs/asyncapi.yaml`: a typed stub per message received, a typed function per event published | `task scaffold`, `task generate` |
+<!-- component:asyncapi:end -->
 
 So: never write or edit a route table, a type that mirrors the contract or an
 operation's signature by hand, and never write a step definition from
@@ -55,6 +61,9 @@ You bring only the business logic the specs describe. That means you write:
 
 - the body of each step in `steps/` (`task scaffold` writes the outlines)
 - the body of each operation in `src/operations/<operationId>.ts` (likewise)
+<!-- component:consume:start -->
+- the body of each consumer in `src/consumers/<operation>.ts` (likewise)
+<!-- component:consume:end -->
 - `src/domain/`, `src/store/` and their unit tests in `test/`
 
 `task skeleton:check` enforces this: it is the first gate in `task ci` and
@@ -79,8 +88,8 @@ the smallest change and tell the user what and why: the template may need it.
      report.
 2. **Never weaken a gate.** The gates are how you find out whether you are
    right; they give the same answer every time. Do not edit `Taskfile.yml`,
-   `cucumber.mjs`, `scripts/`, `rules/house.yaml`, `.spectral.yaml`,
-   `test/routes.test.ts`, `.github/workflows/ci.yml`, `local/`
+   `cucumber.mjs`, `scripts/`, `tools/`, `rules/`, `.spectral*.yaml`,
+   `test/routes.test.ts`, `.github/workflows/`, `local/`
    or the contract checks in `steps/world.ts` and `src/lib/contract.ts`; do not
    skip, tag out or mark scenarios pending.
 3. **Steps go through the front door.** Step definitions call the API with
@@ -106,8 +115,9 @@ it tells you exactly what is missing.
 
 1. **Read the specs.** Read `specs/openapi.yaml` and every feature file in
    full. List the operations (by `operationId`) and, for each, the scenarios
-   tagged `@operation:<operationId>`. Read `skills.json`: use its skills where they fit, and ask the
-   user before adding one for an integration that has none (`task skills:add`); never add one unasked.
+   tagged `@operation:<operationId>`. Read `skills.json`: use its skills
+   where they fit, and ask the user before adding one for an integration that
+   has none (`task skills:add`); never add one unasked.
    <!-- component:consume:start -->
    For a `receive` operation in `specs/asyncapi.yaml`, also follow [messages.md](messages.md).
    <!-- component:consume:end -->
@@ -124,9 +134,10 @@ it tells you exactly what is missing.
    Either way report the output to the user - do not fix the spec yourself,
    and never relax or disable a rule. The same goes for `task spec:compat`:
    a failure there is a contract change that is not versioned, which is the
-   user's to resolve (the `write-spec` skill covers it). If `task http:check` or `task readme:check` fails, a
-   committed file generated from the contract is out of date: run
-   `task http:generate` or `task readme:generate` and commit the result.
+   user's to resolve (the `write-spec` skill covers it). If `task http:check`
+   or `task readme:check` fails, a committed file generated from the contract
+   is out of date: run `task http:generate` or `task readme:generate` and
+   commit the result.
 3. **`task scaffold`** - generates the types, runtime contract and route
    table (`src/generated/`), then writes a typed stub for every operation
    that has no file (`src/operations/<operationId>.ts`) and a typed pending
@@ -146,8 +157,9 @@ it tells you exactly what is missing.
    - check for ambiguity after merging - two patterns that both match a
      sentence fail the run.
    Move the steps into files of your own naming and delete
-   `steps/scaffold.ts` when it is empty; commit your step files. `NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run`
-   must report no undefined and no ambiguous steps. See
+   `steps/scaffold.ts` when it is empty; commit your step files.
+   `NODE_OPTIONS="--import tsx" npx cucumber-js --dry-run` must report no
+   undefined and no ambiguous steps. See
    [Writing steps](#writing-steps).
 6. **Implement the operations, in dependency order.** Scenarios rarely use
    one operation: most need a "create" in a Given and a "get" or "list" in a
@@ -161,8 +173,10 @@ it tells you exactly what is missing.
    - `task features -- --tags @operation:<operationId>` runs the scenarios
      tagged for one operation. Expect them to stay red until the operations
      they also use exist.
-7. **`task features`** - every scenario green, strict. First `task tags`: nothing is applied until `domain` and `team` are in
-   `infra/tags.auto.tfvars.json`. Ask the user for one that is missing - never guess; `service` and `repo` are derived.
+7. **`task features`** - every scenario green, strict. First `task tags`:
+   nothing is applied until `domain` and `team` are in
+   `infra/tags.auto.tfvars.json`. Ask the user for one that is missing -
+   never guess; `service` and `repo` are derived.
    `task acceptance` then runs `responses:check`: a response the contract
    documents that no scenario received is a gap in the spec, not the code.
    Report it to the user; do not write a scenario or drop the response yourself.
@@ -202,6 +216,11 @@ or a new row in a scenario outline, shows only when `task features` runs.
   `operationId` has left the contract, and `task steps:check` lists step
   definitions no sentence uses. Delete both, and any domain or store code
   only they used.
+<!-- component:asyncapi:start -->
+  A message no longer received and an event no longer published fail
+  `task typecheck` too: in the consumer's file in `src/consumers/`, and where
+  the event's function was called. Delete the file, or the `outbox(...)` item.
+<!-- component:asyncapi:end -->
 - **Data that is already stored** - scenarios start from an empty table, so
   no gate sees old items. When the contract gains a required response field,
   give items stored before it a value when they are read.
@@ -223,7 +242,8 @@ commit), and `spec:compat`, which is the user's to resolve.
 - **Answering** - return `json(status, body, headers?)` or `noContent()` from
   `src/lib/problem.ts`; the return type is `Result`. Set response headers such
   as `location` through `headers`; a `location` is a path from the API's root
-  (`/things/<id>`), which a step can pass straight to `this.call`. Throw `HttpProblem` for errors (rule 5).
+  (`/things/<id>`), which a step can pass straight to `this.call`. Throw
+  `HttpProblem` for errors (rule 5).
 - **Authentication** is already enforced for every operation the contract
   secures: never check tokens yourself. `context.caller` is always set on a
   secured operation and undefined otherwise; use it for rules about *what* a
@@ -274,38 +294,10 @@ breaks the contract gets `application/problem+json`:
 
 ## Storing data
 
-Use `dynamo` (a DynamoDB document client) and `tableName` from
-`src/lib/dynamo.ts`. The table (`infra/main.tf`) has string keys `pk` and
-`sk` and two generic indexes, `gsi1` and `gsi2`: set `gsi1pk`/`gsi1sk` or
-`gsi2pk`/`gsi2sk` on an item to put it in one. Both project every attribute,
-so a Query on an index returns whole items.
-
-- **Listing** - Query a key or an index; never Scan. To page, ask for one
-  more item than the page size: its presence tells you there is a next page.
-  A cursor should be opaque to callers and validated when it comes back
-  (rule 4): check its structure and reject, with 400, anything that is not
-  the shape you issue. It does not need signing - a caller who forges a
-  well-formed cursor only gets a different page of data they may already read.
-- **Consistency** - reads of the table can be strongly consistent
-  (`ConsistentRead: true`); reads of an index cannot, on AWS. The emulator's
-  indexes have behaved as immediately consistent, so list-after-write
-  scenarios pass there. Listing from an index is the accepted trade-off; fetch a single item
-  by key, consistently.
-- **Atomic changes** - `TransactWriteCommand` is available, here and on the
-  emulator, and is the way to keep several items in step (a record and the
-  item that makes its name unique). A failed condition raises
-  `TransactionCanceledException`, whose `CancellationReasons[i].Code` is
-  `ConditionalCheckFailed` for the item that failed.
-- **Concurrency** - any write, in or out of a transaction, can be refused
-  because another transaction is touching the same item
-  (`TransactionConflictException`, or the reason code `TransactionConflict`).
-  Retry it, a bounded number of times (five is plenty) with a short, jittered
-  pause. A write planned from a value you read earlier should carry a
-  condition that the value is unchanged, and re-read and retry when it is
-  not. If the retries run out, let the error through: the router logs it and
-  answers 500, which is the truth.
-- **Expressions** - many attribute names are reserved words (`name`, `status`,
-  `type`...). Always use `ExpressionAttributeNames`.
+Use `dynamo` and `tableName` from `src/lib/dynamo.ts`; the table and its two
+indexes are the skeleton's. Before writing `src/store/`, read
+[store.md](store.md): listing and paging, what is consistent, atomic changes,
+and the retries a concurrent write needs.
 
 ## What the fuzzer sends
 
@@ -335,6 +327,9 @@ needs one fails every request with `Runtime.ImportModuleError`. The function
 runs on the AWS SDK its runtime provides, so tell SDK errors by `error.name`,
 not `instanceof`, and do not rely on a cancelled transaction's
 `CancellationReasons`: the codes are also at the end of its message.
+`task emulator:gaps:list` names everything else the emulator cannot do yet
+that this repository lives with; read it before deciding the emulator, and
+not your code, is at fault.
 
 If the local stack cannot run where you are working, you can still run
 `task check`, `task build`, `task infra:validate` and the cucumber dry run,
