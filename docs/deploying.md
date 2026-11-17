@@ -165,7 +165,9 @@ published (`event_log_days`, 1 by default: it is for looking, not keeping).
 
 - **An existing bus.** `-var event_bus_name=<name>` publishes to a bus you
   already run instead. The archive and the log are still made, and hold
-  only this API's events.
+  only this API's events. With a permissions boundary, name the bus at the
+  bootstrap too (`-- -var 'event_buses=["<name>"]'`): the boundary lets the
+  stack publish to its own bus and the ones named there, no other.
 - **Subscribers in other accounts.** `-var 'event_subscriber_accounts=["123456789012"]'`
   lets each account put its own rules on the bus. A subscriber in this
   account needs nothing: it adds a rule matching `source` `/<name>` and the

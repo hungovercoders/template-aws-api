@@ -170,11 +170,12 @@ data "aws_iam_policy_document" "boundary" {
   # component:consume:end
 
   # component:publish:start
-  # The stack's own bus, or an existing one it was told to publish to.
+  # The stack's own bus, and an existing one only when it is named here
+  # (event_buses): no change to infra/ can point the forwarder at another.
   statement {
     sid       = "Publish"
     actions   = ["events:PutEvents"]
-    resources = ["arn:${local.partition}:events:${var.region}:${local.account}:event-bus/*"]
+    resources = [for bus in concat([var.name], var.event_buses) : "arn:${local.partition}:events:${var.region}:${local.account}:event-bus/${bus}"]
   }
 
   statement {

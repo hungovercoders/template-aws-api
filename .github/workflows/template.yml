@@ -48,7 +48,7 @@ jobs:
           fi
           task tags > /dev/null || echo '{ "domain": "brewing", "team": "catalogue" }' > infra/tags.auto.tfvars.json
           # ...and everything the skeleton owns stays as proposed here.
-          git checkout HEAD -- steps/world.ts steps/messages.ts steps/events.ts test/consumer.test.ts test/consumers.test.ts test/forwarder.test.ts test/data.test.ts test/tags.test.ts test/routes.test.ts test/log.test.ts test/components.test.ts test/asyncapi.test.ts test/cloudevents.test.ts test/trace.test.ts
+          git checkout HEAD -- steps/world.ts steps/messages.ts steps/events.ts test/consumer.test.ts test/consumers.test.ts test/forwarder.test.ts test/data.test.ts test/tags.test.ts test/routes.test.ts test/table.test.ts test/log.test.ts test/components.test.ts test/asyncapi.test.ts test/cloudevents.test.ts test/trace.test.ts
       - name: The README is written by the generator proposed here
         # The example's README was written by the generator it had, so a change to the generator
         # would always fail readme:check here. What the change does to it is shown, to be read in
