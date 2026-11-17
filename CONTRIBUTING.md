@@ -91,15 +91,19 @@ skeleton every API shares.
    that matters is `template`: every gate, with the example laid over your
    change.
 3. **Merge it down** `main` → `example/spec` → `example/implementation`, and
-   confirm `example/implementation` is green. After a change to a generator,
+   confirm `stage` is green on each and `example/implementation` is green. After a change to a generator,
    run it on `example/spec` (`task readme:generate`, `task http:generate`)
    and commit what it writes: the gates there fail until you have.
 
 | Branch | Is | CI |
 | --- | --- | --- |
-| `main` | The template | `ci` red by design; `template` green |
-| `example/spec` | `main` plus the example spec | Red by design |
+| `main` | The template | `ci` red by design; `stage` and `template` green |
+| `example/spec` | `main` plus the example spec | `ci` red by design; `stage` green |
 | `example/implementation` | `example/spec` plus its implementation | Green |
+
+`stage` is green on every branch: `task check` for the stage in its `.stage`,
+and the gates that need no spec. Red, it means the branch broke something
+that should hold where `ci` is red anyway.
 
 - **Never change a skeleton file on an example branch.** The example branches
   follow the route above themselves: a change to the example goes into

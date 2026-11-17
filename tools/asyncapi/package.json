@@ -7,5 +7,8 @@
     "@asyncapi/diff": "0.6.1",
     "@asyncapi/modelina": "5.10.1",
     "@asyncapi/parser": "3.6.6"
+  },
+  "overrides": {
+    "jsonpath-plus": "^10.3.0"
   }
 }

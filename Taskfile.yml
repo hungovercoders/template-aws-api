@@ -467,7 +467,9 @@ tasks:
         curl -fsSLo "$tmp/key.asc" https://downloads.aws.com/keys/gpg/current.asc
         gpg --show-keys --with-colons "$tmp/key.asc" | grep -q "^fpr:::::::::{{.EMULATOR_KEY_FINGERPRINT}}:" || { echo "the AWS publishing key does not have the expected fingerprint"; exit 1; }
         gpg --dearmor < "$tmp/key.asc" > "$tmp/key.gpg"
-        gpgv --keyring "$tmp/key.gpg" "$tmp/aws-emulator.deb.sig" "$tmp/aws-emulator.deb"
+        # The signature must be good and made by that key - not by another the key file also holds.
+        gpgv --status-fd 1 --keyring "$tmp/key.gpg" "$tmp/aws-emulator.deb.sig" "$tmp/aws-emulator.deb" > "$tmp/status"
+        grep -aEq '^\[GNUPG:\] VALIDSIG ({{.EMULATOR_KEY_FINGERPRINT}} .*|.* {{.EMULATOR_KEY_FINGERPRINT}})$' "$tmp/status" || { echo "the package is not signed by the AWS publishing key"; exit 1; }
         rm -rf .tools/aws-emulator && mkdir -p .tools/aws-emulator
         dpkg-deb -x "$tmp/aws-emulator.deb" .tools/aws-emulator
         .tools/aws-emulator/opt/aws-emulator/bin/aws-emulator -v
@@ -656,6 +658,17 @@ tasks:
       - task: aws:terraform
         vars: { ACTION: apply }
 
+  deploy:built:
+    desc: Deploy the dist/ that is already there, building nothing - what CI's deploy job runs, so no dependency is installed or run while it holds AWS credentials (NAME=<stack name>)
+    requires:
+      vars: [NAME]
+    preconditions:
+      - sh: test -f dist/handler.mjs
+        msg: dist/handler.mjs is missing - this deploys a bundle built elsewhere; use task deploy to build and deploy
+    cmds:
+      - task: aws:terraform
+        vars: { ACTION: apply }
+
   destroy:
     desc: Remove the deployed stack (NAME=<stack name>)
     requires:
@@ -688,7 +701,14 @@ tasks:
         else
           terraform -chdir=infra init -input=false -reconfigure
         fi
-        # The `repo` tag is read from the git remote, never typed.
-        TF_VAR_repo="$(node scripts/tags.ts repo)"
+        # The `repo` tag is read from the git remote, never typed. Without the
+        # project's loader: the script needs nothing installed, and CI's deploy job installs nothing.
+        TF_VAR_repo="$(NODE_OPTIONS= node --experimental-strip-types --no-warnings scripts/tags.ts repo)"
         export TF_VAR_repo
+        # A stack whose roles carry a permissions boundary keeps it: an apply
+        # that names none - yours, from this shell - must not take it off.
+        if [ -z "$TF_VAR_permissions_boundary" ]; then
+          kept="$(terraform -chdir=infra output -raw permissions_boundary 2>/dev/null || true)"
+          case "$kept" in arn:*) export TF_VAR_permissions_boundary="$kept" ;; *) unset TF_VAR_permissions_boundary ;; esac
+        fi
         terraform -chdir=infra {{.ACTION}} -input=false -var name={{.NAME}} ${AWS_REGION:+-var region=$AWS_REGION} {{.CLI_ARGS}}
