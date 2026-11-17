@@ -77,7 +77,9 @@ Each gate fails for one reason and says what it is:
   `.stage`, which the pre-push hook runs (`task hooks:install`). `template`
   checks the skeleton and docs; `spec` adds the spec gates; `implemented`
   adds the unit tests, typecheck and `steps:check`. `task stage -- <stage>`
-  moves on once that stage's gates pass. `task ci` ignores the stage.
+  moves on once that stage's gates pass. `task ci` ignores the stage. CI
+  runs it too, as the `stage` job: green at every stage, while `ci` is red
+  until the API is implemented.
 - **`steps:check`** - a step definition that no sentence in the feature
   files uses any more. Delete it: the behaviour it described has left the spec.
 - **`contract:fuzz`** - a generated request that produced a 5xx, an

@@ -9,6 +9,22 @@ permissions:
   contents: read
 
 jobs:
+  # Green on every branch, whatever `ci` is. The gates of the stage the
+  # repository has reached (.stage: template, spec, implemented) and the ones
+  # that need no spec, so a branch where `ci` is red by design - nothing is
+  # implemented yet - still says when something that should hold has broken.
+  stage:
+    name: the gates of this stage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # spec:compat compares the contract with the last published one
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+      - run: task check
+      - run: task infra:validate tags:check
+
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 20
