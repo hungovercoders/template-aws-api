@@ -50,8 +50,10 @@ locals {
       ])
     ]
   ]))
-  jwt_issuer   = try(coalesce(var.jwt_issuer), null)
-  jwt_audience = compact(split(",", var.jwt_audience))
+  jwt_issuer = try(coalesce(var.jwt_issuer), null)
+  # CI passes an unset repository variable as "".
+  permissions_boundary = try(coalesce(var.permissions_boundary), null)
+  jwt_audience         = compact(split(",", var.jwt_audience))
 
   routes = toset(flatten([
     for path, item in try(local.contract.paths, {}) : [
@@ -170,8 +172,9 @@ data "aws_iam_policy_document" "lambda" {
 }
 
 resource "aws_iam_role" "lambda" {
-  name               = "${var.name}-lambda"
-  assume_role_policy = data.aws_iam_policy_document.assume.json
+  name                 = "${var.name}-lambda"
+  assume_role_policy   = data.aws_iam_policy_document.assume.json
+  permissions_boundary = local.permissions_boundary
 }
 
 resource "aws_iam_role_policy" "lambda" {
@@ -272,6 +275,15 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
   auto_deploy = true
+
+  # A limit on what callers can make the API do, and cost, when you set one.
+  dynamic "default_route_settings" {
+    for_each = var.throttle_rate_limit != null || var.throttle_burst_limit != null ? [1] : []
+    content {
+      throttling_rate_limit  = var.throttle_rate_limit
+      throttling_burst_limit = var.throttle_burst_limit
+    }
+  }
 }
 
 resource "aws_lambda_permission" "api" {

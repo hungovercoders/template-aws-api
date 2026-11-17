@@ -59,12 +59,17 @@ passes. It is skipped until you set it up, which takes three steps:
    state and an IAM role that GitHub Actions assumes through OIDC - no access
    keys are created or stored. The role can be assumed only by this
    repository's `main` branch and can manage only the resources `infra/`
-   creates for the stack called `NAME`. If the account already has GitHub's
+   creates for the stack called `NAME`. It also creates a permissions
+   boundary: the most any role of the stack can be allowed - its own table,
+   queues, bus and logs. The deploy role can only make roles that carry it,
+   so a change to `infra/` cannot grant more. A function that comes to need
+   another AWS service has it added to the boundary in `infra/bootstrap/`,
+   and the bootstrap applied again. If the account already has GitHub's
    OIDC provider, add `-- -var create_oidc_provider=false`. For a region other
    than eu-west-2, add `-- -var region=<region>`. Say the [tags](#tags) first:
    the role and the bucket carry them, and nothing is applied without them.
 
-2. **Give GitHub the outputs.** The command prints four values. Add each as a
+2. **Give GitHub the outputs.** The command prints five values. Add each as a
    repository **variable** (Settings → Secrets and variables → Actions →
    Variables). None of them is a secret.
 
@@ -74,9 +79,12 @@ passes. It is skipped until you set it up, which takes three steps:
    | `AWS_REGION` | Where the stack is deployed |
    | `TF_STATE_BUCKET` | Where Terraform state is kept |
    | `STACK_NAME` | The `NAME` you bootstrapped |
+   | `PERMISSIONS_BOUNDARY_ARN` | The boundary the stack's roles carry. A stack bootstrapped before there was one needs the bootstrap applied again and this set; until both, it deploys as before. |
 
-3. **Push to `main`.** When `task ci` is green the `deploy` job runs
-   `task deploy`; the API's URL is the `base_url` output at the end of its log.
+3. **Push to `main`.** When `task ci` is green the `deploy` job deploys the
+   bundle those gates passed (`task deploy:built`: it builds nothing, so no
+   dependency runs with AWS credentials); the API's URL is the `base_url`
+   output at the end of its log.
 
 To switch it off again, delete the `AWS_DEPLOY_ROLE_ARN` variable. To remove
 everything: `task destroy NAME=my-api`, then

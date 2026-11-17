@@ -133,6 +133,88 @@ resource "aws_iam_role" "deploy" {
   assume_role_policy = data.aws_iam_policy_document.trust.json
 }
 
+# --- The most a role of the stack may ever do ---------------------------------------
+# The deploy role makes the stack's roles and writes their policies, so on its
+# own it could give one of them anything. This is the limit: a permissions
+# boundary every role of the stack must carry (infra/'s permissions_boundary),
+# and the deploy role may only make, or write a policy for, a role that does.
+# Whatever a role's policy says, it can do no more than this - the stack's own
+# resources, and nothing of IAM. The deploy role cannot change the boundary.
+#
+# An API whose function comes to need another AWS service adds it here, and
+# the bootstrap is applied again by a person: that is the review.
+
+data "aws_iam_policy_document" "boundary" {
+  statement {
+    sid       = "Logs"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["arn:${local.partition}:logs:${var.region}:${local.account}:log-group:/aws/lambda/${var.name}*"]
+  }
+
+  # The table, its indexes and its stream.
+  statement {
+    sid     = "Table"
+    actions = ["dynamodb:*"]
+    resources = [
+      "arn:${local.partition}:dynamodb:${var.region}:${local.account}:table/${var.name}",
+      "arn:${local.partition}:dynamodb:${var.region}:${local.account}:table/${var.name}/*",
+    ]
+  }
+
+  # component:consume:start
+  statement {
+    sid       = "Queues"
+    actions   = ["sqs:*"]
+    resources = ["arn:${local.partition}:sqs:${var.region}:${local.account}:${var.name}-messages*"]
+  }
+  # component:consume:end
+
+  # component:publish:start
+  # The stack's own bus, or an existing one it was told to publish to.
+  statement {
+    sid       = "Publish"
+    actions   = ["events:PutEvents"]
+    resources = ["arn:${local.partition}:events:${var.region}:${local.account}:event-bus/*"]
+  }
+
+  statement {
+    sid       = "Unpublished"
+    actions   = ["sqs:*"]
+    resources = ["arn:${local.partition}:sqs:${var.region}:${local.account}:${var.name}-unpublished"]
+  }
+  # component:publish:end
+
+  # component:data:start
+  statement {
+    sid       = "DataStream"
+    actions   = ["firehose:PutRecord", "firehose:PutRecordBatch"]
+    resources = ["arn:${local.partition}:firehose:${var.region}:${local.account}:deliverystream/${var.name}-data"]
+  }
+
+  dynamic "statement" {
+    for_each = length(local.data_buckets) > 0 ? [1] : []
+
+    content {
+      sid       = "DataBucket"
+      actions   = ["s3:*"]
+      resources = flatten([for bucket in local.data_buckets : ["arn:${local.partition}:s3:::${bucket}", "arn:${local.partition}:s3:::${bucket}/*"]])
+    }
+  }
+  # component:data:end
+}
+
+resource "aws_iam_policy" "boundary" {
+  name        = "${var.name}-boundary"
+  description = "The most any role of the ${var.name} stack may do"
+  policy      = data.aws_iam_policy_document.boundary.json
+}
+
+locals {
+  # Allowed only on a role that carries the boundary: making it, writing its
+  # policy, and putting the boundary on a role made before there was one.
+  bounded_role_actions = ["iam:CreateRole", "iam:PutRolePolicy", "iam:PutRolePermissionsBoundary"]
+}
+
 # --- What the deploy role may do --------------------------------------------------
 # Exactly the resources infra/main.tf creates for the stack called var.name.
 
@@ -219,14 +301,12 @@ data "aws_iam_policy_document" "deploy" {
   statement {
     sid = "ConsumerRole"
     actions = [
-      "iam:CreateRole",
       "iam:DeleteRole",
       "iam:GetRole",
       "iam:PassRole",
       "iam:UpdateAssumeRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
-      "iam:PutRolePolicy",
       "iam:GetRolePolicy",
       "iam:DeleteRolePolicy",
       "iam:ListRolePolicies",
@@ -234,6 +314,18 @@ data "aws_iam_policy_document" "deploy" {
       "iam:ListInstanceProfilesForRole",
     ]
     resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-consumer"]
+  }
+
+  statement {
+    sid       = "ConsumerRoleBounded"
+    actions   = local.bounded_role_actions
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-consumer"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [aws_iam_policy.boundary.arn]
+    }
   }
   # component:consume:end
 
@@ -325,14 +417,12 @@ data "aws_iam_policy_document" "deploy" {
   statement {
     sid = "ForwarderRole"
     actions = [
-      "iam:CreateRole",
       "iam:DeleteRole",
       "iam:GetRole",
       "iam:PassRole",
       "iam:UpdateAssumeRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
-      "iam:PutRolePolicy",
       "iam:GetRolePolicy",
       "iam:DeleteRolePolicy",
       "iam:ListRolePolicies",
@@ -340,6 +430,18 @@ data "aws_iam_policy_document" "deploy" {
       "iam:ListInstanceProfilesForRole",
     ]
     resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-forwarder"]
+  }
+
+  statement {
+    sid       = "ForwarderRoleBounded"
+    actions   = local.bounded_role_actions
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-forwarder"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [aws_iam_policy.boundary.arn]
+    }
   }
   # component:publish:end
 
@@ -375,14 +477,12 @@ data "aws_iam_policy_document" "deploy" {
   statement {
     sid = "DataRole"
     actions = [
-      "iam:CreateRole",
       "iam:DeleteRole",
       "iam:GetRole",
       "iam:PassRole",
       "iam:UpdateAssumeRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
-      "iam:PutRolePolicy",
       "iam:GetRolePolicy",
       "iam:DeleteRolePolicy",
       "iam:ListRolePolicies",
@@ -391,21 +491,32 @@ data "aws_iam_policy_document" "deploy" {
     ]
     resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-data"]
   }
+
+  statement {
+    sid       = "DataRoleBounded"
+    actions   = local.bounded_role_actions
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-data"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [aws_iam_policy.boundary.arn]
+    }
+  }
   # component:data:end
 
   # The Lambda's execution role. Managing a role means this role can decide
-  # what the Lambda is allowed to do - review changes to infra/ accordingly.
+  # what the Lambda is allowed to do - within the boundary above, which it
+  # cannot change or take off. Review changes to infra/ accordingly.
   statement {
     sid = "ExecutionRole"
     actions = [
-      "iam:CreateRole",
       "iam:DeleteRole",
       "iam:GetRole",
       "iam:PassRole",
       "iam:UpdateAssumeRolePolicy",
       "iam:TagRole",
       "iam:UntagRole",
-      "iam:PutRolePolicy",
       "iam:GetRolePolicy",
       "iam:DeleteRolePolicy",
       "iam:ListRolePolicies",
@@ -413,6 +524,18 @@ data "aws_iam_policy_document" "deploy" {
       "iam:ListInstanceProfilesForRole",
     ]
     resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-lambda"]
+  }
+
+  statement {
+    sid       = "ExecutionRoleBounded"
+    actions   = local.bounded_role_actions
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-lambda"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [aws_iam_policy.boundary.arn]
+    }
   }
 
   statement {

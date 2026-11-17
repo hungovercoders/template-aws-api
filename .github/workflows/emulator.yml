@@ -25,11 +25,10 @@ jobs:
     name: emulator gaps
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    permissions:
-      contents: read
-      issues: write # to raise an issue for a gap that has closed
+    outputs:
+      tested: ${{ steps.results.outputs.tested }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Did the pin move?
@@ -49,18 +48,48 @@ jobs:
           else
             echo "The emulator pin did not move: nothing to test."
           fi
-      - uses: jdx/mise-action@v5
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         if: steps.pin.outputs.moved == 'true'
       - name: Test every gap
         if: steps.pin.outputs.moved == 'true'
         run: task emulator:gaps
-      - name: Raise an issue for each gap that has closed
-        # Not from a pull request: its pin may never be merged. And even when a
-        # test could not tell, for the gaps that did close.
-        if: ${{ !cancelled() && steps.pin.outputs.moved == 'true' && github.event_name != 'pull_request' && hashFiles('.local/emulator-gaps.json') != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node --import tsx tools/emulator/gaps.ts --issues
       - name: AWS Emulator log
         if: failure()
         run: tail -n 200 .local/emulator-gaps.log 2>/dev/null || true
+      # Even when a test could not tell, for the gaps that did close.
+      - name: Were there results?
+        id: results
+        if: ${{ !cancelled() && hashFiles('.local/emulator-gaps.json') != '' }}
+        run: echo "tested=true" >> "$GITHUB_OUTPUT"
+      - name: Keep the results for the issues job
+        if: ${{ !cancelled() && steps.results.outputs.tested == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: emulator-gaps
+          path: .local/emulator-gaps.json
+          include-hidden-files: true
+          retention-days: 1
+
+  # A job of its own, so the token that can write issues is never there while
+  # the tests - a pull request's code among them - run.
+  issues:
+    name: raise an issue for each gap that has closed
+    needs: gaps
+    # Not from a pull request: its pin may never be merged.
+    if: ${{ !cancelled() && needs.gaps.outputs.tested == 'true' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
+      - run: task install emulator:gaps:install
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: emulator-gaps
+          path: .local
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --import tsx tools/emulator/gaps.ts --issues

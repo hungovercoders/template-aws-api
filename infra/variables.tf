@@ -38,3 +38,21 @@ variable "alarm_topic_arn" {
   type        = string
   default     = ""
 }
+
+variable "permissions_boundary" {
+  description = "ARN of the permissions boundary every role of the stack carries: the most any of them can ever be allowed, whatever its policy says. `task aws:bootstrap` makes one and limits the deploy role to roles that carry it. Empty: no boundary."
+  type        = string
+  default     = null
+}
+
+variable "throttle_rate_limit" {
+  description = "Requests a second the API accepts, across all routes, before it answers 429. Empty: the account's own limit."
+  type        = number
+  default     = null
+}
+
+variable "throttle_burst_limit" {
+  description = "How many requests the API accepts at once. Empty: the account's own limit."
+  type        = number
+  default     = null
+}

@@ -6,6 +6,8 @@ import { dynamo, tableName } from "../src/lib/dynamo.ts";
 
 /** Empty the table so every scenario starts from nothing. */
 export async function resetTable(): Promise<void> {
+  // Only ever an emulator's table: with no endpoint set this would be AWS itself, and a real table's data.
+  if (!process.env.AWS_ENDPOINT_URL) throw new Error(`refusing to empty the table "${tableName}": AWS_ENDPOINT_URL is not set, so this is not an emulator. The scenarios and the fuzz run are for the local stack (task features, task contract:fuzz, task acceptance).`);
   let start: Record<string, unknown> | undefined;
   do {
     const page = await dynamo.send(
