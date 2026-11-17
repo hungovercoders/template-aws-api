@@ -93,8 +93,9 @@ data "aws_iam_policy_document" "consumer" {
 }
 
 resource "aws_iam_role" "consumer" {
-  name               = "${var.name}-consumer"
-  assume_role_policy = data.aws_iam_policy_document.assume.json
+  name                 = "${var.name}-consumer"
+  assume_role_policy   = data.aws_iam_policy_document.assume.json
+  permissions_boundary = local.permissions_boundary
 }
 
 resource "aws_iam_role_policy" "consumer" {

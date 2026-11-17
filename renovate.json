@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, the AWS Emulator, Prism and schemathesis versions in Taskfile.yml, and the commits skills are copied from (skills.json). One-time setup: install the Renovate app on the repository.",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
   ],
   "baseBranchPatterns": [
     "main"
@@ -114,6 +115,14 @@
       "schedule": [
         "before 6am on monday"
       ]
+    },
+    {
+      "description": "A release is proposed once it is three days old: a compromised package is usually found and withdrawn within that. Only where the registry says when a release was made; the emulator and the skill sources are not held back",
+      "matchDatasources": [
+        "npm",
+        "pypi"
+      ],
+      "minimumReleaseAge": "3 days"
     },
     {
       "description": "One pull request for routine npm updates",

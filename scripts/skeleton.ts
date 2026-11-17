@@ -36,6 +36,7 @@ const SKELETON = [
   "steps/messages.ts",
   "steps/events.ts",
   "test/routes.test.ts",
+  "test/table.test.ts",
   "test/log.test.ts",
   "test/components.test.ts",
   "test/emulator-gaps.test.ts",

@@ -27,12 +27,17 @@ So you know what to rely on, and what to check when reporting:
   Gateway JWT authorizer; Terraform refuses to deploy a secured operation
   without a token issuer. See [Authentication](docs/deploying.md#authentication).
 - **Every request is validated** against the contract before any operation
-  runs, and unknown fields are refused.
+  runs: its path, query and body. A house rule makes every request body
+  refuse unknown fields at its top level; nested objects and query
+  parameters are as open as the contract leaves them.
 - **Deployment from CI uses no stored keys**: GitHub assumes a role through
   OIDC that is limited to one repository's `main` branch and one stack's
-  resources. See [Deploy](docs/deploying.md#deploy).
+  resources. The roles it makes carry a permissions boundary it cannot
+  change, and the job builds nothing: it deploys the bundle the gates
+  passed. See [Deploy](docs/deploying.md#deploy).
 - **AWS Emulator is verified** against AWS's signing key before it is used,
-  and is never installed system-wide.
+  and is never installed system-wide. The Docker image
+  (`task emulator:docker`) installs the package without that check.
 - **Local callers are not a security test.** On the local stack, AWS
   Emulator's authorizer checks a token's shape, issuer and audience but not
   its signature, so `local/token.ts` can mint callers for tests. On AWS the

@@ -49,3 +49,11 @@ variable "repo" {
     error_message = "The `repo` tag has no value. Apply through `task aws:bootstrap`, which reads it from the git remote, or pass -var repo=<the repository's URL>."
   }
 }
+
+# component:publish:start
+variable "event_buses" {
+  description = "Existing EventBridge buses the stack may publish to, by name: what infra/'s event_bus_name may be. The permissions boundary allows the stack's own bus and these, no other."
+  type        = list(string)
+  default     = []
+}
+# component:publish:end
