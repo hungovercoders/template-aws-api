@@ -79,7 +79,7 @@ passes. It is skipped until you set it up, which takes three steps:
    | `AWS_REGION` | Where the stack is deployed |
    | `TF_STATE_BUCKET` | Where Terraform state is kept |
    | `STACK_NAME` | The `NAME` you bootstrapped |
-   | `PERMISSIONS_BOUNDARY_ARN` | The boundary the stack's roles carry. A stack bootstrapped before there was one needs the bootstrap applied again and this set; until both, it deploys as before. |
+   | `PERMISSIONS_BOUNDARY_ARN` | The boundary the stack's roles carry. A stack bootstrapped before there was one deploys as before until you apply the bootstrap again and set this. Do the two together: a deploy between them is refused. |
 
 3. **Push to `main`.** When `task ci` is green the `deploy` job deploys the
    bundle those gates passed (`task deploy:built`: it builds nothing, so no
@@ -185,3 +185,13 @@ published (`event_log_days`, 1 by default: it is for looking, not keeping).
   deploy with `-- -var 'cors_allowed_origins=["https://app.example.com"]'`.
   API Gateway answers the preflight requests itself; no gate covers CORS on
   the local stack.
+
+## Limiting requests
+
+Without a limit a caller can make the API do, and cost, as much as the
+account allows. To set one, give both `throttle_rate_limit` (requests a
+second) and `throttle_burst_limit` (requests at once): from your machine
+`-- -var throttle_rate_limit=100 -var throttle_burst_limit=200`, in the CI
+deploy job the repository variables `THROTTLE_RATE_LIMIT` and
+`THROTTLE_BURST_LIMIT`. Over the limit the API answers 429. Set them in one
+place: an apply only knows the limits it is given.

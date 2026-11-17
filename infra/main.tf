@@ -53,6 +53,8 @@ locals {
   jwt_issuer = try(coalesce(var.jwt_issuer), null)
   # CI passes an unset repository variable as "".
   permissions_boundary = try(coalesce(var.permissions_boundary), null)
+  throttle_rate        = try(tonumber(coalesce(var.throttle_rate_limit)), null)
+  throttle_burst       = try(tonumber(coalesce(var.throttle_burst_limit)), null)
   jwt_audience         = compact(split(",", var.jwt_audience))
 
   routes = toset(flatten([
@@ -278,10 +280,18 @@ resource "aws_apigatewayv2_stage" "default" {
 
   # A limit on what callers can make the API do, and cost, when you set one.
   dynamic "default_route_settings" {
-    for_each = var.throttle_rate_limit != null || var.throttle_burst_limit != null ? [1] : []
+    for_each = local.throttle_rate != null && local.throttle_burst != null ? [1] : []
     content {
-      throttling_rate_limit  = var.throttle_rate_limit
-      throttling_burst_limit = var.throttle_burst_limit
+      throttling_rate_limit  = local.throttle_rate
+      throttling_burst_limit = local.throttle_burst
+    }
+  }
+
+  lifecycle {
+    # One without the other would be sent as a limit of 0: every request refused.
+    precondition {
+      condition     = (local.throttle_rate == null) == (local.throttle_burst == null)
+      error_message = "Set throttle_rate_limit and throttle_burst_limit together, or neither."
     }
   }
 }

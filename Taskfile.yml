@@ -701,7 +701,14 @@ tasks:
         else
           terraform -chdir=infra init -input=false -reconfigure
         fi
-        # The `repo` tag is read from the git remote, never typed; CI says it itself.
-        TF_VAR_repo="${TF_VAR_repo:-$(node scripts/tags.ts repo)}"
+        # The `repo` tag is read from the git remote, never typed. Without the
+        # project's loader: the script needs nothing installed, and CI's deploy job installs nothing.
+        TF_VAR_repo="$(NODE_OPTIONS= node --experimental-strip-types --no-warnings scripts/tags.ts repo)"
         export TF_VAR_repo
+        # A stack whose roles carry a permissions boundary keeps it: an apply
+        # that names none - yours, from this shell - must not take it off.
+        if [ -z "$TF_VAR_permissions_boundary" ]; then
+          kept="$(terraform -chdir=infra output -raw permissions_boundary 2>/dev/null || true)"
+          case "$kept" in arn:*) export TF_VAR_permissions_boundary="$kept" ;; *) unset TF_VAR_permissions_boundary ;; esac
+        fi
         terraform -chdir=infra {{.ACTION}} -input=false -var name={{.NAME}} ${AWS_REGION:+-var region=$AWS_REGION} {{.CLI_ARGS}}

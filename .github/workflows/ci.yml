@@ -32,7 +32,9 @@ jobs:
           name: dist
           path: dist/
           if-no-files-found: error
-          retention-days: 1
+          # Kept as long as any artifact, so the deploy job can be run again by
+          # itself later; replaced when the whole run is.
+          overwrite: true
 
   # Opt-in. Skipped until the repository variable AWS_DEPLOY_ROLE_ARN is set;
   # see "Bring your AWS account" in docs/deploying.md. Deploys main once ci is green.
@@ -56,8 +58,9 @@ jobs:
       TF_VAR_alarm_topic_arn: ${{ vars.ALARM_TOPIC_ARN }}
       # Set once the bootstrap has made one: the boundary every role of the stack carries.
       TF_VAR_permissions_boundary: ${{ vars.PERMISSIONS_BOUNDARY_ARN }}
-      # The `repo` tag, as scripts/tags.ts reads it in GitHub Actions.
-      TF_VAR_repo: ${{ github.server_url }}/${{ github.repository }}
+      # Optional, and only together: a limit on requests (docs/deploying.md).
+      TF_VAR_throttle_rate_limit: ${{ vars.THROTTLE_RATE_LIMIT }}
+      TF_VAR_throttle_burst_limit: ${{ vars.THROTTLE_BURST_LIMIT }}
       STACK_NAME: ${{ vars.STACK_NAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
