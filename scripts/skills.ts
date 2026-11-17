@@ -39,6 +39,13 @@ const stop = (message: string): never => {
 const list = JSON.parse(readFileSync(LIST, "utf8")) as List;
 const save = () => writeFileSync(LIST, JSON.stringify(list, null, 2) + "\n");
 
+// A source is somewhere git fetches from, and nothing else: not an option to git, and not
+// a transport helper (ext::, fd::), which runs a command of the URL's choosing.
+function fetchable(repository: string): string {
+  if (repository.startsWith("-") || /^[A-Za-z0-9+.-]*::/.test(repository)) stop(`skills: "${repository}" is not a repository skills are copied from - a git URL or a path`);
+  return repository;
+}
+
 function git(args: string[], cwd?: string): string {
   const run = runGit(args, cwd);
   if (run.status !== 0) stop(`skills: git ${args.join(" ")} failed\n${run.stderr.trim()}`);
@@ -125,7 +132,7 @@ function fetch(only?: string[]): void {
       const source = list.sources[name] ?? stop(`skills: ${LIST} lists a skill from the source "${name}", which it does not define`);
       const clone = join(work, `clone-${ready.length}`);
       git(["init", "-q", clone]);
-      git(["fetch", "-q", "--depth", "1", source.repository, source.commit], clone);
+      git(["fetch", "-q", "--depth", "1", "--", fetchable(source.repository), source.commit], clone);
       git(["checkout", "-q", "FETCH_HEAD"], clone);
       for (const skill of wanted.filter((candidate) => candidate.source === name)) {
         if (!NAME.test(skill.name)) stop(`skills: "${skill.name}" is not a skill name (lower case letters, digits and hyphens)`);
@@ -161,7 +168,7 @@ function fetch(only?: string[]): void {
 }
 
 function head(repository: string, branch: string): string {
-  return git(["ls-remote", repository, `refs/heads/${branch}`]).split(/\s/)[0] || stop(`skills: ${repository} has no branch "${branch}"`);
+  return git(["ls-remote", "--", fetchable(repository), `refs/heads/${branch}`]).split(/\s/)[0] || stop(`skills: ${repository} has no branch "${branch}"`);
 }
 
 function update(): void {

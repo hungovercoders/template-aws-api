@@ -59,12 +59,17 @@ passes. It is skipped until you set it up, which takes three steps:
    state and an IAM role that GitHub Actions assumes through OIDC - no access
    keys are created or stored. The role can be assumed only by this
    repository's `main` branch and can manage only the resources `infra/`
-   creates for the stack called `NAME`. If the account already has GitHub's
+   creates for the stack called `NAME`. It also creates a permissions
+   boundary: the most any role of the stack can be allowed - its own table,
+   queues, bus and logs. The deploy role can only make roles that carry it,
+   so a change to `infra/` cannot grant more. A function that comes to need
+   another AWS service has it added to the boundary in `infra/bootstrap/`,
+   and the bootstrap applied again. If the account already has GitHub's
    OIDC provider, add `-- -var create_oidc_provider=false`. For a region other
    than eu-west-2, add `-- -var region=<region>`. Say the [tags](#tags) first:
    the role and the bucket carry them, and nothing is applied without them.
 
-2. **Give GitHub the outputs.** The command prints four values. Add each as a
+2. **Give GitHub the outputs.** The command prints five values. Add each as a
    repository **variable** (Settings → Secrets and variables → Actions →
    Variables). None of them is a secret.
 
@@ -74,9 +79,12 @@ passes. It is skipped until you set it up, which takes three steps:
    | `AWS_REGION` | Where the stack is deployed |
    | `TF_STATE_BUCKET` | Where Terraform state is kept |
    | `STACK_NAME` | The `NAME` you bootstrapped |
+   | `PERMISSIONS_BOUNDARY_ARN` | The boundary the stack's roles carry. A stack bootstrapped before there was one deploys as before until you apply the bootstrap again and set this. Do the two together: a deploy between them is refused. |
 
-3. **Push to `main`.** When `task ci` is green the `deploy` job runs
-   `task deploy`; the API's URL is the `base_url` output at the end of its log.
+3. **Push to `main`.** When `task ci` is green the `deploy` job deploys the
+   bundle those gates passed (`task deploy:built`: it builds nothing, so no
+   dependency runs with AWS credentials); the API's URL is the `base_url`
+   output at the end of its log.
 
 To switch it off again, delete the `AWS_DEPLOY_ROLE_ARN` variable. To remove
 everything: `task destroy NAME=my-api`, then
@@ -157,7 +165,9 @@ published (`event_log_days`, 1 by default: it is for looking, not keeping).
 
 - **An existing bus.** `-var event_bus_name=<name>` publishes to a bus you
   already run instead. The archive and the log are still made, and hold
-  only this API's events.
+  only this API's events. With a permissions boundary, name the bus at the
+  bootstrap too (`-- -var 'event_buses=["<name>"]'`): the boundary lets the
+  stack publish to its own bus and the ones named there, no other.
 - **Subscribers in other accounts.** `-var 'event_subscriber_accounts=["123456789012"]'`
   lets each account put its own rules on the bus. A subscriber in this
   account needs nothing: it adds a rule matching `source` `/<name>` and the
@@ -177,3 +187,13 @@ published (`event_log_days`, 1 by default: it is for looking, not keeping).
   deploy with `-- -var 'cors_allowed_origins=["https://app.example.com"]'`.
   API Gateway answers the preflight requests itself; no gate covers CORS on
   the local stack.
+
+## Limiting requests
+
+Without a limit a caller can make the API do, and cost, as much as the
+account allows. To set one, give both `throttle_rate_limit` (requests a
+second) and `throttle_burst_limit` (requests at once): from your machine
+`-- -var throttle_rate_limit=100 -var throttle_burst_limit=200`, in the CI
+deploy job the repository variables `THROTTLE_RATE_LIMIT` and
+`THROTTLE_BURST_LIMIT`. Over the limit the API answers 429. Set them in one
+place: an apply only knows the limits it is given.

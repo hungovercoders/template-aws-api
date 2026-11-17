@@ -14,3 +14,8 @@ output "alarm_topic_arn" {
   description = "The SNS topic the stack's alarms notify. Subscribe your on-call tool to it."
   value       = local.alarm_topic
 }
+
+output "permissions_boundary" {
+  description = "The permissions boundary the stack's roles carry, if any. An apply through the tasks that names none keeps this one."
+  value       = local.permissions_boundary
+}

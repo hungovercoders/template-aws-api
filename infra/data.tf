@@ -181,8 +181,9 @@ data "aws_iam_policy_document" "data" {
 resource "aws_iam_role" "data" {
   count = local.data_count
 
-  name               = "${var.name}-data"
-  assume_role_policy = data.aws_iam_policy_document.data_assume.json
+  name                 = "${var.name}-data"
+  assume_role_policy   = data.aws_iam_policy_document.data_assume.json
+  permissions_boundary = local.permissions_boundary
 }
 
 resource "aws_iam_role_policy" "data" {
