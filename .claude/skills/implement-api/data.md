@@ -1,6 +1,6 @@
 # When the events are kept as data
 
-Read this when `specs/datacontract.yaml` exists. It adds to the workflow in
+Read this when `specs/datacontract.v<N>.yaml` exists. It adds to the workflow in
 `SKILL.md` and to [events.md](events.md); nothing there changes.
 
 The skeleton already keeps every published event in S3 and tests what
@@ -14,7 +14,7 @@ implement for it: no code of yours writes to the bucket, and none should.
   in S3, and the data must keep the contract - types, required properties,
   limits and quality rules.
 - The data contract is part of `specs/`: read-only, like the rest. Never run
-  `task data:generate` or edit `specs/datacontract.yaml` to make a gate
+  `task data:generate` or edit `specs/datacontract.v<N>.yaml` to make a gate
   pass. `data:lint`, `data:check` or `data:compat` failing is a fault in the
   spec: report it, as for `spec:check`.
 

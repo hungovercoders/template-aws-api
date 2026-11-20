@@ -12,7 +12,7 @@ Feature: Listing the catalogue a page at a time
       | Second Wind     | ipa   | 6.4 |
       | Éclair Noir     | stout | 8.0 |
 
-  @operation:list_beers
+  @operation:list_beers_v0
   Scenario: Reading the catalogue two beers at a time
     When staff list the beers 2 at a time
     Then the list is, in order:
@@ -29,13 +29,13 @@ Feature: Listing the catalogue a page at a time
       | Second Wind |
     And there are no more beers to list
 
-  @operation:list_beers
+  @operation:list_beers_v0
   Scenario: A page that ends with the last beer is the last page
     When staff list the beers 5 at a time
     Then the list holds 5 beers
     And there are no more beers to list
 
-  @operation:list_beers
+  @operation:list_beers_v0
   Scenario: Paging through one style
     When staff list the ipa beers 1 at a time
     Then the list is, in order:
@@ -46,14 +46,14 @@ Feature: Listing the catalogue a page at a time
       | Second Wind |
     And there are no more beers to list
 
-  @operation:list_beers
+  @operation:list_beers_v0
   Scenario: A page holds 20 beers unless asked otherwise
     Given the catalogue has 20 more beers
     When staff list the beers
     Then the list holds 20 beers
     And there are more beers to list
 
-  @operation:list_beers
+  @operation:list_beers_v0
   Scenario Outline: A page holds between 1 and 100 beers
     When staff list the beers <size> at a time
     Then the request is refused as invalid, pointing at "limit"
@@ -63,7 +63,7 @@ Feature: Listing the catalogue a page at a time
       | 0    |
       | 101  |
 
-  @operation:list_beers
+  @operation:list_beers_v0
   Scenario: A page marker the catalogue did not issue is refused
     When staff list the beers from the page marker "made-up"
     Then the page marker is refused

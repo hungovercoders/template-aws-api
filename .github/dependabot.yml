@@ -1,0 +1,40 @@
+# Dependabot: security fixes for the dependencies GitHub's advisory database
+# covers - the npm packages and the GitHub Actions. Version updates are
+# Renovate's (renovate.json), so each ecosystem allows Dependabot no version
+# pull requests; a security update is not held by that limit.
+#
+# Turn it on once per repository: Settings → Code security → Dependabot alerts
+# and Dependabot security updates. Security fixes then arrive as one pull
+# request per ecosystem, which CI holds to every gate like any other change.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - "/"
+      - "/tools/emulator"
+      # component:asyncapi:start
+      - "/tools/asyncapi"
+      # component:asyncapi:end
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: fix
+      include: scope
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: fix
+      include: scope
+    groups:
+      actions-security:
+        applies-to: security-updates
+        patterns: ["*"]
