@@ -14,7 +14,7 @@
 import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand, type TransactWriteCommandInput } from "@aws-sdk/lib-dynamodb";
 import { nameKey, orderKey, type BeerChanges, type StoredBeer } from "../domain/beer.ts";
 import type { PageEnd } from "../domain/cursor.ts";
-import { beer_created, beer_rated, beer_retired, beer_updated } from "../generated/events.ts";
+import { beer_created_v1, beer_rated_v1, beer_retired_v1, beer_updated_v1 } from "../generated/events.ts";
 import { dynamo, tableName } from "../lib/dynamo.ts";
 import { outbox } from "../lib/outbox.ts";
 
@@ -112,7 +112,7 @@ export function putNewBeer(beer: StoredBeer): Promise<void> {
         onConditionFailed: new NameTaken(),
       },
       { item: { Put: { TableName: tableName, Item: { ...beerKey(beer.id), ...indexed(beer), ...beer }, ConditionExpression: "attribute_not_exists(pk)" } } },
-      { item: outbox(beer_created({ beer_id: beer.id, name: beer.name, style: beer.style, abv: beer.abv }, beer.id)) },
+      { item: outbox(beer_created_v1({ beer_id: beer.id, name: beer.name, style: beer.style, abv: beer.abv }, beer.id)) },
     ]),
   );
 }
@@ -179,7 +179,7 @@ export function applyChanges(id: string, changes: BeerChanges, updated_at: strin
     };
 
     const updated = { name: changes.name ?? current.name, style: changes.style ?? current.style, abv: changes.abv ?? current.abv };
-    const event = { item: outbox(beer_updated({ beer_id: id, ...updated }, id)) };
+    const event = { item: outbox(beer_updated_v1({ beer_id: id, ...updated }, id)) };
 
     const takesNewLock = changes.name !== undefined && nameKey(changes.name) !== nameKey(current.name);
     await transact(
@@ -219,7 +219,7 @@ export function deleteBeer(id: string): Promise<void> {
         onConditionFailed: STALE,
       },
       { item: { Delete: { TableName: tableName, Key: lockKey(current.name) } } },
-      { item: outbox(beer_retired({ beer_id: id, name: current.name }, id)) },
+      { item: outbox(beer_retired_v1({ beer_id: id, name: current.name }, id)) },
     ]);
   });
 }
@@ -239,7 +239,7 @@ export function addRating(id: string, score: number, updated_at: string): Promis
         },
         onConditionFailed: new BeerNotFound(),
       },
-      { item: outbox(beer_rated({ beer_id: id, score }, id)) },
+      { item: outbox(beer_rated_v1({ beer_id: id, score }, id)) },
     ]);
     // A transaction cannot return the item. Retired since: the rating still counted, but there is no beer to answer with.
     const beer = await readBeer(id);

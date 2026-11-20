@@ -1,4 +1,4 @@
-import type { components } from "../generated/api.d.ts";
+import type { components } from "../generated/api.v0.d.ts";
 
 export type Beer = components["schemas"]["Beer"];
 export type NewBeer = components["schemas"]["NewBeer"];

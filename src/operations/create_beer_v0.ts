@@ -5,7 +5,7 @@ import type { Context } from "../lib/router.ts";
 import { putNewBeer } from "../store/beers.ts";
 import { answering } from "./shared.ts";
 
-export async function create_beer({ body }: Context<"create_beer">) {
+export async function create_beer_v0({ body }: Context<"create_beer_v0">) {
   const now = new Date().toISOString();
   const beer: StoredBeer = {
     id: randomUUID(),
@@ -18,5 +18,5 @@ export async function create_beer({ body }: Context<"create_beer">) {
     updated_at: now,
   };
   await answering(() => putNewBeer(beer));
-  return json(201, toBeer(beer), { location: `/beers/${beer.id}` });
+  return json(201, toBeer(beer), { location: `/v0/beers/${beer.id}` });
 }

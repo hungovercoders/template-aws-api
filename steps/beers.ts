@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import type { ApiWorld, Json } from "./world.ts";
 
 async function addBeer(world: ApiWorld, name: string, style: string, abv: number): Promise<Json> {
-  const { status, body } = await world.call("POST", "/beers", { name, style, abv });
+  const { status, body } = await world.call("POST", "/v0/beers", { name, style, abv });
   assert.equal(status, 201, `adding "${name}" to the catalogue: ${JSON.stringify(body)}`);
   world.remembered.set(name, body);
   return body;
@@ -20,7 +20,7 @@ export function idOf(world: ApiWorld, name: string): string {
 }
 
 async function rate(world: ApiWorld, name: string, score: number) {
-  return world.call("POST", `/beers/${idOf(world, name)}/ratings`, { score });
+  return world.call("POST", `/v0/beers/${idOf(world, name)}/ratings`, { score });
 }
 
 function expectStatus(world: ApiWorld, status: number) {
@@ -50,7 +50,7 @@ Given("the catalogue has these beers:", async function (this: ApiWorld, table: D
 });
 
 Given("staff have retired {string}", async function (this: ApiWorld, name: string) {
-  await this.call("DELETE", `/beers/${idOf(this, name)}`);
+  await this.call("DELETE", `/v0/beers/${idOf(this, name)}`);
   expectStatus(this, 204);
 });
 
@@ -64,7 +64,7 @@ Given(/^"([^"]*)" has been rated ([\d, and]+)$/, async function (this: ApiWorld,
 // --- When -------------------------------------------------------------------
 
 When(/^staff add the beer "([^"]*)", an? (\w+) at ([\d.]+)% abv$/, async function (this: ApiWorld, name: string, style: string, abv: string) {
-  const { status, body } = await this.call("POST", "/beers", { name, style, abv: Number(abv) });
+  const { status, body } = await this.call("POST", "/v0/beers", { name, style, abv: Number(abv) });
   if (status === 201) this.remembered.set(name, body);
 });
 
@@ -80,11 +80,11 @@ When(/^staff try to add a beer with (.+)$/, async function (this: ApiWorld, prob
     "an unexpected detail": { ...valid, colour: "amber" },
   };
   assert.ok(invalid[problem], `no request is defined for a beer with ${problem}`);
-  await this.call("POST", "/beers", invalid[problem]);
+  await this.call("POST", "/v0/beers", invalid[problem]);
 });
 
 When("staff fetch {string}", async function (this: ApiWorld, name: string) {
-  await this.call("GET", `/beers/${idOf(this, name)}`);
+  await this.call("GET", `/v0/beers/${idOf(this, name)}`);
 });
 
 When(/^staff (fetch|change|retire|rate) the beer with id "([^"]*)"$/, async function (this: ApiWorld, action: string, id: string) {
@@ -92,27 +92,27 @@ When(/^staff (fetch|change|retire|rate) the beer with id "([^"]*)"$/, async func
 });
 
 When("staff list the beers", async function (this: ApiWorld) {
-  await this.call("GET", "/beers");
+  await this.call("GET", "/v0/beers");
 });
 
 When("staff list the {word} beers", async function (this: ApiWorld, style: string) {
-  await this.call("GET", `/beers?style=${style}`);
+  await this.call("GET", `/v0/beers?style=${style}`);
 });
 
 When("staff change the abv of {string} to {float}", async function (this: ApiWorld, name: string, abv: number) {
-  await this.call("PATCH", `/beers/${idOf(this, name)}`, { abv });
+  await this.call("PATCH", `/v0/beers/${idOf(this, name)}`, { abv });
 });
 
 When("staff rename {string} to {string}", async function (this: ApiWorld, name: string, newName: string) {
-  await this.call("PATCH", `/beers/${idOf(this, name)}`, { name: newName });
+  await this.call("PATCH", `/v0/beers/${idOf(this, name)}`, { name: newName });
 });
 
 When("staff send no changes for {string}", async function (this: ApiWorld, name: string) {
-  await this.call("PATCH", `/beers/${idOf(this, name)}`, {});
+  await this.call("PATCH", `/v0/beers/${idOf(this, name)}`, {});
 });
 
 When("staff retire {string}", async function (this: ApiWorld, name: string) {
-  await this.call("DELETE", `/beers/${idOf(this, name)}`);
+  await this.call("DELETE", `/v0/beers/${idOf(this, name)}`);
 });
 
 When(/^staff (fetch|change|retire|rate) a beer that is not in the catalogue$/, async function (this: ApiWorld, action: string) {
@@ -121,10 +121,10 @@ When(/^staff (fetch|change|retire|rate) a beer that is not in the catalogue$/, a
 
 /** One valid request of each kind that names a beer by id. */
 async function act(world: ApiWorld, action: string, id: string) {
-  if (action === "fetch") await world.call("GET", `/beers/${id}`);
-  if (action === "change") await world.call("PATCH", `/beers/${id}`, { abv: 5 });
-  if (action === "retire") await world.call("DELETE", `/beers/${id}`);
-  if (action === "rate") await world.call("POST", `/beers/${id}/ratings`, { score: 3 });
+  if (action === "fetch") await world.call("GET", `/v0/beers/${id}`);
+  if (action === "change") await world.call("PATCH", `/v0/beers/${id}`, { abv: 5 });
+  if (action === "retire") await world.call("DELETE", `/v0/beers/${id}`);
+  if (action === "rate") await world.call("POST", `/v0/beers/${id}/ratings`, { score: 3 });
 }
 
 When(/^a drinker rates "([^"]*)" ([\d.]+)$/, async function (this: ApiWorld, name: string, score: string) {
@@ -165,7 +165,7 @@ Then(/^the beer has (\d+) ratings? averaging ([\d.]+)$/, function (this: ApiWorl
 });
 
 Then("{string} still has no ratings", async function (this: ApiWorld, name: string) {
-  const { body } = await this.call("GET", `/beers/${idOf(this, name)}`);
+  const { body } = await this.call("GET", `/v0/beers/${idOf(this, name)}`);
   assert.equal(body.rating_count, 0);
   assert.equal(body.average_rating, null);
 });
@@ -193,13 +193,13 @@ Then("the list is, in order:", function (this: ApiWorld, table: DataTable) {
 });
 
 Then("the catalogue lists no beers", async function (this: ApiWorld) {
-  const { status, body } = await this.call("GET", "/beers");
+  const { status, body } = await this.call("GET", "/v0/beers");
   assert.equal(status, 200);
   assert.deepEqual(body.items, []);
 });
 
 Then("{string} can no longer be fetched", async function (this: ApiWorld, name: string) {
-  const { status } = await this.call("GET", `/beers/${idOf(this, name)}`);
+  const { status } = await this.call("GET", `/v0/beers/${idOf(this, name)}`);
   assert.equal(status, 404);
 });
 
@@ -224,7 +224,7 @@ Then("the request is refused as invalid, pointing at {string}", function (this: 
 /** List a page and remember how it was asked for, so "the next page" can continue it. */
 async function listPage(world: ApiWorld, query: string) {
   world.remembered.set("page query", { query });
-  await world.call("GET", `/beers?${query}`);
+  await world.call("GET", `/v0/beers?${query}`);
 }
 
 Given("the catalogue has {int} more beers", async function (this: ApiWorld, count: number) {
@@ -243,11 +243,11 @@ When("staff list the next page", async function (this: ApiWorld) {
   const cursor = this.last.body?.next_cursor;
   assert.ok(cursor, "the previous page said there are more beers to list");
   const { query } = this.remembered.get("page query")!;
-  await this.call("GET", `/beers?${query}&cursor=${encodeURIComponent(cursor)}`);
+  await this.call("GET", `/v0/beers?${query}&cursor=${encodeURIComponent(cursor)}`);
 });
 
 When("staff list the beers from the page marker {string}", async function (this: ApiWorld, cursor: string) {
-  await this.call("GET", `/beers?cursor=${encodeURIComponent(cursor)}`);
+  await this.call("GET", `/v0/beers?cursor=${encodeURIComponent(cursor)}`);
 });
 
 Then("the list holds {int} beers", function (this: ApiWorld, count: number) {
@@ -271,13 +271,13 @@ Then("the page marker is refused", function (this: ApiWorld) {
 
 /** The beer a scenario added under `name`, as the catalogue has it now; undefined once retired. */
 export async function currently(world: ApiWorld, name: string): Promise<Json | undefined> {
-  const { status, body } = await world.call("GET", `/beers/${idOf(world, name)}`);
+  const { status, body } = await world.call("GET", `/v0/beers/${idOf(world, name)}`);
   return status === 200 ? body : undefined;
 }
 
 When(/^staff add the beer "([^"]*)", an? (\w+) at ([\d.]+)% abv, twice at once$/, async function (this: ApiWorld, name: string, style: string, abv: string) {
   const beer = { name, style, abv: Number(abv) };
-  const replies = await Promise.all([this.call("POST", "/beers", beer), this.call("POST", "/beers", beer)]);
+  const replies = await Promise.all([this.call("POST", "/v0/beers", beer), this.call("POST", "/v0/beers", beer)]);
   this.remembered.set("replies", { statuses: replies.map((reply) => reply.status).sort() });
 });
 
@@ -286,18 +286,18 @@ Then("one request adds the beer and the other is refused because the name is tak
 });
 
 Then("the catalogue holds {int} beer(s)", async function (this: ApiWorld, count: number) {
-  const { status, body } = await this.call("GET", "/beers?limit=100");
+  const { status, body } = await this.call("GET", "/v0/beers?limit=100");
   assert.equal(status, 200);
   assert.equal(body.items.length, count);
 });
 
 When("staff rename {string} to {string} and to {string} at once", async function (this: ApiWorld, name: string, first: string, second: string) {
-  const path = `/beers/${idOf(this, name)}`;
+  const path = `/v0/beers/${idOf(this, name)}`;
   await Promise.all([this.call("PATCH", path, { name: first }), this.call("PATCH", path, { name: second })]);
 });
 
 When("staff retire {string} and rename it to {string} at once", async function (this: ApiWorld, name: string, newName: string) {
-  const path = `/beers/${idOf(this, name)}`;
+  const path = `/v0/beers/${idOf(this, name)}`;
   await Promise.all([this.call("DELETE", path), this.call("PATCH", path, { name: newName })]);
 });
 
@@ -317,7 +317,7 @@ Then(/^whichever of (.+) it is not named can be given to a new beer$/, async fun
   // The first name is the one the scenario added the beer under.
   const held = (await currently(this, names[0]!))?.name;
   for (const name of names.filter((candidate) => candidate !== held)) {
-    const { status, body } = await this.call("POST", "/beers", { name, style: "ale", abv: 4 });
+    const { status, body } = await this.call("POST", "/v0/beers", { name, style: "ale", abv: 4 });
     assert.equal(status, 201, `"${name}" is free to use: ${JSON.stringify(body)}`);
   }
 });
@@ -352,21 +352,21 @@ async function anonymously<T>(world: ApiWorld, work: () => Promise<T>): Promise<
 When(
   /^someone who is not signed in tries to add the beer "([^"]*)", an? (\w+) at ([\d.]+)% abv$/,
   async function (this: ApiWorld, name: string, style: string, abv: string) {
-    await anonymously(this, () => this.call("POST", "/beers", { name, style, abv: Number(abv) }));
+    await anonymously(this, () => this.call("POST", "/v0/beers", { name, style, abv: Number(abv) }));
   },
 );
 
 When(/^someone who is not signed in tries to (rename|retire) "([^"]*)"$/, async function (this: ApiWorld, action: string, name: string) {
-  const path = `/beers/${idOf(this, name)}`;
+  const path = `/v0/beers/${idOf(this, name)}`;
   await anonymously(this, () => (action === "rename" ? this.call("PATCH", path, { name: "Renamed" }) : this.call("DELETE", path)));
 });
 
 When("someone who is not signed in lists the beers, fetches {string} and rates it {int}", async function (this: ApiWorld, name: string, score: number) {
   const id = idOf(this, name);
   const statuses = await anonymously(this, async () => [
-    (await this.call("GET", "/beers")).status,
-    (await this.call("GET", `/beers/${id}`)).status,
-    (await this.call("POST", `/beers/${id}/ratings`, { score })).status,
+    (await this.call("GET", "/v0/beers")).status,
+    (await this.call("GET", `/v0/beers/${id}`)).status,
+    (await this.call("POST", `/v0/beers/${id}/ratings`, { score })).status,
   ]);
   this.remembered.set("replies", { statuses });
 });

@@ -4,7 +4,7 @@ import type { Context } from "../lib/router.ts";
 import * as store from "../store/beers.ts";
 import { answering } from "./shared.ts";
 
-export async function update_beer({ path, body }: Context<"update_beer">) {
+export async function update_beer_v0({ path, body }: Context<"update_beer_v0">) {
   const changes = {
     ...body,
     ...(body.name === undefined ? {} : { name: body.name.trim() }),

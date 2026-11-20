@@ -5,7 +5,7 @@ import { currently, idOf } from "./beers.ts";
 import { deadLetters, deliver, eventually, messageFor, settled } from "./messages.ts";
 import type { ApiWorld } from "./world.ts";
 
-const OPERATION = "receive_beer_rating";
+const OPERATION = "receive_beer_rating_v1";
 const rating = (beer_id: string, score: number) => messageFor(OPERATION, { beer_id, score });
 
 When(/^the taproom sends a rating of ([\d.]+) for "([^"]*)"$/, async function (this: ApiWorld, score: string, name: string) {
