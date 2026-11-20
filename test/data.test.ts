@@ -103,7 +103,10 @@ test("an event or a property the AsyncAPI contract does not have is named, not r
 });
 
 test("the contract must say where the data is kept, for how long and how fresh, in the form the infrastructure reads", () => {
-  const good = "servers:\n  - server: production\n    type: s3\n    location: s3://catalogue-events/events/\n    format: json\n    delimiter: new_line\nslaProperties:\n  - property: retention\n    value: 2\n    unit: y\n  - property: latency\n    value: 15\n    unit: m\n";
+  const good =
+    "servers:\n  - server: production\n    type: s3\n    location: s3://catalogue-events/events/\n    format: json\n    delimiter: new_line\n" +
+    "  - server: production-parquet\n    type: s3\n    location: s3://catalogue-events/parquet/\n    format: parquet\n" +
+    "slaProperties:\n  - property: retention\n    value: 2\n    unit: y\n  - property: latency\n    value: 15\n    unit: m\n";
   expect(needs(read(good))).toEqual([]);
   expect(needs(read("apiVersion: v3.2.0\n"))).toHaveLength(3);
   expect(needs(read(good.replace("s3://catalogue-events/events/", "s3://catalogue-events/events")))[0]).toContain("s3://<bucket>/<prefix>/");
@@ -111,11 +114,27 @@ test("the contract must say where the data is kept, for how long and how fresh, 
   expect(needs(read(good.replace("value: 15", "value: soon")))[0]).toContain("latency");
 });
 
+test("beside every raw server is its Parquet, in the same bucket and a prefix of its own", () => {
+  const sla = "slaProperties:\n  - property: retention\n    value: 30\n    unit: d\n  - property: latency\n    value: 1\n    unit: h\n";
+  const raw = "servers:\n  - server: production\n    type: s3\n    location: s3://catalogue-events/events/v1/\n    format: json\n    delimiter: new_line\n";
+  const parquet = (location: string, format = "parquet") => `  - server: production-parquet\n    type: s3\n    location: ${location}\n    format: ${format}\n`;
+  expect(needs(read(`${raw}${parquet("s3://catalogue-events/parquet/v1/")}${sla}`))).toEqual([]);
+  expect(needs(read(`${raw}${sla}`))).toEqual([expect.stringContaining("has no production-parquet server beside it")]);
+  expect(needs(read(`${raw}${parquet("s3://other-bucket/parquet/v1/")}${sla}`))).toEqual([expect.stringContaining("is in bucket other-bucket, not catalogue-events")]);
+  expect(needs(read(`${raw}${parquet("s3://catalogue-events/events/v1/parquet/")}${sla}`))).toEqual([expect.stringContaining("prefix overlaps")]);
+  expect(needs(read(`${raw}${parquet("s3://catalogue-events/parquet/v1/", "json")}${sla}`))).toEqual([expect.stringContaining("must say format: parquet")]);
+});
+
 test("every server is held to the form the infrastructure reads, not only production", () => {
-  const server = (name: string, location: string) => `  - server: ${name}\n    type: s3\n    location: ${location}\n    format: json\n    delimiter: new_line\n`;
+  const server = (name: string, location: string) =>
+    `  - server: ${name}\n    type: s3\n    location: ${location}\n    format: json\n    delimiter: new_line\n` +
+    `  - server: ${name}-parquet\n    type: s3\n    location: ${location.replace("/events", "/parquet")}\n    format: parquet\n`;
   const sla = "slaProperties:\n  - property: retention\n    value: 30\n    unit: d\n  - property: latency\n    value: 1\n    unit: h\n";
   expect(needs(read(`servers:\n${server("production", "s3://catalogue-events/events/")}${server("test", "s3://catalogue-events-test/events/")}${sla}`))).toEqual([]);
-  expect(needs(read(`servers:\n${server("production", "s3://catalogue-events/events/")}${server("test", "s3://catalogue-events-test")}${sla}`))).toEqual([expect.stringContaining("the test server's location")]);
+  expect(needs(read(`servers:\n${server("production", "s3://catalogue-events/events/")}${server("test", "s3://catalogue-events-test")}${sla}`))).toEqual([
+    expect.stringContaining("the test server's location"),
+    expect.stringContaining("the test-parquet server's location"),
+  ]);
 });
 
 test("what is read from the AsyncAPI contract: only published events, a nullable property is not required, and limits only where the type has them", () => {
