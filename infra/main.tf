@@ -32,9 +32,10 @@ provider "aws" {
 }
 
 locals {
-  # The contract is the single source of the API's routes: API Gateway gets
-  # exactly the operations specs/openapi.yaml declares, nothing more.
-  contract         = yamldecode(file("${path.module}/../specs/openapi.yaml"))
+  # The contracts are the single source of the API's routes: API Gateway gets
+  # exactly the operations every live major (specs/openapi.v<N>.yaml) declares,
+  # nothing more. Each major's paths start /v<N>, so they never collide.
+  contracts        = [for name in sort(fileset("${path.module}/../specs", "openapi.v*.yaml")) : yamldecode(file("${path.module}/../specs/${name}"))]
   methods          = ["get", "put", "post", "delete", "patch", "head", "options"]
   indexes          = ["gsi1", "gsi2"]
   index_attributes = flatten([for index in local.indexes : ["${index}pk", "${index}sk"]])
@@ -43,11 +44,13 @@ locals {
   # OpenAPI: an operation's own `security` replaces the document's, and an
   # empty requirement ({}) allows anonymous calls.
   secured_routes = toset(flatten([
-    for path, item in try(local.contract.paths, {}) : [
-      for method, operation in item : "${upper(method)} ${path}"
-      if contains(local.methods, method) && length(try(operation.security, try(local.contract.security, []))) > 0 && alltrue([
-        for requirement in try(operation.security, try(local.contract.security, [])) : length(requirement) > 0
-      ])
+    for contract in local.contracts : [
+      for path, item in try(contract.paths, {}) : [
+        for method, operation in item : "${upper(method)} ${path}"
+        if contains(local.methods, method) && length(try(operation.security, try(contract.security, []))) > 0 && alltrue([
+          for requirement in try(operation.security, try(contract.security, [])) : length(requirement) > 0
+        ])
+      ]
     ]
   ]))
   jwt_issuer = try(coalesce(var.jwt_issuer), null)
@@ -58,8 +61,10 @@ locals {
   jwt_audience         = compact(split(",", var.jwt_audience))
 
   routes = toset(flatten([
-    for path, item in try(local.contract.paths, {}) : [
-      for method, operation in item : "${upper(method)} ${path}" if contains(local.methods, method)
+    for contract in local.contracts : [
+      for path, item in try(contract.paths, {}) : [
+        for method, operation in item : "${upper(method)} ${path}" if contains(local.methods, method)
+      ]
     ]
   ]))
 }
