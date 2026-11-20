@@ -64,8 +64,7 @@ thing beside the old and mark the old `deprecated: true`.
 **Retiring a major** takes two published changes: mark every operation in its
 file `deprecated: true`, then, once the logs show it is no longer called,
 delete the file. `spec:compat` refuses to delete one that was not published
-deprecated. Events and data are versioned the same way (below and
-[Events as data](data.md)).
+deprecated. Events, and the data kept from them, are versioned the same way.
 
 ## Contract standards
 
