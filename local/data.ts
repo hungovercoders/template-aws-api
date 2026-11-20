@@ -16,7 +16,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
-import { parquetReadObjects } from "hyparquet";
+import { parquetMetadata, parquetReadObjects } from "hyparquet";
+import { parquetSchema, type Property } from "../src/lib/compactor.ts";
 import { parseDocument } from "yaml";
 import { contracts } from "../scripts/contracts.ts";
 import { stackOutputs } from "./outputs.ts";
@@ -255,6 +256,19 @@ async function testParquet(expected: string[], days: number | undefined, runCli:
     const repeated = [...seen].filter(([, count]) => count > 1).map(([id]) => id);
     if (missing.length > 0) problems.push(`${missing.length} of the ${expected.length} events the scenarios published are not in the Parquet in s3://${bucket}/${parquetPrefix} (the first: ${missing[0]})`);
     if (repeated.length > 0) problems.push(`${repeated.length} events are in the Parquet more than once (the first: ${repeated[0]}): each should be there once`);
+  }
+  // The CLI cannot check a Parquet column's type yet: every file's schema is held to the one the contract gives.
+  const typed = parseDocument(readFileSync(CONTRACT, "utf8")).toJS() as { schema?: { physicalName?: string; properties?: Property[] }[] };
+  const columns = (elements: { name: string; type?: unknown; converted_type?: unknown; repetition_type?: unknown; num_children?: unknown }[]) =>
+    elements.map(({ name, type, converted_type, repetition_type, num_children }) => JSON.stringify([name, type ?? null, converted_type ?? null, repetition_type ?? null, num_children ?? null]));
+  for (const file of files) {
+    const object = typed.schema?.find((candidate) => candidate.physicalName === file.type);
+    if (!object) continue;
+    const body = await (await s3.send(new GetObjectCommand({ Bucket: bucket, Key: file.key }))).Body!.transformToByteArray();
+    const written = parquetMetadata(body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer).schema.slice(1);
+    const wanted = parquetSchema(object.properties ?? []).slice(1) as never[];
+    const [have, want] = [columns(written as never[]), columns(wanted)];
+    if (have.join() !== want.join()) problems.push(`${file.key} is not typed as the contract says: columns ${have.filter((c) => !want.includes(c)).join(", ") || "(in another order)"} where it says ${want.filter((c) => !have.includes(c)).join(", ")}`);
   }
   const compacted = schemas.filter((object) => files.some((file) => file.type === object.physicalName));
   if (problems.length > 0) fail(["data:test failed", ...problems.map((problem) => `  - ${problem}`)].join("\n"));
