@@ -187,10 +187,18 @@ data "aws_iam_policy_document" "boundary" {
   # component:publish:end
 
   # component:data:start
+  # A stream per major of the data contract: <name>-data-v<N>.
   statement {
     sid       = "DataStream"
     actions   = ["firehose:PutRecord", "firehose:PutRecordBatch"]
-    resources = ["arn:${local.partition}:firehose:${var.region}:${local.account}:deliverystream/${var.name}-data"]
+    resources = ["arn:${local.partition}:firehose:${var.region}:${local.account}:deliverystream/${var.name}-data-*"]
+  }
+
+  # The schedule starts the daily compaction to Parquet.
+  statement {
+    sid       = "DataCompaction"
+    actions   = ["lambda:InvokeFunction"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-data-compactor"]
   }
 
   dynamic "statement" {
@@ -448,9 +456,10 @@ data "aws_iam_policy_document" "deploy" {
   # component:publish:end
 
   # component:data:start
-  # The events as data: the bucket, the Firehose stream that writes to it and
-  # the role the rule and the stream use (infra/data.tf). The rule itself is
-  # covered by the published events' statement above.
+  # The events as data: the bucket, the Firehose streams that write to it, the
+  # compactor that turns each day into Parquet, its schedule, and their roles
+  # (infra/data.tf). The rules themselves are covered by the published
+  # events' statement above.
   #
   # The bucket is made through Cloud Control, which has no resource of its
   # own to name; what it may touch is held by the S3 statement after it.
@@ -473,7 +482,20 @@ data "aws_iam_policy_document" "deploy" {
   statement {
     sid       = "DataStream"
     actions   = ["firehose:*"]
-    resources = ["arn:${local.partition}:firehose:${var.region}:${local.account}:deliverystream/${var.name}-data"]
+    resources = ["arn:${local.partition}:firehose:${var.region}:${local.account}:deliverystream/${var.name}-data-*"]
+  }
+
+  # The daily compaction to Parquet: its function and the schedule that starts it.
+  statement {
+    sid       = "DataCompactor"
+    actions   = ["lambda:*"]
+    resources = ["arn:${local.partition}:lambda:${var.region}:${local.account}:function:${var.name}-data-compactor"]
+  }
+
+  statement {
+    sid       = "DataSchedule"
+    actions   = ["scheduler:CreateSchedule", "scheduler:UpdateSchedule", "scheduler:DeleteSchedule", "scheduler:GetSchedule"]
+    resources = ["arn:${local.partition}:scheduler:${var.region}:${local.account}:schedule/default/${var.name}-data-compaction"]
   }
 
   statement {
@@ -491,13 +513,13 @@ data "aws_iam_policy_document" "deploy" {
       "iam:ListAttachedRolePolicies",
       "iam:ListInstanceProfilesForRole",
     ]
-    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-data"]
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-data", "arn:${local.partition}:iam::${local.account}:role/${var.name}-data-compactor"]
   }
 
   statement {
     sid       = "DataRoleBounded"
     actions   = local.bounded_role_actions
-    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-data"]
+    resources = ["arn:${local.partition}:iam::${local.account}:role/${var.name}-data", "arn:${local.partition}:iam::${local.account}:role/${var.name}-data-compactor"]
 
     condition {
       test     = "StringEquals"

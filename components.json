@@ -107,9 +107,15 @@
         ".claude/skills/implement-api/data.md",
         "tools/emulator/gaps/data.ts",
         "tools/emulator/terraform/s3-control/",
-        "tools/emulator/terraform/cloud-control-bucket-settings/"
+        "tools/emulator/terraform/cloud-control-bucket-settings/",
+        "src/compactor.ts",
+        "src/lib/compactor.ts",
+        "test/compactor.test.ts"
       ],
       "gates": {
+        "generate": [
+          "data:layout"
+        ],
         "spec": [
           "data:lint",
           "data:check",

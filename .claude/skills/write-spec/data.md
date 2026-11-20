@@ -24,7 +24,9 @@ If the user does not want the events kept, propose removing the component
      of `data` with them. Anything that identifies a person is at least
      `confidential`; ask whether it should be in the event at all;
    - **where it is kept** - the `production` server: the bucket's name
-     (globally unique; propose `<org>-<api>-events`) and a prefix;
+     (globally unique; propose `<org>-<api>-events`) and a prefix ending
+     `/v<N>/`; and `production-parquet`, the same bucket, `parquet/v<N>/`,
+     where each day is compacted (`docs/data.md`);
    - **how long it is kept** (`slaProperties`, `retention`) - ask what law
      or policy applies to personal data before proposing a number;
    - **how fresh it must be** (`slaProperties`, `latency`): how soon after

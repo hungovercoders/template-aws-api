@@ -28,7 +28,7 @@ Every stack is deployed with the same alarms: the baseline in
 | `<name>-event-delivery-failed` | Any failed delivery from the bus to a target in 5 minutes | A rule's target is refusing events |
 <!-- component:publish:end -->
 <!-- component:data:start -->
-| `<name>-data-v<N>-delivery`, `-freshness`, `-rule` | The events kept in S3 are failing to arrive, late, or not reaching the stream | See [Events as data](data.md#alarms) |
+| `<name>-data-v<N>-delivery`, `-freshness`, `-rule`; `<name>-data-compaction` | The events kept in S3 are failing to arrive, late, or not reaching the stream | See [Events as data](data.md#alarms) |
 <!-- component:data:end -->
 
 Each alarm notifies when it fires and again when it recovers. Routing:

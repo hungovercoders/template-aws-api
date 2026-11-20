@@ -235,6 +235,17 @@ tasks:
     cmds:
       - node scripts/data.ts generate
 
+  data:layout:
+    desc: Generate src/generated/data.json - each live data contract major's schema objects, which the compactor types its Parquet by (task generate runs it)
+    cmds:
+      - node scripts/data.ts layout
+
+  data:compact:
+    desc: Compact the events kept as data into Parquet now, as the daily schedule does - the last DATA_DAYS whole days (3) and today - on the local stack or the deployed one (ENV=local|aws, default local)
+    deps: [install]
+    cmds:
+      - node local/data.ts compact
+
   data:lint:
     desc: Gate - every major of the data contract is valid ODCS (the Data Contract CLI) and meets the house rules (rules/datacontract.yaml) and this API's own (.spectral.datacontract.yaml); warnings fail
     deps: [install]
@@ -580,7 +591,7 @@ tasks:
     cmds:
       - rm -rf dist
       - >-
-        npx esbuild $(ls src/handler.ts src/consumer.ts src/forwarder.ts 2>/dev/null) --bundle --platform=node --target=node22 --format=esm
+        npx esbuild $(ls src/handler.ts src/consumer.ts src/forwarder.ts src/compactor.ts 2>/dev/null) --bundle --platform=node --target=node22 --format=esm
         --outdir=dist --out-extension:.js=.mjs --external:@aws-sdk/* --log-level=warning
 
   infra:validate:

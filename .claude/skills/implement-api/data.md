@@ -26,11 +26,14 @@ implement for it: no code of yours writes to the bucket, and none should.
 - **An event landed that the data contract does not describe**, or **no
   event of a kind landed**, so part of the contract went untested. The two
   contracts, or the scenarios, disagree: a fault in the spec. Report it.
+- **An event is not in the Parquet, or is there twice.** The compactor is the
+  skeleton's: report it with the output, as for an event that never landed.
 - **The data breaks the contract.** The event your code published is valid
   against the AsyncAPI contract and still breaks a rule the data contract
   adds - a quality rule, usually. Fix the code if it publishes a value the
   rule forbids. If the rule cannot hold for a valid event, the two contracts
   disagree: stop and tell the user, quoting the rule and the event.
 
-`task data:query -- "select * from <event>"` shows what landed, against
-`task dev`: use it to see the value a rule objected to.
+`task data:query -- "select * from <event>_raw"` shows what landed, against
+`task dev` (`<event>` once `task data:compact` has run): use it to see the
+value a rule objected to.
