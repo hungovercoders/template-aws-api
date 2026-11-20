@@ -47,7 +47,7 @@ if (operations.length === 0) {
 const majors = (kind: "openapi" | "asyncapi" | "datacontract", only?: Set<number>) =>
   contracts(kind)
     .filter((contract) => !only || only.has(contract.major))
-    .map((contract) => `[v${contract.major}](${contract.path}) (${versionOf(kind, parseYaml(readFileSync(contract.path, "utf8"))) ?? "?"})`)
+    .map((contract) => `[v${contract.major}](${contract.path}) (${versionOf(kind, parseYaml(readFileSync(contract.path, "utf8"))) ?? "?"})${kind === "openapi" ? ` at \`/v${contract.major}\`` : ""}`)
     .join(", ");
 
 // An API with an asynchronous side has a second contract, specs/asyncapi.v<N>.yaml:
@@ -119,7 +119,7 @@ const block = [
   "",
   (contract.info?.description ?? "").trim().replace(/\s*\n\s*/g, " "),
   "",
-  `**Versions** ${majors("openapi")}, each served under its own /v<major> · [behaviour](specs/features) · [try it](http/contract.http)`,
+  `**Versions** ${majors("openapi")} · [behaviour](specs/features) · [try it](http/contract.http)`,
   "",
   "## Operations",
   "",

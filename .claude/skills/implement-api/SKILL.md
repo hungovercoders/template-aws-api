@@ -8,13 +8,12 @@ description: Implement, or bring up to date, the AWS Lambda API described by the
 You are given the spec, and it is the whole requirement:
 
 - **`specs/features/*.feature`** - the behaviour: what the API does, in business language.
-- **`specs/openapi.yaml`** - the HTTP contract: every operation, request and response.
-- **`specs/asyncapi.yaml`** and **`specs/datacontract.yaml`**, where the API
-  has them: the messages it takes, the events it publishes, and those events
-  as data. Workflow step 1 says what to read for each.
+- **`specs/openapi.v<N>.yaml`** - the HTTP contract, a file per live major, all served at once.
+- **`specs/asyncapi.v<N>.yaml`** and **`specs/datacontract.v<N>.yaml`**, where the API has
+  them: messages taken, events published, those events as data (workflow step 1).
 
 If the user passes paths to these files instead (`/implement-api <openapi> <features dir>`),
-copy them to `specs/openapi.yaml` and `specs/features/` first. That is the
+copy them to `specs/openapi.v<major>.yaml` and `specs/features/` first. That is the
 user supplying the spec, and the one time you write to `specs/`.
 
 Your job is to make `task ci` green without changing what the specs say.
@@ -36,14 +35,14 @@ behaviour inside each operation and each step.
 | A typed pending step for every sentence in the feature files | `task scaffold` |
 | A request for every operation, for exploring by hand | `task http:generate` |
 <!-- component:asyncapi:start -->
-| For `specs/asyncapi.yaml`: a typed stub per message received, a typed function per event published | `task scaffold`, `task generate` |
+| For `specs/asyncapi.v<N>.yaml`: a typed stub per message received, a typed function per event published | `task scaffold`, `task generate` |
 <!-- component:asyncapi:end -->
 
 So: never write or edit a route table, a type that mirrors the contract or an
 operation's signature by hand, and never write a step definition from
 scratch - start from the one `task scaffold` generated (merging and renaming
-them is expected; see workflow step 5). Use the types from
-`src/generated/api.d.ts` (`components["schemas"]["Thing"]`) rather than
+them is expected; see workflow step 5). Use each major's types from
+`src/generated/api.v<N>.d.ts` (`components["schemas"]["Thing"]`) rather than
 declaring your own, and re-run the command when the specs change. Before
 creating any file, ask whether a command already produces it. Something
 mechanical that no command covers is a gap in the template: report it.
@@ -114,19 +113,19 @@ the smallest change and tell the user what and why: the template may need it.
 Work in this order. Run the named gate after each step and read its output -
 it tells you exactly what is missing.
 
-1. **Read the specs.** Read `specs/openapi.yaml` and every feature file in
+1. **Read the specs.** Read `specs/openapi.v<N>.yaml` and every feature file in
    full. List the operations (by `operationId`) and, for each, the scenarios
    tagged `@operation:<operationId>`. Read `skills.json`: use its skills
    where they fit, and ask the user before adding one for an integration that
    has none (`task skills:add`); never add one unasked.
    <!-- component:consume:start -->
-   For a `receive` operation in `specs/asyncapi.yaml`, also follow [messages.md](messages.md).
+   For a `receive` operation in `specs/asyncapi.v<N>.yaml`, also follow [messages.md](messages.md).
    <!-- component:consume:end -->
    <!-- component:publish:start -->
    For a `send` operation there, also follow [events.md](events.md).
    <!-- component:publish:end -->
    <!-- component:data:start -->
-   With a `specs/datacontract.yaml`, also read [data.md](data.md).
+   With a `specs/datacontract.v<N>.yaml`, also read [data.md](data.md).
    <!-- component:data:end -->
 2. **`task spec:check` and `task spec:lint`** must pass before you write code.
    If `spec:check` fails the spec is incomplete (an operation with no
@@ -201,7 +200,8 @@ spec changed first (`write-spec`).
 
 **Start by reading what changed:** `git diff <the commit the code was last
 green at> -- specs`. A rule that changed while the contract kept its shape,
-or a new row in a scenario outline, shows only when `task features` runs.
+or a new row in a scenario outline, shows only when `task features` runs. A
+new major (`openapi.v2.yaml`) is new operations, `_v2`, over the same store.
 
 - **Something new** - `task scaffold` adds a stub for each new operation and
   a pending step for each new sentence, and touches nothing you have written.

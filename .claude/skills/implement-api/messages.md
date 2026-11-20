@@ -1,6 +1,6 @@
 # Implementing messages the API receives
 
-Read this when `specs/asyncapi.yaml` has a `receive` operation. It adds to
+Read this when `specs/asyncapi.v<N>.yaml` has a `receive` operation. It adds to
 the workflow in `SKILL.md`; nothing there changes.
 
 The skeleton already takes a message from the queue, reads it as the

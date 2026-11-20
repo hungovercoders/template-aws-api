@@ -2,7 +2,7 @@
 
 Read this when the API publishes events and the user wants them kept - for
 analysis, for other systems, for an audit. It adds to `SKILL.md`. The data
-contract is `specs/datacontract.yaml` (`docs/data.md`).
+contract is `specs/datacontract.v<N>.yaml` (`docs/data.md`).
 
 If the user does not want the events kept, propose removing the component
 (`task component:remove -- data`) and stop here.

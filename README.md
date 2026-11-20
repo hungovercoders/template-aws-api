@@ -83,10 +83,10 @@ flowchart TB
 
 | Interface | Direction | Contract | Optional |
 | --- | --- | --- | --- |
-| HTTP API | in and out | `specs/openapi.yaml` | no |
-| Messages from a queue | in | `specs/asyncapi.yaml`, `receive` | yes |
-| Events on a bus | out | `specs/asyncapi.yaml`, `send` | yes |
-| Events as data in S3 | out | `specs/datacontract.yaml` | yes |
+| HTTP API | in and out | `specs/openapi.v<N>.yaml` | no |
+| Messages from a queue | in | `specs/asyncapi.v<N>.yaml`, `receive` | yes |
+| Events on a bus | out | `specs/asyncapi.v<N>.yaml`, `send` | yes |
+| Events as data in S3 | out | `specs/datacontract.v<N>.yaml` | yes |
 
 Each part brings its Terraform, alarms, logs and tags. An API that does not
 need an optional part removes it, and can bring it back later:
@@ -141,17 +141,17 @@ the template once, not to one API.
 ## How it works
 
 ```
-specs/openapi.yaml ──┬─► request validation inside the Lambda
-   (the contract)    ├─► types, the route table and a stub for every operation
-                     ├─► API Gateway routes (Terraform reads the contract)
-                     ├─► response validation on every call the features make
-                     └─► generated fuzz requests (schemathesis)
+specs/openapi.v<N>.yaml   ─┬─► request validation inside the Lambda
+ (a file per live major)   ├─► types, the route table and a stub for every operation
+                           ├─► API Gateway routes under /v<N> (Terraform reads them)
+                           ├─► response validation on every call the features make
+                           └─► generated fuzz requests (schemathesis)
 
-specs/asyncapi.yaml ─┬─► every message and event validated as a CloudEvent
-   (messages, events)└─► a typed stub per message, a typed function per event
+specs/asyncapi.v<N>.yaml  ─┬─► every message and event validated as a CloudEvent
+ (messages, events)        └─► a typed stub per message, a typed function per event
 
-specs/datacontract.yaml ─► the bucket, its retention and freshness alarm
-   (events as data)        (Terraform reads it), and a test of what landed
+specs/datacontract.v<N>.yaml ─► per major: a stream, its retention, a freshness
+ (events as data)               alarm (Terraform reads it), a test of what landed
 
 specs/features/*.feature ──► cucumber, strict, against the built Lambda
    (the behaviour)           on infra/ applied to AWS Emulator
@@ -159,9 +159,9 @@ specs/features/*.feature ──► cucumber, strict, against the built Lambda
 
 | You bring | The template has | The agent writes |
 | --- | --- | --- |
-| `specs/openapi.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
-| `specs/asyncapi.yaml`, if it has messages or events | The queue, the outbox, the event bus | `src/consumers/`, and `outbox(event)` in a write |
-| `specs/datacontract.yaml`: owner, retention, sensitivity | The bucket, delivery, the data test | |
+| `specs/openapi.v<N>.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
+| `specs/asyncapi.v<N>.yaml`, if it has messages or events | The queue, the outbox, the event bus | `src/consumers/`, and `outbox(event)` in a write |
+| `specs/datacontract.v<N>.yaml`: owner, retention, sensitivity | The bucket, delivery, the data test | |
 | Who owns it: `domain` and `team` | Tags and a resource group | |
 
 ## See it working
@@ -209,8 +209,8 @@ start with:
 
 `/write-spec` is the quick way. To do it yourself:
 
-- Replace `specs/openapi.yaml` with your contract. Every operation needs an
-  `operationId`; error responses use the `Problem` schema already in the file.
+- Replace the starter `specs/openapi.v0.yaml` with your contract: paths under
+  `/v0`, `operationId`s ending `_v0`, errors using its `Problem` schema.
 - Add feature files to `specs/features/`, each scenario tagged with the
   operations it covers: `@operation:<operationId>`.
 - Rules for this API alone go in `.spectral.yaml`

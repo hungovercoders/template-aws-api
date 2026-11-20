@@ -1,20 +1,20 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-5d21cab76b8ea0e93473c3c431a0b582f7b49d24fb39eed040a83af2e3541748  .claude/skills/implement-api/SKILL.md
-54a5faf05e3ec48ec69e1eb05f6592809aaeec8c9f5b0b1380477d6e58c6cedf  .claude/skills/implement-api/SKILL.md#asyncapi
-6bbdb0913e33b32b7c0ef245489fb3d3d4990e90b5288993d49d5b9054b01da4  .claude/skills/implement-api/SKILL.md#consume
+b2750e3614bde0163ca2f0696b826184996f71a27c25263c2ab342130a3c4b75  .claude/skills/implement-api/SKILL.md
+a32a5a8368be115c64e587ee2f426dc011de87243b6a01b9fd0d94dbdd2779e5  .claude/skills/implement-api/SKILL.md#asyncapi
+4e9e6f4b3b11b3811b0672c2baf23627f2ef1492767743340bf2c78ff670f86e  .claude/skills/implement-api/SKILL.md#consume
 796ebb03caf74dd871839e0897fa4b3079226e554b58a6b985ec7d40a68ac3ed  .claude/skills/implement-api/SKILL.md#publish
-612d4985a97754e33492e0182ce7e6e5dfdaf7a03219693958e8fa5a5f525e3d  .claude/skills/implement-api/SKILL.md#data
-d9affeb587f1519d8ca004ba3c1d8029bb29631b4e33bcbe193cd9e8ab726cbe  .claude/skills/implement-api/data.md
-c6e087f0c16f5c225319cf01431d379b2257548c3499ccece4fac543a4bda196  .claude/skills/implement-api/events.md
-c39beab28af8a4b4d9bfcb5fed46d92ad17de25aeb3a963f7bffd95d6a90d744  .claude/skills/implement-api/messages.md
+f3c4188aff572cb5f971765b5e939f33a81aa84ce2c935d126fa7b45eb979a5a  .claude/skills/implement-api/SKILL.md#data
+e55de2ccff02e79986844643e3876de518d3b4b8d765ace49e87d2cdf4ba5999  .claude/skills/implement-api/data.md
+892e923f52075a1b18334662f0a94ae3faa0e650be8703361a70d6c46b03c2c2  .claude/skills/implement-api/events.md
+cada10b95f9433cd917fcd146816a0430f6b3648ee4b8530917e81d8a118ebc6  .claude/skills/implement-api/messages.md
 c045e0b36baa4dfdf9bf4855b41bdadbb930932335ef684e585ecd68498c86fb  .claude/skills/implement-api/store.md
-870c96ce715f7e1c253e45535927d665db11f6e7ed266bc326607342eb6b96c4  .claude/skills/write-spec/SKILL.md
-2c48077bb752c09ddc9ca4fbe82babcaafd94268db977646f25f7d72356c2db2  .claude/skills/write-spec/SKILL.md#consume
-5df393315d4b38d6d9e1f99e73e2a9a8fbedef82060534459717be051162e421  .claude/skills/write-spec/SKILL.md#publish
+9f49ee4c5186836dc01efdf95fe880cf1a5fd86e41c0e7cb323a5b7f88f60b40  .claude/skills/write-spec/SKILL.md
+ec0f2755d445a04922729cf94fa6f35d82578913bf5173642a95b73d8763b0f8  .claude/skills/write-spec/SKILL.md#consume
+e66143c0dbf7c4897de0f2549a1c75f03f78481a5a28e13148d6df7ae8088985  .claude/skills/write-spec/SKILL.md#publish
 5f5f1efac824f787aa025e7b243393f93f3696fef0026eb602119588c76efe55  .claude/skills/write-spec/SKILL.md#data
 46065efc20f0ffea2a00f9760f50898f06cdc7992708741f12913e7e9bf7b93e  .claude/skills/write-spec/SKILL.md#asyncapi
-8bc01d062c0eb481008c99aa3c2ee512916624ade0240f979507d7dbb74a21bf  .claude/skills/write-spec/data.md
+935ee4f3a6bd29d8802d8b19b90b64ba114e386037fc389d2645363cf07f9fa1  .claude/skills/write-spec/data.md
 8117bdb6db21c708fbb50ea9f06aac121130b2c505916d9de7890e76c51f1161  .githooks/pre-push
 549719f5f3455328ad00df5f92731c104420afc2021759aa1fba3f8c7ff0c66d  .github/workflows/ci.yml
 e4086fb27145e2b8154457549cf232c7765e0b478a38a11e4079a3898b76ea65  .github/workflows/emulator.yml
@@ -25,7 +25,7 @@ faa8f83142d95f685665d72ebcd11bb3346bb567863aeb6c74e706991986a689  Taskfile.yml#d
 f51ceff32c367903d7edba081b4a2a39dac1cd7109a005778968aa53774095c6  Taskfile.yml#publish
 cddb8d3a5572e3519b6b0b63491215b45619691b533cb613b33c179966d46ed9  components.json
 6cade406af2dc8c0d818e28e193903a87ecec74ad116b91178915289edbab5a6  cucumber.mjs
-cd0c7ccdce9864abf36a75c8b3e10dd997edc292ddb87198a3ceb032b01b92a4  docs/data.md
+928dbac4ca2c5a281de0298f28423da072dd8220793596085fae3f7b592cbf21  docs/data.md
 67c594fc663bb8e459c948440a875581fb2107e17cc952e47bf244d3176297a0  infra/alarms.tf
 8034c5c8c20583f3bd9b90095b6dc03a47b94da1fc12b19a75e7256c09927cc1  infra/bootstrap/main.tf
 19b8cbc3b576402522af1dc2c11ead7521087b828dae5e1345929325bcca6d8d  infra/bootstrap/main.tf#data
@@ -68,7 +68,7 @@ ba2ab7d9a041b1c76df4de55b4e84135fbc04f045f39d5e1d861293ad89cd56e  scripts/docs-c
 cb820c8837eac9670334105f42bdd3aae2aede98c8cb4f87cef09ecb7e530536  scripts/generate.ts
 5ca98e1f514ce7caff86b8642566aa36097488b12af9e7dfa42ae068901a2b82  scripts/http-generate.ts
 21a4882df0c54ccc39f710d51d02a8fb35354d1360fa69eb8250134ba86bd4a1  scripts/publish.ts
-c4140cfc34ad2ac74d694ab97089b5e21100f7c2411da4b831af35a865678a9f  scripts/readme.ts
+fbc3d3c0225da142ee471efe3dc879fdf26d04b5ebadc10c7f1a125782f50fb4  scripts/readme.ts
 64e984d919a1aab94fe2eed22cda48c5ce8514ea2217a7d42992a0fd7da71bfa  scripts/responses-check.ts
 d86f51fc6df7a5bf1207cf97ebc2f648e8b58b21b9f169c70b80911dd4e02608  scripts/rulesets.ts
 2cf398d55755e8724fd51460c015ed6c5f49dc8df417b1d887ac08998648d86d  scripts/sample.ts

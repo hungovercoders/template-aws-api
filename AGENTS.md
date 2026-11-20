@@ -8,7 +8,7 @@ files) is the requirement; `task ci` is the definition of done.
   the business logic the specs describe: `steps/`, `src/operations/`,
   `src/domain/`, `src/store/` and their tests.
 <!-- component:consume:start -->
-- A message the API receives is a `receive` operation in `specs/asyncapi.yaml`
+- A message the API receives is a `receive` operation in `specs/asyncapi.v<N>.yaml`
   and one function in `src/consumers/`; the queue and retries are the skeleton's.
 <!-- component:consume:end -->
 <!-- component:publish:start -->
@@ -29,8 +29,7 @@ files) is the requirement; `task ci` is the definition of done.
   `CONTRIBUTING.md` has the route for each kind of change.
 - To write or change the spec with the user, follow the `write-spec` skill.
   The user owns the requirements: ask, propose and confirm; never invent them.
-- To implement or change the API from the specs, follow the `implement-api`
-  skill.
+- To implement or change the API from the specs, follow the `implement-api` skill.
 - A skill is the instructions in `.claude/skills/<name>/SKILL.md`. If your
   tool does not load skills itself, read that file and follow it.
 - `skills.json` lists every skill in `.claude/skills/` and those the template
@@ -50,8 +49,9 @@ files) is the requirement; `task ci` is the definition of done.
   `task component:add -- <name>`, which brings it back from the template.
 - `specs/` is read-only unless the user asks for a spec change. The tags in
   `infra/tags.auto.tfvars.json` are the owner's to say: ask, never guess.
-- A contract change is versioned: `task spec:compat` lists what breaks and
-  holds `info.version` to it. A breaking change is the user's decision.
+- A contract is a file per live major (`specs/openapi.v<N>.yaml`, paths `/v<N>`,
+  names `_v<N>`); `task spec:compat` holds each to its version. A breaking
+  change is a new major beside the old, and the user's decision.
 - Never weaken a gate (Taskfile, cucumber config, the spec and backlog
   checks, the contract lint rules, CI) to get green.
 - Contract standards are lower snake_case (`rules/house.yaml`); rules for one
@@ -73,7 +73,7 @@ follow it. The rules that prevent damage, so they are always in view:
   commit. Never change a skeleton file on an example branch.
 - Never rebase, amend, reset or force-push `main` or `example/*`.
 - When merging a starter-contract change down, the example keeps its own
-  `specs/openapi.yaml`; never resolve with `-X ours` or `-X theirs`.
+  `specs/openapi.v0.yaml`; never resolve with `-X ours` or `-X theirs`.
 - Write a document only when no gate, generator or task description can
   carry it; give it one reader and one home. Do not raise a `task docs:check`
   budget to fit new text - cut, or ask the user.
