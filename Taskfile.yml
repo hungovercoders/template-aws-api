@@ -119,6 +119,7 @@ tasks:
       - |
         test -f specs/asyncapi.yaml || { echo "asyncapi:lint - no specs/asyncapi.yaml, so this API has no asynchronous side to check"; exit 0; }
         rules=rules/asyncapi.yaml; test -f .spectral.asyncapi.yaml && rules=.spectral.asyncapi.yaml
+        node --import tsx scripts/rulesets.ts "$rules" rules/asyncapi.yaml || exit 1
         npx spectral lint specs/asyncapi.yaml --ruleset "$rules" --fail-severity warn
 
   asyncapi:compat:
@@ -243,6 +244,7 @@ tasks:
         test -f specs/datacontract.yaml || { echo "data:lint - no specs/datacontract.yaml, so the events this API publishes are not kept as data"; exit 0; }
         uvx --from "datacontract-cli[duckdb]=={{.DATACONTRACT_CLI_VERSION}}" datacontract lint specs/datacontract.yaml
         rules=rules/datacontract.yaml; test -f .spectral.datacontract.yaml && rules=.spectral.datacontract.yaml
+        node --import tsx scripts/rulesets.ts "$rules" rules/datacontract.yaml
         npx spectral lint specs/datacontract.yaml --ruleset "$rules" --fail-severity warn
 
   data:check:
@@ -376,7 +378,8 @@ tasks:
     env:
       NODE_OPTIONS: ''
     cmds:
-      - npx spectral lint specs/openapi.yaml --fail-severity warn
+      - node --import tsx scripts/rulesets.ts .spectral.yaml rules/house.yaml
+      - npx spectral lint specs/openapi.yaml --ruleset .spectral.yaml --fail-severity warn
 
   mock:
     desc: Spec phase - serve a mock of the contract on http://127.0.0.1:4010 before anything is implemented (-- --dynamic for generated data)

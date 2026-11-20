@@ -35,6 +35,10 @@ So you know what to rely on, and what to check when reporting:
   resources. The roles it makes carry a permissions boundary it cannot
   change, and the job builds nothing: it deploys the bundle the gates
   passed. See [Deploy](docs/deploying.md#deploy).
+- **Vulnerable dependencies** get a pull request from Dependabot
+  (`.github/dependabot.yml`): the npm packages and GitHub Actions, one per
+  ecosystem, held to every gate. Turn on Dependabot alerts and security
+  updates under Settings → Code security; version updates stay Renovate's.
 - **AWS Emulator is verified** against AWS's signing key before it is used,
   and is never installed system-wide. The Docker image
   (`task emulator:docker`) installs the package without that check.

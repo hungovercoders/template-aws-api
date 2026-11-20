@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, the AWS Emulator, Prism and schemathesis versions in Taskfile.yml, and the commits skills are copied from (skills.json). One-time setup: install the Renovate app on the repository.",
+  "description": "Keeps the template's pins moving: npm, GitHub Actions, Terraform providers, mise tools, the AWS Emulator, Prism and schemathesis versions in Taskfile.yml, and the commits skills are copied from (skills.json). Security fixes are Dependabot's (.github/dependabot.yml), so Renovate raises none of its own. One-time setup: install the Renovate app on the repository.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests"
@@ -8,6 +8,9 @@
   "baseBranchPatterns": [
     "main"
   ],
+  "vulnerabilityAlerts": {
+    "enabled": false
+  },
   "customManagers": [
     {
       "customType": "regex",

@@ -92,7 +92,10 @@ API, on top of Spectral's built-in OpenAPI rules:
 **Your rules** go in `.spectral.yaml`, which extends the house rules. Add what
 is specific to your API or organisation - versioning, security schemes,
 documentation requirements - using any
-[Spectral rule](https://docs.stoplight.io/docs/spectral/d3482ff0ccae9-rules):
+[Spectral rule](https://docs.stoplight.io/docs/spectral/d3482ff0ccae9-rules).
+It may make an inherited rule stricter, never weaker: the lint tasks refuse a
+ruleset that drops the house rules, switches or softens one they hold, or
+exempts paths with `overrides` (`scripts/rulesets.ts`).
 
 ```yaml
 extends: ["./rules/house.yaml"]
