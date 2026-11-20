@@ -2,6 +2,7 @@
 //   node local/data.ts test          - gate: the data that landed keeps the data contract (schema and quality rules)
 //   node local/data.ts query [sql]   - run SQL over the data with DuckDB, a view per event already defined; no SQL opens its shell
 //   node local/data.ts browse        - the same views in Harlequin
+//   node local/data.ts compact       - compact the raw JSON into Parquet now, as the daily schedule does
 // ENV=local (the default) is the local stack on AWS Emulator; ENV=aws is the
 // deployed stack, with your AWS credentials. Each live major of the data
 // contract (specs/datacontract.v<N>.yaml) keeps its data under a prefix of its
@@ -14,6 +15,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
+import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { parquetReadObjects } from "hyparquet";
 import { parseDocument } from "yaml";
 import { contracts } from "../scripts/contracts.ts";
 import { stackOutputs } from "./outputs.ts";
@@ -45,11 +48,22 @@ const chosen = process.env.DATA_MAJOR
 const CONTRACT = chosen.path;
 // Inside `task acceptance` the stack's outputs are already in the environment.
 const inAcceptance = Boolean(process.env.DATA_BUCKET) && where === "local";
-const outputs = inAcceptance ? { data_bucket: process.env.DATA_BUCKET, data_prefixes: process.env.DATA_PREFIXES, data_compression: process.env.DATA_COMPRESSION } : stackOutputs("data");
+const outputs = inAcceptance
+  ? {
+      data_bucket: process.env.DATA_BUCKET,
+      data_prefixes: process.env.DATA_PREFIXES,
+      data_parquet_prefixes: process.env.DATA_PARQUET_PREFIXES,
+      data_compactor: process.env.DATA_COMPACTOR,
+      data_compression: process.env.DATA_COMPRESSION,
+    }
+  : stackOutputs("data");
 const bucket = outputs.data_bucket || fail(`data: the stack has no bucket for the data - it was applied before ${CONTRACT} was written. Apply it again (locally: restart \`task dev\`)`);
 const prefix =
   (JSON.parse(outputs.data_prefixes || "{}") as Record<string, string>)[`v${chosen.major}`] ??
   fail(`data: the stack keeps no data for ${CONTRACT} - it was applied before that major was written. Apply it again (locally: restart \`task dev\`)`);
+const parquetPrefix =
+  (JSON.parse(outputs.data_parquet_prefixes || "{}") as Record<string, string>)[`v${chosen.major}`] ??
+  fail(`data: the stack has no Parquet for ${CONTRACT} - it was applied before the compaction to Parquet was. Apply it again (locally: restart \`task dev\`)`);
 const emulator = process.env.AWS_ENDPOINT_URL;
 // The emulator has no host name for a bucket.
 const s3 = new S3Client(emulator ? { forcePathStyle: true } : {});
@@ -59,12 +73,12 @@ const schemas = ((parseDocument(readFileSync(CONTRACT, "utf8")).toJS() as { sche
 const nameOf = (type: string) => schemas.find((candidate) => candidate.physicalName === type)?.name;
 
 type Stored = { key: string; type: string; day: string };
-/** Everything under the prefix that is an event: <prefix>type=<event type>/dt=<day>/<file>. Names only; nothing is read. */
-async function stored(): Promise<Stored[]> {
+/** Everything under a prefix that is an event, or a day's Parquet: <prefix>type=<event type>/dt=<day>/<file>. Names only; nothing is read. */
+async function stored(under = prefix): Promise<Stored[]> {
   const found: Stored[] = [];
   let token: string | undefined;
   do {
-    const page = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }));
+    const page = await s3.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: under, ContinuationToken: token }));
     for (const object of page.Contents ?? []) {
       const match = /type=([^/]+)\/dt=([^/]+)\/[^/]+$/.exec(object.Key ?? "");
       if (match) found.push({ key: object.Key!, type: match[1]!, day: match[2]! });
@@ -206,6 +220,69 @@ async function test(): Promise<void> {
   if (run.status !== 0) fail(`data:test failed - the data in s3://${bucket}/${prefix} does not keep ${CONTRACT} (above)`);
   const how = copy ? "from an unpacked copy that has been removed" : "where it is";
   console.log(`data:test ok - the data in s3://${bucket}/${prefix} keeps the data contract, tested ${how}: ${tested.length} events' data${skipped.length > 0 ? ` (${skipped.length} days of gzipped data not tested)` : ""}${without.length > 0 ? `; none yet for ${without.map((object) => object.name).join(", ")}` : ""}`);
+  await testParquet(expected, days, (contracts) => spawnSync("uvx", ["--from", `datacontract-cli[duckdb,s3]==${version}`, "python", "local/data_test.py", "data", ...contracts], { stdio: "inherit", env }).status === 0);
+}
+
+/** Run the compactor now, as its schedule does, today included. */
+async function compactNow(): Promise<unknown> {
+  const name = outputs.data_compactor || fail("data: the stack has no compactor - it was applied before the compaction to Parquet was. Apply it again (locally: restart `task dev`)");
+  const lookbackDays = Number(process.env.DATA_DAYS ?? 3);
+  const reply = await new LambdaClient({}).send(new InvokeCommand({ FunctionName: name, Payload: new TextEncoder().encode(JSON.stringify({ includeToday: true, lookbackDays })) }));
+  const answer = reply.Payload ? new TextDecoder().decode(reply.Payload) : "";
+  if (reply.FunctionError) fail(`data:compact failed - the compactor ${name} answered ${reply.FunctionError}: ${answer}`);
+  return JSON.parse(answer || "{}");
+}
+
+/**
+ * The Parquet keeps the contract too. In acceptance the compactor is run first,
+ * and every event the scenarios published must be in it exactly once; on AWS the
+ * last DATA_DAYS whole days are tested, which the schedule has compacted.
+ */
+async function testParquet(expected: string[], days: number | undefined, runCli: (contracts: string[]) => boolean): Promise<void> {
+  if (inAcceptance) await compactNow();
+  const today = new Date().toISOString().slice(0, 10);
+  const since = days ? new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10) : "";
+  const files = (await stored(parquetPrefix)).filter((file) => file.day >= since && (!days || file.day < today));
+  const problems: string[] = [];
+  if (inAcceptance && expected.length > 0) {
+    const seen = new Map<string, number>();
+    for (const file of files) {
+      const body = await (await s3.send(new GetObjectCommand({ Bucket: bucket, Key: file.key }))).Body!.transformToByteArray();
+      const rows = (await parquetReadObjects({ file: body.buffer.slice(body.byteOffset, body.byteOffset + body.byteLength) as ArrayBuffer, columns: ["id"] })) as { id: string }[];
+      for (const row of rows) seen.set(row.id, (seen.get(row.id) ?? 0) + 1);
+    }
+    const missing = expected.filter((id) => !seen.has(id));
+    const repeated = [...seen].filter(([, count]) => count > 1).map(([id]) => id);
+    if (missing.length > 0) problems.push(`${missing.length} of the ${expected.length} events the scenarios published are not in the Parquet in s3://${bucket}/${parquetPrefix} (the first: ${missing[0]})`);
+    if (repeated.length > 0) problems.push(`${repeated.length} events are in the Parquet more than once (the first: ${repeated[0]}): each should be there once`);
+  }
+  const compacted = schemas.filter((object) => files.some((file) => file.type === object.physicalName));
+  if (problems.length > 0) fail(["data:test failed", ...problems.map((problem) => `  - ${problem}`)].join("\n"));
+  if (compacted.length === 0) return console.log(`data:test - nothing has been compacted into s3://${bucket}/${parquetPrefix}${days ? ` in the last ${days} whole days` : ""}, so there is no Parquet to test`);
+
+  // One contract for each event type and place, as for the raw JSON, read as Parquet; and an id is there once.
+  const dir = resolve(".local", "datacontract.test-parquet");
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const contract = parseDocument(readFileSync(CONTRACT, "utf8")).toJS() as { schema: (SchemaObject & { properties?: { name: string; quality?: unknown[] }[] })[] };
+  const at = (object: SchemaObject, day: string) => ({ type: "s3", location: `s3://${bucket}/${parquetPrefix}type=${object.physicalName}/${day}/*.parquet`, ...(emulator ? { endpointUrl: new URL(emulator).origin } : {}) });
+  const places = compacted.flatMap((object) =>
+    days
+      ? [...new Set(files.filter((file) => file.type === object.physicalName).map((file) => file.day))].sort().map((day) => ({ object, label: `${object.name}.${day}`, server: at(object, `dt=${day}`) }))
+      : [{ object, label: object.name, server: at(object, "*") }],
+  );
+  const contracts = places.map(({ object, label, server }) => {
+    const doc = parseDocument(readFileSync(CONTRACT, "utf8"));
+    doc.set("servers", [{ server: "data", ...server, format: "parquet" }]);
+    const own = contract.schema.find((candidate) => candidate.name === object.name)!;
+    const properties = (own.properties ?? []).map((property) => (property.name === "id" ? { ...property, quality: [...(property.quality ?? []), { metric: "duplicateValues", mustBe: 0 }] } : property));
+    doc.set("schema", [{ ...own, physicalName: object.name, properties }]);
+    const file = join(dir, `${label}.yaml`);
+    writeFileSync(file, doc.toString({ lineWidth: 0 }));
+    return file;
+  });
+  if (!runCli(contracts)) fail(`data:test failed - the Parquet in s3://${bucket}/${parquetPrefix} does not keep ${CONTRACT} (above)`);
+  console.log(`data:test ok - the Parquet in s3://${bucket}/${parquetPrefix} keeps the data contract, each event once: ${compacted.length} events' data`);
 }
 
 const quote = (text: string) => `'${text.replace(/'/g, "''")}'`;
@@ -218,7 +295,10 @@ async function views(canReadS3: boolean): Promise<string> {
   const lines: string[] = [];
   const objects = await stored();
   const present = new Set(objects.map((object) => object.type));
+  const parquetFiles = await stored(parquetPrefix);
+  const compactedTypes = new Set(parquetFiles.map((file) => file.type));
   let source: (object: SchemaObject) => string;
+  let parquetSource: (object: SchemaObject) => string;
   // Reading S3 needs DuckDB's httpfs extension, which it downloads the first time.
   if (canReadS3) {
     const credentials = await defaultProvider()();
@@ -231,6 +311,7 @@ async function views(canReadS3: boolean): Promise<string> {
     lines.push(`CREATE OR REPLACE SECRET data (TYPE s3, KEY_ID ${quote(credentials.accessKeyId)}, SECRET ${quote(credentials.secretAccessKey)}${session}, REGION ${quote(region)}${at});`);
     // Plain or gzipped: DuckDB tells by the file's name.
     source = (object) => `read_json(${quote(`s3://${bucket}/${prefix}type=${object.physicalName}/*/*`)}, format='newline_delimited', hive_partitioning=true, union_by_name=true)`;
+    parquetSource = (object) => `read_parquet(${quote(`s3://${bucket}/${parquetPrefix}type=${object.physicalName}/*/*.parquet`)}, hive_partitioning=true)`;
   } else {
     // Where the extension cannot be downloaded (a proxy that only passes HTTPS), the data can only be read from a copy.
     if (where === "aws") {
@@ -240,16 +321,28 @@ async function views(canReadS3: boolean): Promise<string> {
     console.error("data: DuckDB could not install its httpfs extension here, so the local stack's data is read from a copy that is removed when this ends.");
     await copyTo(copy, objects);
     source = (object) => `read_json(${quote(`${copy}/${object.name}/*/*.json`)}, format='newline_delimited', hive_partitioning=true, union_by_name=true)`;
+    for (const file of parquetFiles) {
+      const path = join(copy, "parquet", nameOf(file.type) ?? "_undescribed", `dt=${file.day}`, "events.parquet");
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, await read(file.key), { mode: 0o600 });
+    }
+    parquetSource = (object) => `read_parquet(${quote(`${copy}/parquet/${object.name}/*/*.parquet`)}, hive_partitioning=true)`;
   }
   const defined: string[] = [];
   for (const object of schemas) {
     if (!present.has(object.physicalName!)) continue;
     // An event is delivered at least once, so it can be stored twice: a view shows each once.
-    lines.push(`CREATE OR REPLACE VIEW ${object.name} AS SELECT * REPLACE (CAST("time" AS TIMESTAMPTZ) AS "time") FROM ${source(object)} QUALIFY row_number() OVER (PARTITION BY id ORDER BY "time") = 1;`);
+    lines.push(`CREATE OR REPLACE VIEW ${object.name}_raw AS SELECT * REPLACE (CAST("time" AS TIMESTAMPTZ) AS "time") FROM ${source(object)} QUALIFY row_number() OVER (PARTITION BY id ORDER BY "time") = 1;`);
+    defined.push(`${object.name}_raw`);
+  }
+  // The days compacted to Parquet: typed by the contract, each event once already.
+  for (const object of schemas) {
+    if (!compactedTypes.has(object.physicalName!)) continue;
+    lines.push(`CREATE OR REPLACE VIEW ${object.name} AS SELECT * FROM ${parquetSource(object)};`);
     defined.push(object.name);
   }
   const quiet = schemas.filter((object) => !defined.includes(object.name)).map((object) => object.name);
-  console.error(`data: ${defined.length > 0 ? `views ${defined.join(", ")}` : "no views"} over s3://${bucket}/${prefix}${quiet.length > 0 ? `; nothing has landed yet for ${quiet.join(", ")}` : ""}`);
+  console.error(`data: ${defined.length > 0 ? `views ${defined.join(", ")}` : "no views"} over s3://${bucket}/${prefix} (<event>_raw) and s3://${bucket}/${parquetPrefix} (<event>)${quiet.length > 0 ? `; no Parquet yet for ${quiet.join(", ")}` : ""}`);
   const file = resolve(".local", `data-${where}.sql`);
   mkdirSync(dirname(file), { recursive: true });
   // It holds the credentials the views read with: readable by nobody else, and gone when the task ends,
@@ -268,6 +361,7 @@ const canReadS3 = () => duckdb(["-c", "INSTALL httpfs; LOAD httpfs;"]).status ==
 
 const [command, ...rest] = process.argv.slice(2);
 if (command === "test") await test();
+else if (command === "compact") console.log(`data:compact - ${JSON.stringify(await compactNow())}`);
 else if (command === "query") {
   const init = await views(canReadS3());
   const sql = rest.join(" ").trim();
@@ -280,4 +374,4 @@ else if (command === "query") {
   const run = spawnSync("uvx", ["--with", `duckdb==${duckdbVersion()}`, `harlequin==${version}`, "--init-path", init], { stdio: "inherit" });
   rmSync(init, { force: true });
   process.exit(run.status ?? 1);
-} else fail("data: test | query [sql] | browse");
+} else fail("data: test | query [sql] | browse | compact");

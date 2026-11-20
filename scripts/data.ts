@@ -10,10 +10,12 @@
 //                                     contract, and says what the infrastructure needs (where, how long, how fresh)
 //   node scripts/data.ts compat     - gate: changes since the last published contract are listed, and its
 //                                     version is bumped to match (breaking needs a major)
+//   node scripts/data.ts layout     - src/generated/data.json: each live major's schema objects, for the
+//                                     compactor to type its Parquet by (task generate runs it)
 // The Data Contract CLI does the rest: `task data:lint` (valid ODCS) and
 // `task data:test` (the data that landed keeps the contract).
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -195,14 +197,30 @@ export const read = (text: string) => (parseDocument(text).toJS() ?? {}) as Cont
 export function needs(contract: Contract): string[] {
   const problems: string[] = [];
   if (!contract.servers?.some((server) => server.server === "production")) problems.push("servers has no server named `production`: where the data is kept");
-  // Every server is a stack's bucket (`-var data_server=<name>`), so each is held to what the Terraform reads.
-  for (const server of contract.servers ?? []) {
+  const LOCATION = /^s3:\/\/([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])\/(([a-z0-9_-]+\/)+)$/;
+  const servers = contract.servers ?? [];
+  // Every server is a stack's bucket (`-var data_server=<name>`), so each is held to what the Terraform reads;
+  // beside it, <name>-parquet is where the compactor writes each day as Parquet.
+  for (const server of servers) {
     const name = `the ${server.server ?? "unnamed"} server`;
+    const parquet = server.server?.endsWith("-parquet") ?? false;
     if (server.type !== "s3") problems.push(`${name}'s type must be s3`);
-    if (!/^s3:\/\/[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]\/([a-z0-9_-]+\/)+$/.test(server.location ?? "")) {
+    if (!LOCATION.test(server.location ?? "")) {
       problems.push(`${name}'s location must be s3://<bucket>/<prefix>/ - lower case, ending in a slash; events land under it as type=<event type>/dt=<date>/`);
     }
+    if (parquet) {
+      if (server.format !== "parquet") problems.push(`${name} must say format: parquet - the compactor writes one Parquet file per event type and day`);
+      continue;
+    }
     if (server.format !== "json" || server.delimiter !== "new_line") problems.push(`${name} must say format: json and delimiter: new_line - one event per line is what is written`);
+    const twin = servers.find((candidate) => candidate.server === `${server.server}-parquet`);
+    if (!twin) {
+      problems.push(`${name} has no ${server.server}-parquet server beside it: where the compactor writes each day as Parquet (type: s3, format: parquet, the same bucket, a prefix of its own)`);
+      continue;
+    }
+    const [raw, curated] = [LOCATION.exec(server.location ?? ""), LOCATION.exec(twin.location ?? "")];
+    if (raw && curated && raw[1] !== curated[1]) problems.push(`the ${twin.server} server is in bucket ${curated[1]}, not ${raw[1]}: the Parquet is kept beside the raw JSON`);
+    if (raw && curated && (raw[2]!.startsWith(curated[2]!) || curated[2]!.startsWith(raw[2]!))) problems.push(`the ${twin.server} server's prefix overlaps ${name}'s: each needs a prefix of its own`);
   }
   const sla = (property: string) => contract.slaProperties?.find((entry) => entry.property === property);
   const retention = sla("retention");
@@ -321,6 +339,35 @@ function compareOne(file: File, ref: string, problems: string[], report: string[
   report.push(`  ${label}: ${from} -> ${current.version}: ${breaking ? "breaking" : "nothing breaking"}, ${changes.length} changes`, ...(problems.length > before_ && breaking ? [verdict] : lines));
 }
 
+// --- Generated: what the compactor types its Parquet by -------------------------
+
+type Described = { name?: string; logicalType?: string; required?: boolean; properties?: Described[]; items?: Described };
+const described = (property: Described): Described => ({
+  ...(property.name === undefined ? {} : { name: property.name }),
+  ...(property.logicalType === undefined ? {} : { logicalType: property.logicalType }),
+  ...(property.required ? { required: true } : {}),
+  ...(property.properties ? { properties: property.properties.map(described) } : {}),
+  ...(property.items ? { items: described(property.items) } : {}),
+});
+
+/** Each live major's schema objects: their names, their event types and how each property is typed. */
+export function layout(texts: Record<string, string>): Record<string, { name: string; physicalName: string; properties: Described[] }[]> {
+  return Object.fromEntries(
+    Object.entries(texts).map(([major, text]) => {
+      const contract = parseDocument(text).toJS() as { schema?: (Described & { physicalName?: string })[] };
+      const objects = (contract?.schema ?? []).filter((object) => object.name && object.physicalName);
+      return [major, objects.map((object) => ({ name: object.name!, physicalName: object.physicalName!, properties: (object.properties ?? []).map(described) }))];
+    }),
+  );
+}
+
+function writeLayout(): void {
+  const texts = Object.fromEntries(contracts("datacontract").map((file) => [`v${file.major}`, readFileSync(file.path, "utf8")]));
+  mkdirSync("src/generated", { recursive: true });
+  writeFileSync("src/generated/data.json", JSON.stringify(layout(texts), null, 2) + "\n");
+  console.log(`generated src/generated/data.json - ${Object.keys(texts).length} data contract majors`);
+}
+
 // Run as a script, wherever the checkout is and however it was reached - not when a test imports it.
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   try {
@@ -328,7 +375,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.ar
     if (command === "generate") generate();
     else if (command === "check") check();
     else if (command === "compat") compat();
-    else stop("data: generate | check | compat");
+    else if (command === "layout") writeLayout();
+    else stop("data: generate | check | compat | layout");
   } catch (error) {
     if (!(error instanceof Problem)) throw error;
     console.error(error.message);
