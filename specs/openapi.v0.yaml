@@ -12,9 +12,9 @@ tags:
   - name: ratings
 
 paths:
-  /beers:
+  /v0/beers:
     get:
-      operationId: list_beers
+      operationId: list_beers_v0
       summary: List the beers in the catalogue
       tags: [beers]
       parameters:
@@ -74,7 +74,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
     post:
-      operationId: create_beer
+      operationId: create_beer_v0
       summary: Add a beer to the catalogue
       tags: [beers]
       requestBody:
@@ -108,11 +108,11 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
 
-  /beers/{beer_id}:
+  /v0/beers/{beer_id}:
     parameters:
       - $ref: "#/components/parameters/BeerId"
     get:
-      operationId: get_beer
+      operationId: get_beer_v0
       summary: Fetch one beer
       tags: [beers]
       responses:
@@ -127,7 +127,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
-      operationId: update_beer
+      operationId: update_beer_v0
       summary: Change a beer's details
       tags: [beers]
       requestBody:
@@ -156,7 +156,7 @@ paths:
         "409":
           $ref: "#/components/responses/Conflict"
     delete:
-      operationId: retire_beer
+      operationId: retire_beer_v0
       summary: Retire a beer from the catalogue
       tags: [beers]
       security:
@@ -171,11 +171,11 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /beers/{beer_id}/ratings:
+  /v0/beers/{beer_id}/ratings:
     parameters:
       - $ref: "#/components/parameters/BeerId"
     post:
-      operationId: rate_beer
+      operationId: rate_beer_v0
       summary: Rate a beer
       tags: [ratings]
       requestBody:

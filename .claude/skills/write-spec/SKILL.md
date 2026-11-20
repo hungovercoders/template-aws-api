@@ -1,6 +1,6 @@
 ---
 name: write-spec
-description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/openapi.yaml and the BDD feature files in specs/features, and where the API takes messages, publishes events or keeps them as data, the AsyncAPI contract and the data contract - and to change that spec safely for the rest of the API's life. Use when asked to design, specify or define an API, and whenever an existing API should do something new, different or less, or has a bug - every such change starts here, before any code. Ends with a spec the gates accept and the user has approved; it does not implement.
+description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/openapi.v<N>.yaml and the BDD feature files in specs/features, and where the API takes messages, publishes events or keeps them as data, the AsyncAPI contract and the data contract - and to change that spec safely for the rest of the API's life. Use when asked to design, specify or define an API, and whenever an existing API should do something new, different or less, or has a bug - every such change starts here, before any code. Ends with a spec the gates accept and the user has approved; it does not implement.
 ---
 
 # Write the spec with the user
@@ -13,10 +13,10 @@ Its outputs, and nothing else:
 
 - **`specs/features/*.feature`** - the behaviour: what the API does, in the
   user's business language, whichever way it is asked.
-- **`specs/openapi.yaml`** - the HTTP contract: every operation, request and
+- **`specs/openapi.v<N>.yaml`** - the HTTP contract: every operation, request and
   response.
-- **`specs/asyncapi.yaml`** - where the API takes messages or publishes
-  events - and **`specs/datacontract.yaml`** - where it keeps those events as
+- **`specs/asyncapi.v<N>.yaml`** - where the API takes messages or publishes
+  events - and **`specs/datacontract.v<N>.yaml`** - where it keeps those events as
   data. Each has a section below, present while the repository has that part.
 
 Stop when the spec is done. Implementing it is the `implement-api` skill.
@@ -46,7 +46,7 @@ you assumed something, say so and get a yes.
 ## Workflow
 
 1. **Understand what exists.** Run `task component:list` and see
-   [Optional components](#optional-components). Read `specs/openapi.yaml` and
+   [Optional components](#optional-components). Read `specs/openapi.v<N>.yaml` and
    `specs/features/`. If the contract has operations, this is a *change* to a
    published spec: read [Changing a spec](#changing-a-spec) before anything
    else. If it is the starter (`paths: {}`), this is a new API.
@@ -147,7 +147,7 @@ write by hand what a removed component would have provided.
 ## Messages the API receives
 
 Work that arrives on a queue is specified like a request: a scenario says
-what happens, and `specs/asyncapi.yaml` (see `docs/spec.md`) says what the
+what happens, and `specs/asyncapi.v<N>.yaml` (see `docs/spec.md`) says what the
 message is, as a `receive` operation. Ask the user, and confirm:
 
 - **what arrives and from whom** - name the message for what happened where
@@ -172,12 +172,12 @@ is handled first.
 ## Events the API publishes
 
 What other services are told is specified too: a scenario says when an
-event is published, and `specs/asyncapi.yaml` says what it is, as a `send`
+event is published, and `specs/asyncapi.v<N>.yaml` says what it is, as a `send`
 operation. Ask the user, and confirm:
 
 - **what others need to know happened** - name each event for the thing and
-  what happened to it, in the past tense: "a beer was retired". One event
-  for each thing that happens, not one "changed" event for all of them;
+  what happened to it, in the past tense: "a beer was retired" (type
+  `...beer.retired.v1`, message and operations `_v1`). One event per thing;
 - **what it carries.** Enough for a subscriber to act without calling back,
   and nothing private: an event is read by services you do not know. Every
   property is a promise, so start small; adding one later is not breaking;
@@ -256,10 +256,11 @@ is. Ask the user to check a skill's licence allows the copy.
 
 ## Writing the contract
 
-- **Start from `specs/openapi.yaml` as it is.** It carries the `Problem`
+- **Start from `specs/openapi.v0.yaml` as it is.** It carries the `Problem`
   schema and reusable error responses the template's router produces.
 - **`operationId`** names the operation everywhere - the handler, the file,
-  the tag in the features. Lower snake_case, verb first: `create_beer`.
+  the tag in the features. Lower snake_case, verb first, its major last:
+  `create_beer_v0`. Every path starts with that major: `/v0/beers`.
 - **Every operation** has a `summary`, a `400` response, and a response for
   every outcome a scenario describes. If a scenario says a request is
   refused, the contract documents that status for that operation.
@@ -279,7 +280,7 @@ is. Ask the user to check a skill's licence allows the copy.
   document `401` on each.
 - **Lists** - anything that can grow is paged: a `limit`, a `cursor`, and a
   `next_cursor` in the response. Say what the order is.
-- **`info.version`** is a semantic version. A new API starts at `0.1.0`.
+- **`info.version`** is a semantic version whose major is the file's. A new API starts at `0.1.0`.
 
 ## What the template has decided
 
@@ -310,7 +311,7 @@ kinds, and tell the user which theirs is before you make it:
 
 | Kind | Examples | `info.version` |
 | --- | --- | --- |
-| **Breaking** - an existing consumer can fail | removing or renaming an operation, property or enum value; a new required request property; a tighter limit; a different status; **a rule that now gives a different answer** | new **major** (while the API is `0.x`, a new minor) |
+| **Breaking** - an existing consumer can fail | removing or renaming an operation, property or enum value; a new required request property; a tighter limit; a different status; **a rule that now gives a different answer** | a **new major file** beside the old (while the API is `0.x`, a new minor) |
 | **Additive** - existing consumers are unaffected | a new operation; a new optional request property; a new response property | new **minor** |
 | **Clarifying** - the API behaves the same | descriptions, examples, summaries | new **patch** |
 
@@ -332,9 +333,9 @@ One change often holds several kinds; the version follows the most serious.
   demands a minor for these; the major is their decision, and you raise it.
 - **A breaking change is the user's decision, not yours.** Show them the
   list and the consumers it affects, and offer the additive alternative
-  first: add the new thing beside the old, mark the old `deprecated: true`,
-  and remove it in a later major version. Only bump the major when they
-  choose to break.
+  first: add the new thing beside the old and mark the old `deprecated: true`.
+  If they choose to break, copy the major's file to the next one
+  (`openapi.v2.yaml`: version `2.0.0`, paths `/v2`, ids `_v2`; `docs/spec.md`).
 - Change the features with the contract: update the scenarios the change
   affects, add scenarios for new behaviour, and delete scenarios only for
   behaviour the user has agreed to remove. Word new sentences like the

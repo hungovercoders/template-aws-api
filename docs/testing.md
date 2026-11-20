@@ -19,17 +19,18 @@ Each gate fails for one reason and says what it is:
   source has moved to a newer commit than the copy; run `task skills:fetch`
   and commit.
 - **`spec:check`** - no operations, an operation without an `operationId`, an
-  operation no scenario is tagged for, or a tag naming an operation that does
-  not exist.
+  operation no scenario is tagged for, a tag naming an operation that does not
+  exist, or a file whose version, paths or `operationId`s are not its major's.
 - **`spec:lint`** - the contract breaks a rule in `rules/house.yaml` or
   `.spectral.yaml`. Warnings fail as well as errors.
-- **`spec:compat`** - the contract changed since the last published one and
-  `info.version` does not say so: a breaking change without a new major
-  version, an API change without a new minor, or an edit without a new version.
+- **`spec:compat`** - a major changed since it was last published and its
+  `info.version` does not say so: a breaking change (it belongs in the next
+  major's file), an API change without a new minor, an edit without a new
+  version, or a major deleted that was not published deprecated.
 <!-- component:asyncapi:start -->
 - **`asyncapi:check`**, **`asyncapi:lint`**, **`asyncapi:compat`**,
   **`asyncapi:examples:check`** - the same four failures for
-  `specs/asyncapi.yaml` as `spec:check`, `spec:lint`, `spec:compat` and
+  `specs/asyncapi.v<N>.yaml` as `spec:check`, `spec:lint`, `spec:compat` and
   `http:check` have for the OpenAPI contract; see
   [Messages and events](spec.md#messages-and-events-the-asyncapi-contract).
   Without that file they have nothing to do.

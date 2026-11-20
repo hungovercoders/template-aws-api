@@ -28,7 +28,7 @@ Every stack is deployed with the same alarms: the baseline in
 | `<name>-event-delivery-failed` | Any failed delivery from the bus to a target in 5 minutes | A rule's target is refusing events |
 <!-- component:publish:end -->
 <!-- component:data:start -->
-| `<name>-data-delivery`, `-data-freshness`, `-data-rule` | The events kept in S3 are failing to arrive, late, or not reaching the stream | See [Events as data](data.md#alarms) |
+| `<name>-data-v<N>-delivery`, `-freshness`, `-rule` | The events kept in S3 are failing to arrive, late, or not reaching the stream | See [Events as data](data.md#alarms) |
 <!-- component:data:end -->
 
 Each alarm notifies when it fires and again when it recovers. Routing:
@@ -172,7 +172,7 @@ Nothing is lost yet, and nothing else is held up.
 5. Once the cause is fixed, `ENV=aws task dlq:redrive` sends them round again.
 
 **Usually** a sender and this API disagreeing about the contract. Compare
-the message with `specs/asyncapi.yaml` and with `messages/`.
+the message with `specs/asyncapi.v<N>.yaml` and with `messages/`.
 
 ### queue-age
 

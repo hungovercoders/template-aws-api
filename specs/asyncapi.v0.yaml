@@ -13,88 +13,88 @@ channels:
     address: beer-ratings
     description: Ratings of beers, submitted somewhere other than the catalogue's own API.
     messages:
-      beer_rating_submitted:
-        $ref: "#/components/messages/beer_rating_submitted"
+      beer_rating_submitted_v1:
+        $ref: "#/components/messages/beer_rating_submitted_v1"
   beer_events:
     address: beer-events
     description: What happened to the beers in the catalogue.
     messages:
-      beer_created:
-        $ref: "#/components/messages/beer_created"
-      beer_updated:
-        $ref: "#/components/messages/beer_updated"
-      beer_retired:
-        $ref: "#/components/messages/beer_retired"
-      beer_rated:
-        $ref: "#/components/messages/beer_rated"
+      beer_created_v1:
+        $ref: "#/components/messages/beer_created_v1"
+      beer_updated_v1:
+        $ref: "#/components/messages/beer_updated_v1"
+      beer_retired_v1:
+        $ref: "#/components/messages/beer_retired_v1"
+      beer_rated_v1:
+        $ref: "#/components/messages/beer_rated_v1"
 operations:
-  publish_beer_created:
+  publish_beer_created_v1:
     action: send
     summary: A beer was added to the catalogue
     channel:
       $ref: "#/channels/beer_events"
     messages:
-      - $ref: "#/channels/beer_events/messages/beer_created"
-  publish_beer_updated:
+      - $ref: "#/channels/beer_events/messages/beer_created_v1"
+  publish_beer_updated_v1:
     action: send
     summary: A beer's details were changed
     channel:
       $ref: "#/channels/beer_events"
     messages:
-      - $ref: "#/channels/beer_events/messages/beer_updated"
-  publish_beer_retired:
+      - $ref: "#/channels/beer_events/messages/beer_updated_v1"
+  publish_beer_retired_v1:
     action: send
     summary: A beer was retired from the catalogue
     channel:
       $ref: "#/channels/beer_events"
     messages:
-      - $ref: "#/channels/beer_events/messages/beer_retired"
-  publish_beer_rated:
+      - $ref: "#/channels/beer_events/messages/beer_retired_v1"
+  publish_beer_rated_v1:
     action: send
     summary: A beer was rated
     channel:
       $ref: "#/channels/beer_events"
     messages:
-      - $ref: "#/channels/beer_events/messages/beer_rated"
-  receive_beer_rating:
+      - $ref: "#/channels/beer_events/messages/beer_rated_v1"
+  receive_beer_rating_v1:
     action: receive
     summary: Record a rating that was submitted elsewhere
     channel:
       $ref: "#/channels/beer_ratings"
     messages:
-      - $ref: "#/channels/beer_ratings/messages/beer_rating_submitted"
+      - $ref: "#/channels/beer_ratings/messages/beer_rating_submitted_v1"
 components:
   messages:
-    beer_rating_submitted:
-      name: beer_rating_submitted
+    beer_rating_submitted_v1:
+      name: beer_rating_submitted_v1
       title: Beer rating submitted
       summary: A drinker scored a beer.
       contentType: application/cloudevents+json
       payload:
         $ref: "#/components/schemas/BeerRatingSubmitted"
-    beer_created:
-      name: beer_created
+    beer_created_v1:
+      name: beer_created_v1
       title: Beer created
       summary: A beer was added to the catalogue.
       contentType: application/cloudevents+json
       payload:
         $ref: "#/components/schemas/BeerCreated"
-    beer_updated:
-      name: beer_updated
+    beer_updated_v1:
+      name: beer_updated_v1
       title: Beer updated
       summary: A beer's name, style or strength was changed.
       contentType: application/cloudevents+json
       payload:
         $ref: "#/components/schemas/BeerUpdated"
-    beer_retired:
-      name: beer_retired
+    beer_retired_v1:
+      name: beer_retired_v1
       title: Beer retired
       summary: A beer was retired from the catalogue.
       contentType: application/cloudevents+json
       payload:
         $ref: "#/components/schemas/BeerRetired"
-    beer_rated:
-      name: beer_rated
+    beer_rated_v1:
+      name: beer_rated_v1
       title: Beer rated
       summary: A drinker scored a beer.
       contentType: application/cloudevents+json

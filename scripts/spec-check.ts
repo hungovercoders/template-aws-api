@@ -1,73 +1,80 @@
 // Gate: the spec is complete enough to drive an implementation.
-//   - specs/openapi.yaml is a valid OpenAPI document with at least one operation
-//   - every operation has a unique operationId
+//   - every specs/openapi.v<N>.yaml is a valid OpenAPI document, its version's
+//     major is N, its paths start /v<N> and its operationIds end _v<N>
+//   - together they have at least one operation, and every operationId is unique
 //   - every operation is covered by a scenario tagged @operation:<operationId>
 //   - every @operation tag names an operation that exists
-//   - every operation the contract secures uses HTTP bearer auth and documents 401
+//   - every operation a contract secures uses HTTP bearer auth and documents 401
 import SwaggerParser from "@apidevtools/swagger-parser";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
+import { contracts, misnamed, openapiNameProblems, versionProblems } from "./contracts.ts";
 
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
-const problems: string[] = [];
+const problems: string[] = [...misnamed("openapi"), ...misnamed("asyncapi")];
 
 type Security = Record<string, string[]>[];
 type Api = {
+  info?: { version?: string };
   paths?: Record<string, Record<string, { operationId?: string; security?: Security; responses?: Record<string, unknown> }>>;
   security?: Security;
   components?: { securitySchemes?: Record<string, { type?: string; scheme?: string }> };
 };
-let api: Api = {};
-let paths: NonNullable<Api["paths"]> = {};
-try {
-  api = (await SwaggerParser.validate("specs/openapi.yaml")) as Api;
-  paths = api.paths ?? {};
-} catch (error) {
-  problems.push(`specs/openapi.yaml is not a valid OpenAPI document: ${(error as Error).message}`);
-}
 
+const files = contracts("openapi");
+if (files.length === 0) problems.push("there is no specs/openapi.v<N>.yaml - add your API contract (specs/openapi.v0.yaml for a 0.x API)");
 const operationIds: string[] = [];
-for (const [path, item] of Object.entries(paths)) {
-  for (const method of METHODS.filter((m) => item[m])) {
-    const id = item[method]!.operationId;
-    if (!id) problems.push(`${method.toUpperCase()} ${path} has no operationId`);
-    else if (operationIds.includes(id)) problems.push(`operationId ${id} is used more than once`);
-    else operationIds.push(id);
+for (const contract of files) {
+  let api: Api;
+  try {
+    api = (await SwaggerParser.validate(contract.path)) as Api;
+  } catch (error) {
+    problems.push(`${contract.path} is not a valid OpenAPI document: ${(error as Error).message}`);
+    continue;
+  }
+  problems.push(...versionProblems(contract, api), ...openapiNameProblems(contract, api));
+  for (const [path, item] of Object.entries(api.paths ?? {})) {
+    for (const method of METHODS.filter((m) => item[m])) {
+      const id = item[method]!.operationId;
+      if (!id) problems.push(`${contract.path}: ${method.toUpperCase()} ${path} has no operationId`);
+      else if (operationIds.includes(id)) problems.push(`operationId ${id} is used more than once`);
+      else operationIds.push(id);
 
-    // Authentication is the skeleton's: an API Gateway JWT authorizer on AWS,
-    // which answers 401 itself. That is the only scheme it knows how to enforce.
-    const security = item[method]!.security ?? api.security ?? [];
-    const secured = security.length > 0 && security.every((requirement) => Object.keys(requirement).length > 0);
-    if (!secured) continue;
-    const name = id ?? `${method.toUpperCase()} ${path}`;
-    for (const scheme of new Set(security.flatMap((requirement) => Object.keys(requirement)))) {
-      const definition = api.components?.securitySchemes?.[scheme];
-      if (definition?.type !== "http" || definition.scheme?.toLowerCase() !== "bearer") {
-        problems.push(`${name} is secured by "${scheme}", which is not an HTTP bearer scheme - the only kind the template enforces`);
+      // Authentication is the skeleton's: an API Gateway JWT authorizer on AWS,
+      // which answers 401 itself. That is the only scheme it knows how to enforce.
+      const security = item[method]!.security ?? api.security ?? [];
+      const secured = security.length > 0 && security.every((requirement) => Object.keys(requirement).length > 0);
+      if (!secured) continue;
+      const name = id ?? `${method.toUpperCase()} ${path}`;
+      for (const scheme of new Set(security.flatMap((requirement) => Object.keys(requirement)))) {
+        const definition = api.components?.securitySchemes?.[scheme];
+        if (definition?.type !== "http" || definition.scheme?.toLowerCase() !== "bearer") {
+          problems.push(`${name} is secured by "${scheme}", which is not an HTTP bearer scheme - the only kind the template enforces`);
+        }
       }
+      if (!item[method]!.responses?.["401"]) problems.push(`${name} is secured but does not document a 401 response`);
     }
-    if (!item[method]!.responses?.["401"]) problems.push(`${name} is secured but does not document a 401 response`);
   }
 }
 if (problems.length === 0 && operationIds.length === 0) {
-  problems.push("specs/openapi.yaml declares no operations - add your API contract");
+  problems.push(`${files.map((contract) => contract.path).join(", ")} declare${files.length === 1 ? "s" : ""} no operations - add your API contract`);
 }
 
 const features = readdirSync("specs/features", { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".feature"));
 if (features.length === 0) problems.push("specs/features contains no .feature files - add your behaviour spec");
 
-// An API may also have an AsyncAPI contract (specs/asyncapi.yaml). Its
+// An API may also have AsyncAPI contracts (specs/asyncapi.v<N>.yaml). Their
 // operations are tagged the same way; `task asyncapi:check` holds them to it.
-let asyncIds: string[] = [];
-if (existsSync("specs/asyncapi.yaml")) {
+const asyncIds: string[] = [];
+for (const contract of contracts("asyncapi")) {
   try {
-    asyncIds = Object.keys((parseYaml(readFileSync("specs/asyncapi.yaml", "utf8")) as { operations?: Record<string, unknown> })?.operations ?? {});
+    asyncIds.push(...Object.keys((parseYaml(readFileSync(contract.path, "utf8")) as { operations?: Record<string, unknown> })?.operations ?? {}));
   } catch {
     // Not readable as YAML: asyncapi:check says so.
   }
 }
-for (const id of asyncIds.filter((id) => operationIds.includes(id))) problems.push(`operation ${id} is in both specs/openapi.yaml and specs/asyncapi.yaml; an operation's name is unique across the two`);
+for (const id of new Set(asyncIds.filter((id) => operationIds.includes(id)))) problems.push(`operation ${id} is in both an OpenAPI and an AsyncAPI contract; an operation's name is unique across them`);
 
 const tagged = new Set<string>();
 for (const feature of features) {

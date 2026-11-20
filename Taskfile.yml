@@ -17,7 +17,7 @@ vars:
   SCHEMATHESIS_VERSION: 4.33.4
   MOCK_PORT: '{{.MOCK_PORT | default "4010"}}'
   # component:data:start
-  # The version of the Open Data Contract Standard specs/datacontract.yaml is
+  # The version of the Open Data Contract Standard specs/datacontract.v<N>.yaml are
   # written in: the one place it is chosen. Moving to the next is this line,
   # the contract's apiVersion, and whatever `task data:lint` then says.
   ODCS_VERSION: v3.2.0
@@ -57,7 +57,7 @@ tasks:
       - node_modules/.package-lock.json
 
   generate:
-    desc: Generate the runtime contract, its types and the route table from specs/openapi.yaml
+    desc: Generate the runtime contract, its types and the route table from every specs/openapi.v<N>.yaml
     deps: [install]
     cmds:
       - node scripts/generate.ts
@@ -66,6 +66,7 @@ tasks:
     sources:
       - specs/*.yaml
       - scripts/generate.ts
+      - scripts/contracts.ts
       - tools/**/*.ts
     generates:
       - src/generated/openapi.json
@@ -105,24 +106,26 @@ tasks:
       - tools/asyncapi/node_modules/.package-lock.json
 
   asyncapi:check:
-    desc: Gate - specs/asyncapi.yaml is a valid AsyncAPI 3 contract and every operation is covered by a tagged scenario (nothing to do without the file)
+    desc: Gate - every specs/asyncapi.v<N>.yaml is a valid AsyncAPI 3 contract of major N with versioned names, and every operation is covered by a tagged scenario (nothing to do without one)
     deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts check
 
   asyncapi:lint:
-    desc: Gate - the AsyncAPI contract meets the house rules (rules/asyncapi.yaml) and this API's own (.spectral.asyncapi.yaml); warnings fail
+    desc: Gate - every major's AsyncAPI contract meets the house rules (rules/asyncapi.yaml) and this API's own (.spectral.asyncapi.yaml); warnings fail
     deps: [install]
     env:
       NODE_OPTIONS: ''
     cmds:
       - |
-        test -f specs/asyncapi.yaml || { echo "asyncapi:lint - no specs/asyncapi.yaml, so this API has no asynchronous side to check"; exit 0; }
+        set -- specs/asyncapi.v*.yaml
+        test -e "$1" || { echo "asyncapi:lint - no specs/asyncapi.v<N>.yaml, so this API has no asynchronous side to check"; exit 0; }
         rules=rules/asyncapi.yaml; test -f .spectral.asyncapi.yaml && rules=.spectral.asyncapi.yaml
-        npx spectral lint specs/asyncapi.yaml --ruleset "$rules" --fail-severity warn
+        node --import tsx scripts/rulesets.ts "$rules" rules/asyncapi.yaml || exit 1
+        npx spectral lint "$@" --ruleset "$rules" --fail-severity warn
 
   asyncapi:compat:
-    desc: Gate - changes to the AsyncAPI contract since the last published one are listed, and its info.version is bumped to match (breaking needs a major)
+    desc: Gate - each AsyncAPI major is compared with what was published of it, and its info.version is bumped to match; a breaking change is a new version of the event, or a new major file
     deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts compat
@@ -225,7 +228,7 @@ tasks:
 
   # component:data:start
   data:generate:
-    desc: Write into specs/datacontract.yaml what the AsyncAPI contract decides - a schema object for every event the API publishes, each property's type and whether it is required. What a person wrote is kept; with no file yet, it starts one
+    desc: Write into every specs/datacontract.v<N>.yaml (starting v0 when there is none) what the AsyncAPI contract decides - a schema object for every event the API publishes, each property's type and whether it is required. What a person wrote is kept; with no file yet, it starts one
     deps: [generate]
     env:
       ODCS_VERSION: '{{.ODCS_VERSION}}'
@@ -233,20 +236,22 @@ tasks:
       - node scripts/data.ts generate
 
   data:lint:
-    desc: Gate - the data contract is valid ODCS (the Data Contract CLI) and meets the house rules (rules/datacontract.yaml) and this API's own (.spectral.datacontract.yaml); warnings fail
+    desc: Gate - every major of the data contract is valid ODCS (the Data Contract CLI) and meets the house rules (rules/datacontract.yaml) and this API's own (.spectral.datacontract.yaml); warnings fail
     deps: [install]
     env:
       NODE_OPTIONS: ''
     cmds:
       - |
         set -e
-        test -f specs/datacontract.yaml || { echo "data:lint - no specs/datacontract.yaml, so the events this API publishes are not kept as data"; exit 0; }
-        uvx --from "datacontract-cli[duckdb]=={{.DATACONTRACT_CLI_VERSION}}" datacontract lint specs/datacontract.yaml
+        set -- specs/datacontract.v*.yaml
+        test -e "$1" || { echo "data:lint - no specs/datacontract.v<N>.yaml, so the events this API publishes are not kept as data"; exit 0; }
+        for contract in "$@"; do uvx --from "datacontract-cli[duckdb]=={{.DATACONTRACT_CLI_VERSION}}" datacontract lint "$contract"; done
         rules=rules/datacontract.yaml; test -f .spectral.datacontract.yaml && rules=.spectral.datacontract.yaml
-        npx spectral lint specs/datacontract.yaml --ruleset "$rules" --fail-severity warn
+        node --import tsx scripts/rulesets.ts "$rules" rules/datacontract.yaml
+        npx spectral lint "$@" --ruleset "$rules" --fail-severity warn
 
   data:check:
-    desc: Gate - the data contract is of the pinned ODCS version, describes every event the AsyncAPI contract says the API publishes exactly as it has them, and says where the data is kept, for how long and how fresh
+    desc: Gate - every major of the data contract is of the pinned ODCS version, its version and id and locations carry its major (/v<N>/, one bucket), describes every event the AsyncAPI contract says the API publishes exactly as it has them, and says where the data is kept, for how long and how fresh
     deps: [generate]
     env:
       ODCS_VERSION: '{{.ODCS_VERSION}}'
@@ -254,7 +259,7 @@ tasks:
       - node scripts/data.ts check
 
   data:compat:
-    desc: Gate - changes to the data contract since the last published one are listed (the Data Contract CLI), and its version is bumped to match (breaking needs a major)
+    desc: Gate - each data contract major is compared with what was published of it (the Data Contract CLI), and its version is bumped to match; a breaking change is a new major file, whose data lands beside the old
     deps: [install]
     env:
       DATACONTRACT_CLI_VERSION: '{{.DATACONTRACT_CLI_VERSION}}'
@@ -269,7 +274,7 @@ tasks:
       - node local/data.ts test
 
   data:query:
-    desc: Query the events kept in S3 with SQL through DuckDB, a view per event already defined - task data:query -- "select * from beer_rated"; with no SQL, its shell (ENV=local|aws, default local)
+    desc: Query the events kept in S3 with SQL through DuckDB, a view per event already defined - task data:query -- "select * from beer_rated_v1"; with no SQL, its shell. The newest data contract major, or DATA_MAJOR=v<N> (ENV=local|aws, default local)
     interactive: true
     env:
       DUCKDB_VERSION: '{{.DUCKDB_VERSION}}'
@@ -371,19 +376,24 @@ tasks:
       - node scripts/spec-check.ts
 
   spec:lint:
-    desc: Gate - the contract meets the house rules (rules/house.yaml) and this API's own (.spectral.yaml); warnings fail
+    desc: Gate - every major's contract (specs/openapi.v<N>.yaml) meets the house rules (rules/house.yaml) and this API's own (.spectral.yaml); warnings fail
     deps: [install]
     env:
       NODE_OPTIONS: ''
     cmds:
-      - npx spectral lint specs/openapi.yaml --fail-severity warn
+      - node --import tsx scripts/rulesets.ts .spectral.yaml rules/house.yaml
+      - |
+        set -- specs/openapi.v*.yaml
+        test -e "$1" || { echo "spec:lint - there is no specs/openapi.v<N>.yaml to lint"; exit 1; }
+        npx spectral lint "$@" --ruleset .spectral.yaml --fail-severity warn
 
   mock:
-    desc: Spec phase - serve a mock of the contract on http://127.0.0.1:4010 before anything is implemented (-- --dynamic for generated data)
+    desc: Spec phase - serve a mock of every major's contract on http://127.0.0.1:4010 before anything is implemented (-- --dynamic for generated data)
+    deps: [generate]
     env:
       NODE_OPTIONS: ''
     cmds:
-      - npx --yes @stoplight/prism-cli@{{.PRISM_VERSION}} mock specs/openapi.yaml --port {{.MOCK_PORT}} {{.CLI_ARGS}}
+      - npx --yes @stoplight/prism-cli@{{.PRISM_VERSION}} mock src/generated/openapi.json --port {{.MOCK_PORT}} {{.CLI_ARGS}}
 
   http:generate:
     desc: Write http/contract.http - a ready-to-send request for every operation in the contract
@@ -391,7 +401,7 @@ tasks:
     cmds:
       - node scripts/http-generate.ts
     sources:
-      - specs/openapi.yaml
+      - specs/openapi.v*.yaml
       - scripts/http-generate.ts
     generates:
       - http/contract.http
@@ -557,7 +567,7 @@ tasks:
       # Start from an empty table whatever ran before.
       - node local/table.ts reset
       - >-
-        uvx --from "schemathesis=={{.SCHEMATHESIS_VERSION}}" schemathesis run specs/openapi.yaml
+        uvx --from "schemathesis=={{.SCHEMATHESIS_VERSION}}" schemathesis run src/generated/openapi.json
         --url "$BASE_URL" --seed 1 --max-examples 25 --request-timeout 10
         --tls-verify "$AWS_CA_BUNDLE" -H "Authorization: Bearer $(node local/token.ts fuzz)"
         --checks not_a_server_error,status_code_conformance,content_type_conformance,response_schema_conformance

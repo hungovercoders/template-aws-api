@@ -26,7 +26,7 @@ function generate(): void {
   writeFileSync(
     "src/generated/events.ts",
     [
-      "// Generated from specs/asyncapi.yaml by `task generate` - do not edit.",
+      "// Generated from specs/asyncapi.v<N>.yaml by `task generate` - do not edit.",
       "// Every event this API publishes: make one with its function, which holds it",
       "// to the contract, and write it with the change it is about (src/lib/outbox.ts).",
       ...(lines.length > 0 ? ['import { events } from "../lib/cloudevents.ts";', `import type { ${names.join(", ")} } from "./messages.d.ts";`, "", ...lines] : ["export {};"]),

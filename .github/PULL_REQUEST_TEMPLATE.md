@@ -7,7 +7,7 @@ Closes #
 ## Checks
 
 - [ ] The spec changed first: scenarios in `specs/features` and the contract say what this does
-- [ ] `task spec:compat` passes; if it lists a breaking change, `info.version` has a new major and consumers know
+- [ ] `task spec:compat` passes; a breaking change is a new major's file beside the old, and consumers know
 - [ ] `task ci` is green
 - [ ] No skeleton file changed - or `task skeleton:lock` is in this change and I can say why the skeleton had to move
 - [ ] No gate was weakened

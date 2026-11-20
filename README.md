@@ -3,39 +3,39 @@
 
 A brewery's beer catalogue. Signed-in staff add the beers they brew, keep the details current and retire beers. Anyone can browse the catalogue, and drinkers rate beers from 1 to 5.
 
-**Version 0.1.0** · [contract](specs/openapi.yaml) · [behaviour](specs/features) · [try it](http/contract.http)
+**Versions** [v0](specs/openapi.v0.yaml) (0.1.0) at `/v0` · [behaviour](specs/features) · [try it](http/contract.http)
 
 ## Operations
 
 | Operation | Request | Caller | What it does |
 | --- | --- | --- | --- |
-| `list_beers` | `GET /beers` | Anyone | List the beers in the catalogue |
-| `create_beer` | `POST /beers` | Signed in | Add a beer to the catalogue |
-| `get_beer` | `GET /beers/{beer_id}` | Anyone | Fetch one beer |
-| `retire_beer` | `DELETE /beers/{beer_id}` | Signed in | Retire a beer from the catalogue |
-| `update_beer` | `PATCH /beers/{beer_id}` | Signed in | Change a beer's details |
-| `rate_beer` | `POST /beers/{beer_id}/ratings` | Anyone | Rate a beer |
+| `list_beers_v0` | `GET /v0/beers` | Anyone | List the beers in the catalogue |
+| `create_beer_v0` | `POST /v0/beers` | Signed in | Add a beer to the catalogue |
+| `get_beer_v0` | `GET /v0/beers/{beer_id}` | Anyone | Fetch one beer |
+| `retire_beer_v0` | `DELETE /v0/beers/{beer_id}` | Signed in | Retire a beer from the catalogue |
+| `update_beer_v0` | `PATCH /v0/beers/{beer_id}` | Signed in | Change a beer's details |
+| `rate_beer_v0` | `POST /v0/beers/{beer_id}/ratings` | Anyone | Rate a beer |
 
-Messages and events are version 0.2.0 of [their own contract](specs/asyncapi.yaml), with an [example of each](messages).
+Messages and events have contracts of their own - [v0](specs/asyncapi.v0.yaml) (0.2.0) - with an [example of each](messages).
 
 ## Messages it receives
 
 | Operation | On | What it does |
 | --- | --- | --- |
-| `receive_beer_rating` | `beer-ratings` | Record a rating that was submitted elsewhere |
+| `receive_beer_rating_v1` | `beer-ratings` | Record a rating that was submitted elsewhere |
 
 ## Events it publishes
 
 | Operation | On | What it does |
 | --- | --- | --- |
-| `publish_beer_created` | `beer-events` | A beer was added to the catalogue |
-| `publish_beer_updated` | `beer-events` | A beer's details were changed |
-| `publish_beer_retired` | `beer-events` | A beer was retired from the catalogue |
-| `publish_beer_rated` | `beer-events` | A beer was rated |
+| `publish_beer_created_v1` | `beer-events` | A beer was added to the catalogue |
+| `publish_beer_updated_v1` | `beer-events` | A beer's details were changed |
+| `publish_beer_retired_v1` | `beer-events` | A beer was retired from the catalogue |
+| `publish_beer_rated_v1` | `beer-events` | A beer was rated |
 
 ## Events kept as data
 
-Every event it publishes is also kept in S3, under version 0.1.0 of a [data contract](specs/datacontract.yaml): owned by the catalogue team, kept for 2 years, there to read within 15 minutes.
+Every event it publishes is also kept in S3, under a data contract - [v0](specs/datacontract.v0.yaml) (0.1.0): owned by the catalogue team, kept for 2 years, there to read within 15 minutes.
 See [events as data](docs/data.md) for how it is tested and queried.
 
 ## Working on it

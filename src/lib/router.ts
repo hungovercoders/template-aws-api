@@ -2,7 +2,7 @@
 // every request to the contract before an operation sees it.
 import type { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from "aws-lambda";
 import type { operations } from "../generated/api.d.ts";
-import { apiVersion, operationForRouteKey, validateRequest } from "./contract.ts";
+import { operationForRouteKey, validateRequest } from "./contract.ts";
 import { createLogger, type Logger } from "./log.ts";
 import { continueTrace, traceId } from "./trace.ts";
 import { HttpProblem, problem, unauthorized, type Result } from "./problem.ts";
@@ -55,9 +55,10 @@ export function createHandler(routes: Routes): APIGatewayProxyHandlerV2 {
       operation_id: operationForRouteKey(event.routeKey)?.operationId,
     });
     const result = await respond(event, log);
+    // Every answer from an operation says which version of which contract produced it.
+    const apiVersion = operationForRouteKey(event.routeKey)?.version;
     log.info("request", { status: result.statusCode, duration_ms: Date.now() - started, api_version: apiVersion });
-    // Every answer says which contract version produced it.
-    return { ...result, headers: { "api-version": apiVersion, ...result.headers } };
+    return apiVersion === undefined ? result : { ...result, headers: { "api-version": apiVersion, ...result.headers } };
   };
 
   async function respond(event: APIGatewayProxyEventV2, log: Logger): Promise<Result> {

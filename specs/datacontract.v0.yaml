@@ -1,6 +1,6 @@
 apiVersion: v3.2.0
 kind: DataContract
-id: beer-catalogue-events
+id: beer-catalogue-events-v0
 name: Beer Catalogue events
 version: 0.1.0
 status: active
@@ -13,7 +13,7 @@ team:
 servers:
   - server: production
     type: s3
-    location: s3://hungovercoders-beer-catalogue-events/events/
+    location: s3://hungovercoders-beer-catalogue-events/events/v0/
     format: json
     delimiter: new_line
 slaProperties:
@@ -24,7 +24,7 @@ slaProperties:
     value: 15
     unit: m
 schema:
-  - name: beer_created
+  - name: beer_created_v1
     physicalName: com.hungovercoders.beer_catalogue.beer.created.v1
     physicalType: object
     businessName: Beer created
@@ -114,7 +114,7 @@ schema:
             logicalTypeOptions:
               minimum: 0
             description: Alcohol by volume, percent.
-  - name: beer_rated
+  - name: beer_rated_v1
     physicalName: com.hungovercoders.beer_catalogue.beer.rated.v1
     physicalType: object
     businessName: Beer rated
@@ -192,7 +192,7 @@ schema:
               minimum: 1
               maximum: 5
             description: A whole number from 1 to 5.
-  - name: beer_retired
+  - name: beer_retired_v1
     physicalName: com.hungovercoders.beer_catalogue.beer.retired.v1
     physicalType: object
     businessName: Beer retired
@@ -269,7 +269,7 @@ schema:
             logicalTypeOptions:
               minLength: 1
             description: The name it had when it was retired.
-  - name: beer_updated
+  - name: beer_updated_v1
     physicalName: com.hungovercoders.beer_catalogue.beer.updated.v1
     physicalType: object
     businessName: Beer updated
