@@ -34,6 +34,23 @@ An event is delivered at least once, so it can be stored more than once:
 tell a repeat by its `id`. A record Firehose cannot place - not JSON, or with
 no `type` - goes under `errors/`, never dropped.
 
+**Compacted to Parquet, daily.** A little after midnight UTC a schedule runs
+the compactor (`src/compactor.ts`). For each major and event type it rewrites
+the last three days as one Parquet file per day the events *happened*, under
+the major's `<server>-parquet` location:
+
+```
+s3://<bucket>/<parquet prefix ending /v<N>/>type=<event type>/dt=<day it happened>/events.parquet
+```
+
+Each file is typed by the contract - a column per property, `data` a struct -
+and holds each event once. Rewriting a day gives the same file, so a run
+again is harmless, and an event that arrives late is in the next run. An event
+the contract's types cannot hold is left out, logged with its id, and is
+still in the raw JSON. The raw JSON is kept for `data_raw_retention_days`
+(30), the Parquet for the contract's retention; read the Parquet for any whole
+day, the raw JSON for today.
+
 ## The contract
 
 `task data:generate` writes what the AsyncAPI contract already decides: a
@@ -47,6 +64,7 @@ changes; it keeps everything a person wrote. The rest is the owner's to say:
 | `team`, `description.purpose` | Who owns the data and what it is for | Required by `data:lint` |
 | `classification` on every property | `public`, `internal`, `confidential` or `restricted` | Required by `data:lint` |
 | `servers`, the one named `production` | `type: s3`, `location: s3://<bucket>/<prefix>/`, `format: json`, `delimiter: new_line` | The bucket and prefix Terraform creates and Firehose writes to |
+| `servers`, `production-parquet` | `type: s3`, the same bucket, a prefix of its own, `format: parquet` | Where the compactor writes each day |
 | `slaProperties`, `retention` | How long an event is kept (`unit: d` or `y`) | The bucket's lifecycle rule |
 | `slaProperties`, `latency` | How soon an event is there to read (`unit: s`, `m`, `h` or `d`) | The threshold of the `data-freshness` alarm |
 | `quality` | Rules the data keeps, on an object or a property | Tested against what landed |
@@ -62,13 +80,14 @@ of its own in the contract, and is deployed with `-var data_server=<name>`.
 | `task data:lint` | The contract is valid ODCS (the [Data Contract CLI](https://cli.datacontract.com)) and meets the house rules in `rules/datacontract.yaml`; this API's own go in `.spectral.datacontract.yaml` |
 | `task data:check` | Each major is of the ODCS version the template pins (`ODCS_VERSION` in `Taskfile.yml`), describes every published event exactly as the AsyncAPI contract has it, carries its major in its version, `id` and location, and says what the infrastructure reads |
 | `task data:compat` | What changed since each major was last published (the CLI's changelog), and that its `version` says so: a breaking change to a published major is refused - it goes in the next major's file |
-| `task data:test` | The data keeps the contract: types, required properties, limits and quality rules - tested where it is, in the bucket; nothing is copied. In `task acceptance` it runs after the features, on the events the scenarios published, every one of which must have landed. `ENV=aws task data:test` tests the last two days of the deployed stack's data (`DATA_DAYS`), each day by itself, so a rule about the whole - an `id` that repeats - is held within a day |
+| `task data:test` | The data keeps the contract: types, required properties, limits and quality rules - tested where it is, in the bucket; nothing is copied. Then the Parquet, the same way, with each `id` there once. In `task acceptance` it runs after the features, on the events the scenarios published, every one of which must have landed - and then runs the compactor, and every one must be in the Parquet exactly once. `ENV=aws task data:test` tests the last two days of the deployed stack's data (`DATA_DAYS`), each day by itself, so a rule about the whole - an `id` that repeats - is held within a day |
 
 ## Reading the data
 
 | Task | What it does |
 | --- | --- |
-| `task data:query -- "select * from beer_rated_v1"` | Runs SQL through DuckDB over the newest major's data, or the one `DATA_MAJOR=v<N>` names. Each event has a view, named after its schema object, that shows every event once; `data` is a struct (`data.score`) and `dt` the day it arrived. With no SQL it opens DuckDB's shell |
+| `task data:query -- "select * from beer_rated_v1"` | Runs SQL through DuckDB over the newest major's data, or the one `DATA_MAJOR=v<N>` names. Each event has a view over its Parquet, named after its schema object, and one over its raw JSON, `<name>_raw`, up to the minute; each shows every event once, `data` is a struct (`data.score`) and `dt` the day. With no SQL it opens DuckDB's shell |
+| `task data:compact` | Runs the compactor now, as its schedule does, today included |
 | `task data:browse` | The same views in [Harlequin](https://harlequin.sh) |
 
 Both read the data where it is, never from a copy: the local stack
@@ -112,6 +131,7 @@ server to it.
 | `<name>-data-v<N>-delivery` | Firehose failed to write to S3 in 5 minutes | Events are published but not being kept |
 | `<name>-data-v<N>-freshness` | The oldest event not yet in S3 is older than the contract's `latency` | The data is staler than promised |
 | `<name>-data-v<N>-rule` | The bus could not hand an event to Firehose in 5 minutes | Events are published but not reaching the stream |
+| `<name>-data-compaction` | The compactor failed | The Parquet is behind the raw JSON |
 
 AWS Emulator emits no Firehose metrics, so the first two are created there
 but never change state; only a deployed stack shows them firing.
@@ -142,6 +162,16 @@ promises before they are in S3.
 **Means** the rule that feeds Firehose is failing: the bus has the events,
 the stream does not.
 
-1. The rule is `<name>-data`; its role is `<name>-data`. **Usually** the
+1. The rule is `<name>-data-v<N>`; its role is `<name>-data`. **Usually** the
    role or the stream was changed or removed outside Terraform.
 2. `task deploy` puts them back; replay the gap from the bus's archive.
+
+### data-compaction
+
+**Means** the daily run that writes the Parquet failed, so the last days are
+in the raw JSON only. Nothing is lost while the raw JSON is kept.
+
+1. Its log, `/aws/lambda/<name>-data-compactor`, says why: a timeout on a
+   large day, or the bucket or its role changed outside Terraform.
+2. Fix that, then `ENV=aws DATA_DAYS=<days behind> task data:compact` writes the
+   days again; the next run catches up three days by itself.
