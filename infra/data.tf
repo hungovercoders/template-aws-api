@@ -1,13 +1,16 @@
 # The events as data: every event the API publishes is also kept in S3, where
-# analysts and other systems read it long after it was sent. A rule on the
-# bus sends each to Firehose, which writes it as one line of JSON -
-# the whole CloudEvent - under
-#   <prefix>type=<event type>/dt=<date>/
+# analysts and other systems read it long after it was sent. For each live
+# major of the data contract (specs/datacontract.v<N>.yaml) a rule on the bus
+# sends every event to that major's Firehose stream, which writes it as one
+# line of JSON - the whole CloudEvent - under that major's location:
+#   <prefix ending /v<N>/>type=<event type>/dt=<date>/
+# so a new major's readers and an old one's are served side by side, from one
+# bucket.
 #
-# What is kept, where, for how long and how fresh is the data contract's to
-# say (specs/datacontract.yaml), and is read from it here, so the contract
-# and the infrastructure cannot disagree. An API without a data contract
-# keeps nothing: none of this is created.
+# What is kept, where, for how long and how fresh is each data contract's to
+# say, and is read from it here, so the contracts and the infrastructure
+# cannot disagree. An API without a data contract keeps nothing: none of this
+# is created.
 
 variable "data_server" {
   description = "Which server of the data contract this stack is: its bucket and prefix are where the events are kept. A second stack of the same API (a test environment) needs a server of its own in the contract."
@@ -39,18 +42,27 @@ variable "data_reader_accounts" {
 }
 
 locals {
-  data_contract_file = "${path.module}/../specs/datacontract.yaml"
-  data_contract      = fileexists(local.data_contract_file) ? yamldecode(file(local.data_contract_file)) : null
-  data_servers       = [for server in try(local.data_contract.servers, []) : server if try(server.server, "") == var.data_server]
-  data_enabled       = length(local.data_servers) > 0
-  data_count         = local.data_enabled ? 1 : 0
+  # Every live major, by name (v0, v1, ...), with this stack's server in it.
+  data_contracts = {
+    for name in sort(fileset("${path.module}/../specs", "datacontract.v*.yaml")) :
+    regex("^datacontract\\.(v[0-9]+)\\.yaml$", name)[0] => yamldecode(file("${path.module}/../specs/${name}"))
+  }
+  data_majors = {
+    for major, contract in local.data_contracts : major => {
+      server = [for server in try(contract.servers, []) : server if try(server.server, "") == var.data_server][0]
+      sla    = { for entry in try(contract.slaProperties, []) : entry.property => entry }
+    } if length([for server in try(contract.servers, []) : server if try(server.server, "") == var.data_server]) > 0
+  }
+  data_enabled = length(local.data_majors) > 0
+  data_count   = local.data_enabled ? 1 : 0
 
-  # s3://<bucket>/<prefix>/ - `task data:check` holds the contract to this form.
-  data_location = local.data_enabled ? regex("^s3://(?P<bucket>[^/]+)/(?P<prefix>.*)$", local.data_servers[0].location) : { bucket = "", prefix = "" }
+  # s3://<bucket>/<prefix>/ - `task data:check` holds each contract to this form, and every major to one bucket.
+  data_locations = { for major, entry in local.data_majors : major => regex("^s3://(?P<bucket>[^/]+)/(?P<prefix>.*)$", entry.server.location) }
+  data_buckets   = distinct([for location in values(local.data_locations) : location.bucket])
+  data_bucket    = local.data_enabled ? local.data_buckets[0] : ""
 
-  data_sla       = { for entry in try(local.data_contract.slaProperties, []) : entry.property => entry }
-  data_retention = local.data_enabled ? local.data_sla["retention"].value * (local.data_sla["retention"].unit == "y" ? 365 : 1) : 0
-  data_latency   = local.data_enabled ? local.data_sla["latency"].value * { s = 1, m = 60, h = 3600, d = 86400 }[local.data_sla["latency"].unit] : 0
+  data_retention = { for major, entry in local.data_majors : major => entry.sla["retention"].value * (entry.sla["retention"].unit == "y" ? 365 : 1) }
+  data_latency   = { for major, entry in local.data_majors : major => entry.sla["latency"].value * { s = 1, m = 60, h = 3600, d = 86400 }[entry.sla["latency"].unit] }
 }
 
 provider "awscc" {
@@ -70,9 +82,16 @@ provider "awscc" {
 resource "awscc_s3_bucket" "data" {
   count = local.data_count
 
-  bucket_name = local.data_location.bucket
+  bucket_name = local.data_bucket
   # Cloud Control has no default tags: they are given by name.
   tags = [for key, value in local.tags : { key = key, value = value }]
+
+  lifecycle {
+    precondition {
+      condition     = length(local.data_buckets) == 1
+      error_message = "Every major of the data contract keeps its data in the same bucket, under its own /v<N>/ prefix."
+    }
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "data" {
@@ -97,20 +116,40 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
   }
 }
 
-# The contract's retention: an event is deleted when it is that old.
+# Each contract's retention, under its own prefix: an event is deleted when it is that old.
 resource "aws_s3_bucket_lifecycle_configuration" "data" {
   count = local.data_count
 
   bucket = one(awscc_s3_bucket.data[*].id)
 
+  dynamic "rule" {
+    for_each = local.data_locations
+
+    content {
+      id     = "retention-${rule.key}"
+      status = "Enabled"
+
+      filter {
+        prefix = rule.value.prefix
+      }
+
+      expiration {
+        days = local.data_retention[rule.key]
+      }
+    }
+  }
+
+  # What could not be placed is kept as long as the longest promise.
   rule {
-    id     = "retention"
+    id     = "retention-errors"
     status = "Enabled"
 
-    filter {}
+    filter {
+      prefix = "errors/"
+    }
 
     expiration {
-      days = local.data_retention
+      days = max(concat([1], values(local.data_retention))...)
     }
   }
 }
@@ -121,7 +160,7 @@ data "aws_iam_policy_document" "data_readers" {
   statement {
     sid       = "Read"
     actions   = ["s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"]
-    resources = [one(awscc_s3_bucket.data[*].arn), "${one(awscc_s3_bucket.data[*].arn)}/${local.data_location.prefix}*"]
+    resources = concat([one(awscc_s3_bucket.data[*].arn)], [for location in values(local.data_locations) : "${one(awscc_s3_bucket.data[*].arn)}/${location.prefix}*"])
 
     principals {
       type        = "AWS"
@@ -173,11 +212,11 @@ data "aws_iam_policy_document" "data" {
   statement {
     sid       = "Deliver"
     actions   = ["firehose:PutRecord", "firehose:PutRecordBatch"]
-    resources = ["arn:${data.aws_partition.current.partition}:firehose:${var.region}:${data.aws_caller_identity.data.account_id}:deliverystream/${var.name}-data"]
+    resources = ["arn:${data.aws_partition.current.partition}:firehose:${var.region}:${data.aws_caller_identity.data.account_id}:deliverystream/${var.name}-data-*"]
   }
 }
 
-# One role for the two hops: the rule puts events on the stream, the stream writes them to the bucket.
+# One role for the two hops of every major: a rule puts events on its stream, the stream writes them to the bucket.
 resource "aws_iam_role" "data" {
   count = local.data_count
 
@@ -195,18 +234,18 @@ resource "aws_iam_role_policy" "data" {
 }
 
 resource "aws_kinesis_firehose_delivery_stream" "data" {
-  count = local.data_count
+  for_each = local.data_majors
 
-  name        = "${var.name}-data"
+  name        = "${var.name}-data-${each.key}"
   destination = "extended_s3"
 
   extended_s3_configuration {
     role_arn   = one(aws_iam_role.data[*].arn)
     bucket_arn = one(awscc_s3_bucket.data[*].arn)
-    # The event's type and the day it arrived are its place.
-    prefix = "${local.data_location.prefix}type=!{partitionKeyFromQuery:type}/dt=!{timestamp:yyyy-MM-dd}/"
+    # The major's location, then the event's type and the day it arrived, are its place.
+    prefix = "${local.data_locations[each.key].prefix}type=!{partitionKeyFromQuery:type}/dt=!{timestamp:yyyy-MM-dd}/"
     # What cannot be placed - not JSON, or with no type - is kept apart, never dropped.
-    error_output_prefix = "errors/!{firehose:error-output-type}/dt=!{timestamp:yyyy-MM-dd}/"
+    error_output_prefix = "errors/${each.key}/!{firehose:error-output-type}/dt=!{timestamp:yyyy-MM-dd}/"
     compression_format  = var.data_compression
     buffering_interval  = var.data_buffer_seconds
     buffering_size      = 64
@@ -244,8 +283,8 @@ resource "aws_kinesis_firehose_delivery_stream" "data" {
   lifecycle {
     # An event waits in the buffer before it is written, so the buffer has to fit inside what readers were promised.
     precondition {
-      condition     = var.data_buffer_seconds < local.data_latency
-      error_message = "data_buffer_seconds must be less than the data contract's latency (slaProperties): an event is only in S3 once the buffer has been written."
+      condition     = var.data_buffer_seconds < local.data_latency[each.key]
+      error_message = "data_buffer_seconds must be less than the latency (slaProperties) of data contract ${each.key}: an event is only in S3 once the buffer has been written."
     }
   }
 }
@@ -253,20 +292,20 @@ resource "aws_kinesis_firehose_delivery_stream" "data" {
 # --- From the bus to the stream -----------------------------------------------
 
 resource "aws_cloudwatch_event_rule" "data" {
-  count = local.data_count
+  for_each = local.data_majors
 
-  name           = "${var.name}-data"
-  description    = "Every event ${var.name} publishes, to S3 as data."
+  name           = "${var.name}-data-${each.key}"
+  description    = "Every event ${var.name} publishes, to S3 as data under data contract ${each.key}."
   event_bus_name = local.bus_name
   event_pattern  = jsonencode({ source = ["/${var.name}"] })
 }
 
 resource "aws_cloudwatch_event_target" "data" {
-  count = local.data_count
+  for_each = local.data_majors
 
-  rule           = one(aws_cloudwatch_event_rule.data[*].name)
+  rule           = aws_cloudwatch_event_rule.data[each.key].name
   event_bus_name = local.bus_name
-  arn            = one(aws_kinesis_firehose_delivery_stream.data[*].arn)
+  arn            = aws_kinesis_firehose_delivery_stream.data[each.key].arn
   role_arn       = one(aws_iam_role.data[*].arn)
   # The CloudEvent itself, without the bus's envelope.
   input_path = "$.detail"
@@ -275,13 +314,13 @@ resource "aws_cloudwatch_event_target" "data" {
 # --- Alarms -------------------------------------------------------------------
 
 resource "aws_cloudwatch_metric_alarm" "data_delivery" {
-  count = local.data_count
+  for_each = local.data_majors
 
-  alarm_name          = "${var.name}-data-delivery"
+  alarm_name          = "${var.name}-data-${each.key}-delivery"
   alarm_description   = "Firehose is failing to write events to S3: they are held for a day and then lost as data. Runbook: docs/data.md#data-delivery"
   namespace           = "AWS/Firehose"
   metric_name         = "DeliveryToS3.Success"
-  dimensions          = { DeliveryStreamName = one(aws_kinesis_firehose_delivery_stream.data[*].name) }
+  dimensions          = { DeliveryStreamName = aws_kinesis_firehose_delivery_stream.data[each.key].name }
   statistic           = "Minimum"
   period              = local.alarm_period
   evaluation_periods  = 1
@@ -293,31 +332,31 @@ resource "aws_cloudwatch_metric_alarm" "data_delivery" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "data_freshness" {
-  count = local.data_count
+  for_each = local.data_majors
 
-  alarm_name          = "${var.name}-data-freshness"
+  alarm_name          = "${var.name}-data-${each.key}-freshness"
   alarm_description   = "The oldest event not yet in S3 is older than the data contract promises. Runbook: docs/data.md#data-freshness"
   namespace           = "AWS/Firehose"
   metric_name         = "DeliveryToS3.DataFreshness"
-  dimensions          = { DeliveryStreamName = one(aws_kinesis_firehose_delivery_stream.data[*].name) }
+  dimensions          = { DeliveryStreamName = aws_kinesis_firehose_delivery_stream.data[each.key].name }
   statistic           = "Maximum"
   period              = local.alarm_period
   evaluation_periods  = 1
   comparison_operator = "GreaterThanThreshold"
-  threshold           = local.data_latency # seconds, from the contract's latency
+  threshold           = local.data_latency[each.key] # seconds, from the contract's latency
   treat_missing_data  = "notBreaching"
   alarm_actions       = local.alarm_action
   ok_actions          = local.alarm_action
 }
 
 resource "aws_cloudwatch_metric_alarm" "data_rule" {
-  count = local.data_count
+  for_each = local.data_majors
 
-  alarm_name          = "${var.name}-data-rule"
+  alarm_name          = "${var.name}-data-${each.key}-rule"
   alarm_description   = "The bus could not hand events to Firehose: they were published but are not being kept. Runbook: docs/data.md#data-rule"
   namespace           = "AWS/Events"
   metric_name         = "FailedInvocations"
-  dimensions          = { EventBusName = local.bus_name, RuleName = one(aws_cloudwatch_event_rule.data[*].name) }
+  dimensions          = { EventBusName = local.bus_name, RuleName = aws_cloudwatch_event_rule.data[each.key].name }
   statistic           = "Sum"
   period              = local.alarm_period
   evaluation_periods  = 1
@@ -332,12 +371,12 @@ resource "aws_cloudwatch_metric_alarm" "data_rule" {
 
 output "data_bucket" {
   description = "The bucket the events are kept in; empty when the API has no data contract."
-  value       = local.data_location.bucket
+  value       = local.data_bucket
 }
 
-output "data_prefix" {
-  description = "The prefix under which they are kept, as type=<event type>/dt=<date>/."
-  value       = local.data_location.prefix
+output "data_prefixes" {
+  description = "Where each major of the data contract keeps them, as JSON: {\"v1\": \"<prefix ending /v1/>\"}, each holding type=<event type>/dt=<date>/."
+  value       = jsonencode({ for major, location in local.data_locations : major => location.prefix })
 }
 
 output "data_compression" {
@@ -345,7 +384,7 @@ output "data_compression" {
   value       = local.data_enabled ? var.data_compression : ""
 }
 
-output "data_stream" {
-  description = "The Firehose stream that writes them."
-  value       = local.data_enabled ? "${var.name}-data" : ""
+output "data_streams" {
+  description = "The Firehose stream that writes each major's data, as JSON."
+  value       = jsonencode({ for major, stream in aws_kinesis_firehose_delivery_stream.data : major => stream.name })
 }

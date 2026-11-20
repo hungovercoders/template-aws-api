@@ -50,14 +50,15 @@ locals {
 }
 
 # component:data:start
-# The buckets the data contract names, one for each of its S3 servers: the
+# The buckets the data contracts name, one for each of their S3 servers: the
 # only buckets, besides the state's, the deploy role may manage. Apply the
 # bootstrap again when the contract gains a server.
 locals {
-  data_contract_file = "${path.module}/../../specs/datacontract.yaml"
-  data_buckets = fileexists(local.data_contract_file) ? [
-    for server in try(yamldecode(file(local.data_contract_file)).servers, []) : regex("^s3://([^/]+)/", server.location)[0] if try(server.type, "") == "s3"
-  ] : []
+  data_buckets = distinct(flatten([
+    for name in fileset("${path.module}/../../specs", "datacontract.v*.yaml") : [
+      for server in try(yamldecode(file("${path.module}/../../specs/${name}")).servers, []) : regex("^s3://([^/]+)/", server.location)[0] if try(server.type, "") == "s3"
+    ]
+  ]))
 }
 # component:data:end
 

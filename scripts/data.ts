@@ -1,6 +1,8 @@
-// The data contract (specs/datacontract.yaml): what the events this API
-// publishes are once they have landed in S3 - an Open Data Contract Standard
-// document, with a schema object for every event.
+// The data contracts (specs/datacontract.v<N>.yaml, one for each live major):
+// what the events this API publishes are once they have landed in S3 - an Open
+// Data Contract Standard document, with a schema object for every event. Every
+// live major receives every event, under its own location (ending /v<N>/), so
+// a new major's readers and an old one's are served side by side.
 //   node scripts/data.ts generate   - write into the contract what follows from the AsyncAPI contract: a schema
 //                                     object for every event it publishes, each property's type and whether it
 //                                     is required. What a person wrote (owner, classification, quality) is kept
@@ -16,10 +18,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isMap, isSeq, parseDocument, type Document, type YAMLMap, type YAMLSeq } from "yaml";
+import { atBaseline, type Contract as File, contracts, datacontractNameProblems, misnamed, retired, versionProblems } from "./contracts.ts";
 import { merged, type Schema } from "./sample.ts";
-import { baseline, show } from "./spec-baseline.ts";
+import { baseline } from "./spec-baseline.ts";
 
-export const CONTRACT = "specs/datacontract.yaml";
+/** How the contracts are named in what this says. */
+export const CONTRACT = "specs/datacontract.v<N>.yaml";
 const ASYNCAPI = "src/generated/asyncapi.json";
 /** The one place the ODCS version is chosen (Taskfile.yml); moving to the next is one change there. */
 const ODCS = process.env.ODCS_VERSION ?? "v3.2.0";
@@ -133,7 +137,7 @@ const slug = (text: string) =>
 function starter(): string {
   const title = existsSync(ASYNCAPI) ? ((JSON.parse(readFileSync(ASYNCAPI, "utf8")) as { info?: { title?: string } }).info?.title ?? "") : "";
   const name = title.replace(/\s+(messages|events)$/i, "") || "API";
-  return [`apiVersion: ${ODCS}`, "kind: DataContract", `id: ${slug(name)}-events`, `name: ${name} events`, "version: 0.1.0", "status: draft", ""].join("\n");
+  return [`apiVersion: ${ODCS}`, "kind: DataContract", `id: ${slug(name)}-events-v0`, `name: ${name} events`, "version: 0.1.0", "status: draft", ""].join("\n");
 }
 
 /** The contract with everything the AsyncAPI contract decides written in, and what is in it that should not be. */
@@ -163,12 +167,16 @@ export function generated(text: string, events: Event[]): { text: string; strays
 
 function generate(): void {
   const events = published();
-  if (!existsSync(CONTRACT) && events.length === 0) return console.log("data:generate - the API publishes no events, so there is nothing to describe");
-  const made = !existsSync(CONTRACT);
-  const { text, strays } = generated(made ? starter() : readFileSync(CONTRACT, "utf8"), events);
-  writeFileSync(CONTRACT, text);
-  console.log(`data:generate - ${CONTRACT} ${made ? "started" : "brought up to date"}: ${events.length} events, from the AsyncAPI contract`);
-  for (const stray of strays) console.log(`  - ${stray}; remove it`);
+  const files = contracts("datacontract");
+  if (files.length === 0 && events.length === 0) return console.log("data:generate - the API publishes no events, so there is nothing to describe");
+  // Every live major describes every event; with none yet, major 0 is started.
+  const made = files.length === 0;
+  for (const path of made ? ["specs/datacontract.v0.yaml"] : files.map((file) => file.path)) {
+    const { text, strays } = generated(made ? starter() : readFileSync(path, "utf8"), events);
+    writeFileSync(path, text);
+    console.log(`data:generate - ${path} ${made ? "started" : "brought up to date"}: ${events.length} events, from the AsyncAPI contract`);
+    for (const stray of strays) console.log(`  - ${stray}; remove it`);
+  }
   if (made) console.log("  The rest is the owner's to say: `task data:lint` and `task data:check` list what is missing.");
 }
 
@@ -209,18 +217,33 @@ export function needs(contract: Contract): string[] {
 }
 
 function check(): void {
-  if (!existsSync(CONTRACT)) return console.log(`data:check - no ${CONTRACT}, so the events this API publishes are not kept as data`);
-  const text = readFileSync(CONTRACT, "utf8");
-  const contract = read(text);
-  const problems: string[] = [];
-  if (contract.apiVersion !== ODCS) problems.push(`apiVersion is ${contract.apiVersion}; the template is on ODCS ${ODCS} (ODCS_VERSION in Taskfile.yml)`);
+  const files = contracts("datacontract");
+  const wrong = misnamed("datacontract");
+  if (files.length === 0 && wrong.length === 0) return console.log(`data:check - no ${CONTRACT}, so the events this API publishes are not kept as data`);
+  const problems: string[] = [...wrong];
   const events = published();
-  const { text: wanted, strays } = generated(text, events);
-  problems.push(...strays);
-  if (wanted !== text) problems.push("it differs from what the AsyncAPI contract says (an event, a property, a type or whether it is required) - run `task data:generate` and commit the result");
-  problems.push(...needs(contract));
-  if (problems.length > 0) stop([`data:check failed - ${CONTRACT}`, ...problems.map((problem) => `  - ${problem}`)].join("\n"));
-  console.log(`data:check ok - ODCS ${ODCS}, ${events.length} events described as the AsyncAPI contract has them`);
+  const buckets = new Map<string, Set<string>>();
+  for (const file of files) {
+    const text = readFileSync(file.path, "utf8");
+    const contract = read(text);
+    const own: string[] = [...versionProblems(file, contract), ...datacontractNameProblems(file, contract)];
+    if (contract.apiVersion !== ODCS) own.push(`apiVersion is ${contract.apiVersion}; the template is on ODCS ${ODCS} (ODCS_VERSION in Taskfile.yml)`);
+    const { text: wanted, strays } = generated(text, events);
+    own.push(...strays);
+    if (wanted !== text) own.push("it differs from what the AsyncAPI contract says (an event, a property, a type or whether it is required) - run `task data:generate` and commit the result");
+    own.push(...needs(contract));
+    problems.push(...own.map((problem) => (problem.startsWith(file.path) ? problem : `${file.path}: ${problem}`)));
+    for (const server of contract.servers ?? []) {
+      const bucket = /^s3:\/\/([^/]+)\//.exec(server.location ?? "")?.[1];
+      if (bucket && server.server) buckets.set(server.server, new Set([...(buckets.get(server.server) ?? []), bucket]));
+    }
+  }
+  // One stack keeps every major's data in one bucket, each under its own prefix.
+  for (const [server, names] of buckets) {
+    if (names.size > 1) problems.push(`the ${server} server is in more than one bucket (${[...names].join(", ")}); every major keeps its data in the same bucket, under its own /v<N>/ prefix`);
+  }
+  if (problems.length > 0) stop(["data:check failed", ...problems.map((problem) => `  - ${problem}`)].join("\n"));
+  console.log(`data:check ok - ODCS ${ODCS}, ${files.map((file) => `v${file.major}`).join(" and ")}: ${events.length} events described as the AsyncAPI contract has them`);
 }
 
 // --- Gate: a change is versioned ----------------------------------------------
@@ -231,16 +254,27 @@ const cli = (args: string[]) => {
 };
 
 function compat(): void {
-  const skip = (why: string) => console.log(`data:compat skipped - ${why}`);
-  if (!existsSync(CONTRACT)) return skip(`there is no ${CONTRACT}`);
   const ref = baseline();
-  if (!ref) return skip("there is no earlier commit to compare with");
-  const before = show(ref, CONTRACT);
-  if (before === undefined) return skip(`${ref.slice(0, 12)} has no ${CONTRACT}, so there is nothing to break`);
-  const now = readFileSync(CONTRACT, "utf8");
+  if (!ref) return console.log("data:compat skipped - there is no earlier commit to compare with");
+  const short = ref.slice(0, 12);
+  const problems: string[] = [];
+  const report: string[] = [];
+  for (const file of contracts("datacontract")) compareOne(file, ref, problems, report);
+  const { gone, problems: unannounced } = retired("datacontract", ref);
+  problems.push(...unannounced);
+  report.push(...gone.filter((file) => !unannounced.some((problem) => problem.startsWith(file.path))).map((file) => `  v${file.major} (${file.path}): retired - it was published deprecated`));
+  if (problems.length > 0) stop(["data:compat failed", ...problems.map((problem) => `  - ${problem}`), ...report].join("\n"));
+  console.log([`data:compat ok - compared with ${short}`, ...report].join("\n"));
+}
+
+function compareOne(file: File, ref: string, problems: string[], report: string[]): void {
+  const label = `v${file.major} (${file.path})`;
+  const before = atBaseline(file, ref);
+  if (before === undefined) return void report.push(`  ${label}: new since ${ref.slice(0, 12)} - a new major has nothing published to break`);
+  const now = readFileSync(file.path, "utf8");
   const [old, current] = [read(before), read(now)];
   const from = `${old.version} (at ${ref.slice(0, 12)})`;
-  if (before.trim() === now.trim()) return console.log(`data:compat ok - unchanged since ${from}`);
+  if (before.trim() === now.trim()) return void report.push(`  ${label}: unchanged since ${from}`);
 
   // The Data Contract CLI says what changed (changelog) and whether a reader of the data would break (breaking).
   const work = mkdtempSync(join(tmpdir(), "data-compat-"));
@@ -249,15 +283,15 @@ function compat(): void {
   let verdict: string;
   try {
     writeFileSync(join(work, "before.yaml"), before);
-    const log = cli(["changelog", join(work, "before.yaml"), CONTRACT, "--output-format", "json"]);
+    const log = cli(["changelog", join(work, "before.yaml"), file.path, "--output-format", "json"]);
     const start = log.stdout.indexOf("{");
-    if (log.status !== 0 || start < 0) stop(`data:compat failed - the Data Contract CLI could not compare the contracts\n${(log.stderr || log.stdout).trim()}`);
-    const report = JSON.parse(log.stdout.slice(start)) as { summary?: typeof changes };
-    if (!Array.isArray(report.summary)) stop("data:compat failed - the Data Contract CLI's changelog is not in the form this gate reads (no `summary`); the pinned version changed it");
-    changes = report.summary!.filter((change) => change.path !== "version");
+    if (log.status !== 0 || start < 0) stop(`data:compat failed - the Data Contract CLI could not compare ${file.path}\n${(log.stderr || log.stdout).trim()}`);
+    const summary = (JSON.parse(log.stdout.slice(start)) as { summary?: typeof changes }).summary;
+    if (!Array.isArray(summary)) stop("data:compat failed - the Data Contract CLI's changelog is not in the form this gate reads (no `summary`); the pinned version changed it");
+    changes = summary!.filter((change) => change.path !== "version");
     // It exits 0 when no reader breaks and 1 when one would; anything else is the CLI failing.
-    const judged = cli(["breaking", join(work, "before.yaml"), CONTRACT]);
-    if (judged.status !== 0 && judged.status !== 1) stop(`data:compat failed - the Data Contract CLI could not judge the change\n${(judged.stderr || judged.stdout).trim()}`);
+    const judged = cli(["breaking", join(work, "before.yaml"), file.path]);
+    if (judged.status !== 0 && judged.status !== 1) stop(`data:compat failed - the Data Contract CLI could not judge the change to ${file.path}\n${(judged.stderr || judged.stdout).trim()}`);
     breaking = judged.status === 1;
     verdict = judged.stdout.trim();
   } finally {
@@ -265,23 +299,26 @@ function compat(): void {
   }
 
   const parse = (version: string | undefined) => /^(\d+)\.(\d+)\.(\d+)$/.exec(version ?? "")?.slice(1).map(Number);
-  const to = parse(current.version) ?? stop(`data:compat failed\n  - version "${current.version}" is not a semantic version (MAJOR.MINOR.PATCH)`);
+  const to = parse(current.version);
+  if (!to) return void problems.push(`${file.path}: version "${current.version}" is not a semantic version (MAJOR.MINOR.PATCH)`);
   const [major, minor, patch] = to as [number, number, number];
   const [oldMajor, oldMinor, oldPatch] = (parse(old.version) ?? [0, 0, 0]) as [number, number, number];
   const bumped = {
-    major: major > oldMajor,
     minor: major > oldMajor || (major === oldMajor && minor > oldMinor),
     any: major > oldMajor || (major === oldMajor && (minor > oldMinor || (minor === oldMinor && patch > oldPatch))),
   };
-  const lines = changes.map((change) => `    ${change.type ?? "changed"} ${change.path}`);
-  const problems: string[] = [];
-  if (breaking && !(bumped.major || (oldMajor === 0 && bumped.minor))) {
-    problems.push(`the data contract has breaking changes but its version went from ${from} to ${current.version}; that needs a new ${oldMajor === 0 ? "minor version (the contract is still 0.x)" : "major version"}`);
+  const lines = changes.map((change) => `      ${change.type ?? "changed"} ${change.path}`);
+  const before_ = problems.length;
+  if (breaking && !(oldMajor === 0 && bumped.minor)) {
+    problems.push(
+      oldMajor === 0
+        ? `${file.path} has breaking changes but its version went from ${from} to ${current.version}; while the contract is 0.x that needs a new minor version`
+        : `${file.path} has breaking changes: v${file.major}'s readers would fail. Make the change in specs/datacontract.v${file.major + 1}.yaml, whose data lands beside this one's, and leave v${file.major} as it is`,
+    );
   } else if (!bumped.any) {
-    problems.push(`the data contract was edited but its version is still ${current.version}; every published edit needs a new version`);
+    problems.push(`${file.path} was edited but its version is still ${current.version}; every published edit needs a new version`);
   }
-  if (problems.length > 0) stop(["data:compat failed", ...problems.map((problem) => `  - ${problem}`), ...(breaking ? [verdict] : lines)].join("\n"));
-  console.log([`data:compat ok - ${from} -> ${current.version}: ${breaking ? "breaking" : "nothing breaking"}, ${changes.length} changes`, ...lines].join("\n"));
+  report.push(`  ${label}: ${from} -> ${current.version}: ${breaking ? "breaking" : "nothing breaking"}, ${changes.length} changes`, ...(problems.length > before_ && breaking ? [verdict] : lines));
 }
 
 // Run as a script, wherever the checkout is and however it was reached - not when a test imports it.

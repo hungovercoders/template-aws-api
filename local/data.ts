@@ -3,7 +3,10 @@
 //   node local/data.ts query [sql]   - run SQL over the data with DuckDB, a view per event already defined; no SQL opens its shell
 //   node local/data.ts browse        - the same views in Harlequin
 // ENV=local (the default) is the local stack on AWS Emulator; ENV=aws is the
-// deployed stack, with your AWS credentials.
+// deployed stack, with your AWS credentials. Each live major of the data
+// contract (specs/datacontract.v<N>.yaml) keeps its data under a prefix of its
+// own: `test` tests every one; `query` and `browse` read the newest, or the one
+// DATA_MAJOR names (DATA_MAJOR=v1).
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { spawnSync } from "node:child_process";
@@ -12,26 +15,41 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { parseDocument } from "yaml";
+import { contracts } from "../scripts/contracts.ts";
 import { stackOutputs } from "./outputs.ts";
 
-const CONTRACT = "specs/datacontract.yaml";
 const fail = (message: string): never => {
   console.error(message);
   process.exit(1);
 };
 
 const where = process.env.ENV ?? "local";
+const majors = contracts("datacontract");
 // An API that keeps no data has nothing to test; asking to read it is a mistake.
-if (!existsSync(CONTRACT)) {
-  if (process.argv[2] !== "test") fail(`data: there is no ${CONTRACT}, so the events this API publishes are not kept as data`);
-  console.log(`data:test - no ${CONTRACT}, so the events this API publishes are not kept as data`);
+if (majors.length === 0) {
+  if (process.argv[2] !== "test") fail("data: there is no specs/datacontract.v<N>.yaml, so the events this API publishes are not kept as data");
+  console.log("data:test - no specs/datacontract.v<N>.yaml, so the events this API publishes are not kept as data");
   process.exit(0);
 }
+// Every major is tested, each in a run of its own.
+if (process.argv[2] === "test" && !process.env.DATA_MAJOR && majors.length > 1) {
+  for (const { major } of majors) {
+    const run = spawnSync(process.execPath, [...process.execArgv, ...process.argv.slice(1)], { stdio: "inherit", env: { ...process.env, DATA_MAJOR: `v${major}` } });
+    if (run.status !== 0) process.exit(run.status ?? 1);
+  }
+  process.exit(0);
+}
+const chosen = process.env.DATA_MAJOR
+  ? (majors.find(({ major }) => `v${major}` === process.env.DATA_MAJOR) ?? fail(`data: DATA_MAJOR is ${process.env.DATA_MAJOR}, which is not a live major (${majors.map(({ major }) => `v${major}`).join(", ")})`))
+  : majors.at(-1)!;
+const CONTRACT = chosen.path;
 // Inside `task acceptance` the stack's outputs are already in the environment.
 const inAcceptance = Boolean(process.env.DATA_BUCKET) && where === "local";
-const outputs = inAcceptance ? { data_bucket: process.env.DATA_BUCKET, data_prefix: process.env.DATA_PREFIX, data_compression: process.env.DATA_COMPRESSION } : stackOutputs("data");
+const outputs = inAcceptance ? { data_bucket: process.env.DATA_BUCKET, data_prefixes: process.env.DATA_PREFIXES, data_compression: process.env.DATA_COMPRESSION } : stackOutputs("data");
 const bucket = outputs.data_bucket || fail(`data: the stack has no bucket for the data - it was applied before ${CONTRACT} was written. Apply it again (locally: restart \`task dev\`)`);
-const prefix = outputs.data_prefix ?? "";
+const prefix =
+  (JSON.parse(outputs.data_prefixes || "{}") as Record<string, string>)[`v${chosen.major}`] ??
+  fail(`data: the stack keeps no data for ${CONTRACT} - it was applied before that major was written. Apply it again (locally: restart \`task dev\`)`);
 const emulator = process.env.AWS_ENDPOINT_URL;
 // The emulator has no host name for a bucket.
 const s3 = new S3Client(emulator ? { forcePathStyle: true } : {});

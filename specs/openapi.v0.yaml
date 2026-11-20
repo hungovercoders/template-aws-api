@@ -11,6 +11,11 @@ info:
 # least one scenario in specs/features tagged @operation:<operationId>.
 # `task spec:lint` holds this file to rules/house.yaml (lower snake_case
 # names) and to your own rules in .spectral.yaml.
+#
+# This file is major 0 of the contract: its version is 0.x.x, its paths start
+# /v0 and its operationIds end _v0 (e.g. POST /v0/things, create_thing_v0).
+# A later major is a file of its own beside it - specs/openapi.v1.yaml, /v1,
+# _v1 - served by the same stack, so both majors' consumers keep working.
 paths: {}
 
 # To require a signed-in caller, declare it here - for every operation, or

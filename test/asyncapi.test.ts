@@ -18,38 +18,38 @@ channels:
   brewery_notices:
     address: brewery-notices
     messages:
-      brewery_closed:
-        $ref: '#/components/messages/brewery_closed'
+      brewery_closed_v1:
+        $ref: '#/components/messages/brewery_closed_v1'
   beer_events:
     address: beer-events
     messages:
-      beer_created:
-        $ref: '#/components/messages/beer_created'
+      beer_created_v1:
+        $ref: '#/components/messages/beer_created_v1'
 operations:
-  handle_brewery_closed:
+  handle_brewery_closed_v1:
     action: receive
     summary: Retire the beers of a brewery that closed.
     channel:
       $ref: '#/channels/brewery_notices'
     messages:
-      - $ref: '#/channels/brewery_notices/messages/brewery_closed'
-  publish_beer_created:
+      - $ref: '#/channels/brewery_notices/messages/brewery_closed_v1'
+  publish_beer_created_v1:
     action: send
     summary: A beer was added to the catalogue.
     channel:
       $ref: '#/channels/beer_events'
     messages:
-      - $ref: '#/channels/beer_events/messages/beer_created'
+      - $ref: '#/channels/beer_events/messages/beer_created_v1'
 components:
   messages:
-    brewery_closed:
-      name: brewery_closed
+    brewery_closed_v1:
+      name: brewery_closed_v1
       summary: A brewery stopped trading.
       contentType: application/cloudevents+json
       payload:
         $ref: '#/components/schemas/BreweryClosedEvent'
-    beer_created:
-      name: beer_created
+    beer_created_v1:
+      name: beer_created_v1
       summary: A beer was added.
       contentType: application/cloudevents+json
       payload:
@@ -85,7 +85,7 @@ components:
                 abv: { type: number, minimum: 0 }
                 style: { type: string }
 `;
-const FEATURE = ["@operation:handle_brewery_closed", "Feature: Events", "  Scenario: a brewery closes", "    Given a brewery", "  @operation:publish_beer_created", "  Scenario: a beer is created", "    Given a beer", ""].join("\n");
+const FEATURE = ["@operation:handle_brewery_closed_v1", "Feature: Events", "  Scenario: a brewery closes", "    Given a brewery", "  @operation:publish_beer_created_v1", "  Scenario: a beer is created", "    Given a beer", ""].join("\n");
 
 type Document = Record<string, any>;
 const base = parse(CONTRACT) as Document;
@@ -107,7 +107,7 @@ test.each<[string, string, (document: Document) => void]>([
     d.components.messages.beer_retired = { name: "beer_retired", payload: { type: "object" } };
     d.channels.beer_events.messages.beer_retired = { $ref: "#/components/messages/beer_retired" };
   }],
-  ["a summary reworded", "non-breaking", (d) => (d.components.messages.beer_created.summary = "A beer joined the catalogue.")],
+  ["a summary reworded", "non-breaking", (d) => (d.components.messages.beer_created_v1.summary = "A beer joined the catalogue.")],
   ["a description added to a property", "non-breaking", (d) => (data(d).properties.abv.description = "Alcohol by volume")],
   ["only the version changed", "none", (d) => (d.info.version = "1.1.0")],
   ["a property removed", "breaking", (d) => {
@@ -117,7 +117,7 @@ test.each<[string, string, (document: Document) => void]>([
   ["a property made required", "breaking", (d) => data(d).required.push("style")],
   ["a property's type changed", "breaking", (d) => (data(d).properties.abv.type = "string")],
   ["an event's type renamed", "breaking", (d) => (d.components.schemas.BeerCreatedEvent.allOf[1].properties.type.const = "com.example.catalogue.beer.created.v2")],
-  ["an operation removed", "breaking", (d) => delete d.operations.publish_beer_created],
+  ["an operation removed", "breaking", (d) => delete d.operations.publish_beer_created_v1],
   ["a channel's address changed", "breaking", (d) => (d.channels.beer_events.address = "beers")],
   ["a property called description removed", "breaking", (d) => {
     data(d).properties.description = { type: "string" };
@@ -136,11 +136,11 @@ test.each<[string, string, (document: Document) => void]>([
   ["a constraint added to a property", "breaking", (d) => (data(d).properties.name.maxLength = 10)],
   ["a payload closed to other properties", "breaking", (d) => (d.components.schemas.BeerCreatedEvent.allOf[1].additionalProperties = false)],
   ["an operation called summary removed", "breaking", (d) => {
-    d.operations.summary = structuredClone(d.operations.publish_beer_created);
+    d.operations.summary = structuredClone(d.operations.publish_beer_created_v1);
     const before = structuredClone(d);
     delete d.operations.summary;
     expect(changes(before, d).some((change) => change.level === "breaking")).toBe(true);
-    delete d.operations.publish_beer_created;
+    delete d.operations.publish_beer_created_v1;
   }],
 ])("%s is %s", (_, expected, edit) => {
   expect(verdict(edited(edit))).toBe(expected);
@@ -173,7 +173,7 @@ const repository = (name: string, contract: string | null = CONTRACT) => {
   // The envelope every message extends is the skeleton's, beside its tools.
   mkdirSync(join(dir, "tools/asyncapi"), { recursive: true });
   cpSync(ENVELOPE, join(dir, "tools/asyncapi/cloudevent.yaml"));
-  if (contract) write(dir, "specs/asyncapi.yaml", contract);
+  if (contract) write(dir, "specs/asyncapi.v1.yaml", contract);
   write(dir, "specs/features/events.feature", FEATURE);
   git(dir, "init", "-q");
   git(dir, "add", "-A");
@@ -186,7 +186,7 @@ test("an API with no AsyncAPI contract has nothing to check", () => {
   const dir = repository("none", null);
   for (const command of ["check", "compat", "generate", "examples"]) {
     const result = run(dir, command);
-    expect(result.output).toContain("no specs/asyncapi.yaml");
+    expect(result.output).toContain("no specs/asyncapi.v<N>.yaml");
     expect(result.status).toBe(0);
   }
 });
@@ -197,10 +197,10 @@ test("check passes a valid contract whose every operation has a scenario", () =>
 
 test("check names an operation no scenario is tagged for", () => {
   const dir = repository("uncovered");
-  write(dir, "specs/features/events.feature", FEATURE.replace("  @operation:publish_beer_created\n", ""));
+  write(dir, "specs/features/events.feature", FEATURE.replace("  @operation:publish_beer_created_v1\n", ""));
   const result = run(dir, "check");
   expect(result.status).toBe(1);
-  expect(result.output).toContain("operation publish_beer_created has no scenario tagged @operation:publish_beer_created");
+  expect(result.output).toContain("operation publish_beer_created_v1 has no scenario tagged @operation:publish_beer_created_v1");
 });
 
 test("check says what is wrong with an invalid contract", () => {
@@ -212,21 +212,29 @@ test("check says what is wrong with an invalid contract", () => {
 
 test("compat holds info.version to what changed", () => {
   const dir = repository("compat");
-  const publish = (document: Document) => write(dir, "specs/asyncapi.yaml", stringify(document));
+  const publish = (document: Document) => write(dir, "specs/asyncapi.v1.yaml", stringify(document));
   const compat = () => run(dir, "compat");
   expect(compat().output).toContain("unchanged since");
 
-  // A breaking change needs a new major version.
+  // A breaking change to a published major is refused, whatever the version says:
+  // the changed event is a new version beside the old one, or a new major file.
   const breaking = edited((d) => {
     delete data(d).properties.abv;
     data(d).required = ["beer_id", "name"];
   });
   publish({ ...breaking, info: { ...breaking.info, version: "1.1.0" } });
   expect(compat().status).toBe(1);
-  expect(compat().output).toContain("needs a new major version");
+  expect(compat().output).toContain("Publish a changed event as a new version beside the old one");
   expect(compat().output).toContain("remove /components/schemas/BeerCreatedEvent/allOf/1/properties/data/properties/abv");
   publish({ ...breaking, info: { ...breaking.info, version: "2.0.0" } });
-  expect(compat().output).toContain("asyncapi:compat ok - 1.0.0");
+  expect(compat().status).toBe(1);
+
+  // The same change as a new major beside the published one breaks nobody.
+  write(dir, "specs/asyncapi.v1.yaml", CONTRACT);
+  write(dir, "specs/asyncapi.v2.yaml", stringify({ ...breaking, info: { ...breaking.info, version: "2.0.0" } }));
+  expect(compat().status).toBe(0);
+  expect(compat().output).toContain("v2 (specs/asyncapi.v2.yaml): new since");
+  rmSync(join(dir, "specs/asyncapi.v2.yaml"));
 
   // Any other change needs a new minor version; an edit that changes nothing, any new version.
   const added = edited((d) => (data(d).properties.brewery_id = { type: "string" }));
@@ -234,15 +242,49 @@ test("compat holds info.version to what changed", () => {
   expect(compat().output).toContain("needs at least a new minor version");
   publish({ ...added, info: { ...added.info, version: "1.1.0" } });
   expect(compat().status).toBe(0);
-  write(dir, "specs/asyncapi.yaml", `${CONTRACT}# a comment\n`);
+  write(dir, "specs/asyncapi.v1.yaml", `${CONTRACT}# a comment\n`);
   expect(compat().output).toContain("every published edit needs a new version");
+});
+
+test("a published major is retired only once it was published deprecated", () => {
+  const dir = repository("retire");
+  write(dir, "specs/asyncapi.v2.yaml", CONTRACT.replace("version: 1.0.0", "version: 2.0.0"));
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "v2 beside v1");
+  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
+  const sudden = run(dir, "compat");
+  expect(sudden.status).toBe(1);
+  expect(sudden.output).toContain("specs/asyncapi.v1.yaml was removed, but the published one was not deprecated");
+
+  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replace("version: 1.0.0", "version: 1.0.1\n  x-deprecated: true"));
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "v1 deprecated");
+  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
+  const announced = run(dir, "compat");
+  expect(announced.status).toBe(0);
+  expect(announced.output).toContain("v1 (specs/asyncapi.v1.yaml): retired");
+});
+
+test("check holds a file to its major and an event's names to its type's version", () => {
+  const dir = repository("names");
+  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replace("version: 1.0.0", "version: 2.0.0"));
+  expect(run(dir, "check").output).toContain("a file holds one major");
+  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replaceAll("publish_beer_created_v1", "publish_beer_created"));
+  write(dir, "specs/features/events.feature", FEATURE.replaceAll("publish_beer_created_v1", "publish_beer_created"));
+  expect(run(dir, "check").output).toContain("operation publish_beer_created carries v1 messages, so its name ends _v1");
+  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replaceAll("beer_created_v1", "beer_created").replaceAll("publish_beer_created", "publish_beer_created_v1"));
+  write(dir, "specs/features/events.feature", FEATURE);
+  expect(run(dir, "check").output).toContain("message beer_created has type com.example.catalogue.beer.created.v1, so its name ends _v1");
+  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
+  write(dir, "specs/asyncapi.yaml", CONTRACT);
+  expect(run(dir, "check").output).toContain("specs/asyncapi.yaml is not read");
 });
 
 test("every message is a CloudEvent with a type of its own, named the house way", () => {
   const problems = (name: string, edit: (document: Document) => void) => run(repository(name, stringify(edited(edit))), "check").output;
   const beer = (d: Document) => d.components.schemas.BeerCreatedEvent;
-  expect(problems("bare", (d) => (beer(d).allOf = [beer(d).allOf[1]]))).toContain("message beer_created is not a CloudEvent: its payload must extend the envelope");
-  expect(problems("untyped", (d) => delete beer(d).allOf[1].properties.type)).toContain("message beer_created does not fix its type");
+  expect(problems("bare", (d) => (beer(d).allOf = [beer(d).allOf[1]]))).toContain("message beer_created_v1 is not a CloudEvent: its payload must extend the envelope");
+  expect(problems("untyped", (d) => delete beer(d).allOf[1].properties.type)).toContain("message beer_created_v1 does not fix its type");
   expect(problems("shared", (d) => (beer(d).allOf[1].properties.type.const = "com.example.registry.brewery.closed.v1"))).toContain("have the same type");
   expect(problems("dataless", (d) => (beer(d).allOf[1].required = []))).toContain("does not require and describe its data");
 });
@@ -250,7 +292,7 @@ test("every message is a CloudEvent with a type of its own, named the house way"
 test("the house rules lint the contract's names and its event types", () => {
   const lint = (name: string, edit: (document: Document) => void) => {
     const dir = repository(name, stringify(edited(edit)));
-    const result = spawnSync(resolve("node_modules/.bin/spectral"), ["lint", "specs/asyncapi.yaml", "--ruleset", resolve("rules/asyncapi.yaml"), "--fail-severity", "warn"], { cwd: dir, encoding: "utf8", env });
+    const result = spawnSync(resolve("node_modules/.bin/spectral"), ["lint", "specs/asyncapi.v1.yaml", "--ruleset", resolve("rules/asyncapi.yaml"), "--fail-severity", "warn"], { cwd: dir, encoding: "utf8", env });
     return { status: result.status, output: result.stdout + result.stderr };
   };
   expect(lint("clean", () => {}).status).toBe(0);
@@ -262,19 +304,19 @@ test("the house rules lint the contract's names and its event types", () => {
   }
   // A property of the data that happens to be called type is not the event's type.
   expect(lint("inner", (d) => (data(d).properties.type = { type: "string", const: "lager" })).status).toBe(0);
-  expect(lint("badmedia", (d) => (d.components.messages.beer_created.contentType = "application/json")).output).toContain("house-message-is-a-cloudevent");
+  expect(lint("badmedia", (d) => (d.components.messages.beer_created_v1.contentType = "application/json")).output).toContain("house-message-is-a-cloudevent");
   expect(lint("camel", (d) => (data(d).properties.beerId = { type: "string" })).output).toContain("house-property-names-snake-case");
 });
 
 test("message names are one of a kind and never a path", () => {
-  const twice = edited((d) => (d.components.messages.beer_created.name = "brewery_closed"));
+  const twice = edited((d) => (d.components.messages.beer_created_v1.name = "brewery_closed_v1"));
   const dir = repository("names", stringify(twice));
   const check = run(dir, "check");
   expect(check.status).toBe(1);
-  expect(check.output).toContain('message name "brewery_closed" is used by more than one message');
+  expect(check.output).toContain('message name "brewery_closed_v1" is used by more than one message');
   expect(run(dir, "examples").status).toBe(1);
 
-  const path = repository("path", stringify(edited((d) => (d.components.messages.beer_created.name = "../../outside"))));
+  const path = repository("path", stringify(edited((d) => (d.components.messages.beer_created_v1.name = "../../outside"))));
   expect(run(path, "check").output).toContain('message name "../../outside" is not lower snake_case');
   expect(run(path, "examples").status).toBe(1);
   expect(existsSync(join(root, "outside.json"))).toBe(false);
@@ -308,10 +350,10 @@ test("two enums of the same name in different payloads keep their own values", (
 test("removing a published contract is breaking, and examples are not left behind", () => {
   const dir = repository("removed");
   run(dir, "examples");
-  rmSync(join(dir, "specs/asyncapi.yaml"));
+  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
   const compat = run(dir, "compat");
   expect(compat.status).toBe(1);
-  expect(compat.output).toContain("was removed, and with it 2 published operations");
+  expect(compat.output).toContain("specs/asyncapi.v1.yaml was removed, but the published one was not deprecated");
   expect(run(dir, "examples", "check").output).toContain("still has examples");
   expect(run(dir, "check").status).toBe(0);
 });
@@ -322,7 +364,7 @@ test("an example on a base schema is not taken for the whole message", () => {
   envelope.CloudEvent.example = { id: "only-the-base" };
   write(dir, "tools/asyncapi/cloudevent.yaml", stringify(envelope));
   run(dir, "examples");
-  expect(JSON.parse(readFileSync(join(dir, "messages/beer_created.json"), "utf8")).data).toEqual({ beer_id: "beer id", name: "name", abv: 0 });
+  expect(JSON.parse(readFileSync(join(dir, "messages/beer_created_v1.json"), "utf8")).data).toEqual({ beer_id: "beer id", name: "name", abv: 0 });
 });
 
 test("a change to the envelope every message extends is a breaking change to the contract", () => {
@@ -352,7 +394,7 @@ test("generate writes the resolved contract, a type for every payload and the ta
   // Nothing is left for a reader to guess: no anonymous names, no `any`.
   expect(types).not.toMatch(/Anonymous|\bany\b/);
   const operations = readFileSync(join(dir, "src/generated/async-operations.ts"), "utf8");
-  expect(operations).toContain('"id": "handle_brewery_closed"');
+  expect(operations).toContain('"id": "handle_brewery_closed_v1"');
   expect(operations).toContain('"action": "receive"');
   expect(operations).toContain('"address": "beer-events"');
   expect(operations).toContain('"type": "com.example.catalogue.beer.created.v1"');
@@ -363,7 +405,7 @@ test("examples are written from the contract and checked against it", () => {
   const dir = repository("examples");
   expect(run(dir, "examples", "check").status).toBe(1);
   expect(run(dir, "examples").status).toBe(0);
-  expect(JSON.parse(readFileSync(join(dir, "messages/beer_created.json"), "utf8"))).toEqual({
+  expect(JSON.parse(readFileSync(join(dir, "messages/beer_created_v1.json"), "utf8"))).toEqual({
     specversion: "1.0",
     id: "id",
     source: "source",
@@ -373,10 +415,10 @@ test("examples are written from the contract and checked against it", () => {
   });
   expect(run(dir, "examples", "check").output).toContain("asyncapi:examples:check ok");
   // One that no longer matches, and one for a message that is gone.
-  writeFileSync(join(dir, "messages/beer_created.json"), "{}\n");
+  writeFileSync(join(dir, "messages/beer_created_v1.json"), "{}\n");
   write(dir, "messages/old.json", "{}\n");
   const stale = run(dir, "examples", "check");
-  expect(stale.output).toContain("messages/beer_created.json does not match the contract");
+  expect(stale.output).toContain("messages/beer_created_v1.json does not match the contract");
   expect(stale.output).toContain("messages/old.json is not a message in the contract");
   run(dir, "examples");
   expect(existsSync(join(dir, "messages/old.json"))).toBe(false);

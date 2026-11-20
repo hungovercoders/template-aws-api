@@ -1,4 +1,6 @@
-// The contract at runtime. One module, three consumers:
+// The contracts at runtime - every live major, merged by `task generate`, each
+// operation marked with the version of the contract it is from. One module,
+// three consumers:
 //   - the Lambda router validates every request against it
 //   - the local harness uses it to match routes the way API Gateway will
 //   - the cucumber world validates every response against it
@@ -17,6 +19,7 @@ type OperationObject = {
   parameters?: Parameter[];
   requestBody?: { required?: boolean; content?: Record<string, Media> };
   responses?: Record<string, Response>;
+  "x-api-version"?: string;
 };
 
 export type Operation = {
@@ -30,6 +33,8 @@ export type Operation = {
   responses: Record<string, Response>;
   /** The contract's `security` requires a caller: API Gateway will only let authenticated requests through. */
   secured: boolean;
+  /** The version of the contract this operation is from (info.version of its specs/openapi.v<N>.yaml). */
+  version: string;
 };
 
 /** OpenAPI: an operation's own `security` replaces the document's; an empty requirement ({}) allows anonymous calls. */
@@ -43,8 +48,6 @@ const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
 
 const contract = document as { info?: { version?: string }; paths?: Record<string, Record<string, unknown>>; security?: SecurityRequirement[] };
 
-/** The contract version this build serves (info.version). */
-export const apiVersion = contract.info?.version ?? "0.0.0";
 
 export const operations: Operation[] = Object.entries(contract.paths ?? {}).flatMap(([path, item]) =>
   METHODS.filter((method) => item[method]).map((method) => {
@@ -59,6 +62,7 @@ export const operations: Operation[] = Object.entries(contract.paths ?? {}).flat
       requestBody: body && { required: body.required === true, schema: body.content?.["application/json"]?.schema },
       responses: op.responses ?? {},
       secured: requiresCaller(op.security ?? contract.security),
+      version: op["x-api-version"] ?? contract.info?.version ?? "0.0.0",
     };
   }),
 );

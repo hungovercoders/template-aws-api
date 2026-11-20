@@ -31,7 +31,7 @@ const delivered = new Set<string>();
  */
 export function messageFor(operationId: string, data: unknown, overrides: Partial<CloudEvent> = {}): CloudEvent {
   const operation = receives.find((candidate) => candidate.id === operationId);
-  assert.ok(operation, `${operationId} is not a receive operation in specs/asyncapi.yaml`);
+  assert.ok(operation, `${operationId} is not a receive operation in specs/asyncapi.v<N>.yaml`);
   const type = operation.messages[0]?.type;
   assert.ok(type, `${operationId} has no message with a type`);
   return { specversion: "1.0", id: randomUUID(), source: "/scenario", type, time: new Date().toISOString(), datacontenttype: "application/json", data, ...overrides };
@@ -39,7 +39,7 @@ export function messageFor(operationId: string, data: unknown, overrides: Partia
 
 /** Put a message on the queue. `body` is a CloudEvent, or anything at all for a message that should be refused. */
 export async function deliver(operationId: string, body: unknown): Promise<void> {
-  assert.ok(receives.some((operation) => operation.id === operationId), `${operationId} is not a receive operation in specs/asyncapi.yaml`);
+  assert.ok(receives.some((operation) => operation.id === operationId), `${operationId} is not a receive operation in specs/asyncapi.v<N>.yaml`);
   // A FIFO queue wants to know which messages are ordered together; here, all of them.
   const fifo = queue().endsWith(".fifo") ? { MessageGroupId: "scenario", MessageDeduplicationId: randomUUID() } : {};
   await sqs.send(new SendMessageCommand({ QueueUrl: queue(), MessageBody: typeof body === "string" ? body : JSON.stringify(body), ...fifo }));
