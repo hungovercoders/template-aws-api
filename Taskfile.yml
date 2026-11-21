@@ -638,6 +638,12 @@ tasks:
       - terraform -chdir=infra/bootstrap init -backend=false -input=false > /dev/null
       - node scripts/tags.ts check
 
+  resources:
+    desc: List what a stack is made of - every AWS resource it created, by service, from its Terraform state; on AWS, with its resource group in the console (ENV=local|aws, default local)
+    deps: [install]
+    cmds:
+      - node local/resources.ts
+
   tags:
     desc: Show the tags every resource of a stack carries - domain, team, service, repo - and which are not yet set (NAME=<stack name>)
     env:
