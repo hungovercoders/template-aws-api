@@ -1,7 +1,7 @@
 import { parquetReadObjects } from "hyparquet";
 import { expect, test } from "vitest";
 import { layout } from "../scripts/data.ts";
-import { compact, dayOf, parquetSchema, type SchemaObject, Unplaceable, valueOf, window } from "../src/lib/compactor.ts";
+import { compact, dayOf, parquetSchema, recentDays, type SchemaObject, Unplaceable, valueOf, window } from "../src/lib/compactor.ts";
 
 const BEER: SchemaObject = {
   name: "beer_created_v1",
@@ -105,6 +105,9 @@ test("a run rewrites the last whole days, and today when asked", () => {
   const now = new Date("2026-11-20T00:17:00Z");
   expect(window(now, 3, false)).toEqual(["2026-11-17", "2026-11-18", "2026-11-19"]);
   expect(window(now, 1, true)).toEqual(["2026-11-19", "2026-11-20"]);
+  // The raw query view's days: today and the day before by default.
+  expect(recentDays(now, 2)).toEqual(["2026-11-19", "2026-11-20"]);
+  expect(recentDays(now, 1)).toEqual(["2026-11-20"]);
   expect(dayOf({ time: "2026-11-20T00:30:00+01:00" })).toBe("2026-11-19");
 });
 
