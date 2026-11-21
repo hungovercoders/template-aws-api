@@ -8,7 +8,7 @@
 
 [Start here](#start-here) · [Architecture](#the-architecture-you-get) · [What you get](#what-you-get) ·
 [Why a template](#why-a-template-not-a-prompt) · [How it works](#how-it-works) · [See it working](#see-it-working) ·
-[Tasks](#everyday-tasks) · [By hand](#writing-the-spec-by-hand) · [Layout](#where-things-are) · [Guides](#guides)
+[Tasks](#everyday-tasks) · [Layout](#where-things-are) · [Guides](#guides)
 
 A template for AWS Lambda APIs where you write only what makes the API
 yours: what it does, in plain-language scenarios, and what it looks like, in
@@ -45,14 +45,73 @@ and queried there (real output, shortened).
 
 ## Start here
 
-You need [mise](https://mise.jdx.dev). It installs everything else.
+### 1. Set up your machine (once)
+
+You need [mise](https://mise.jdx.dev), which installs every other tool - Node,
+Task, Terraform, uv - at the versions in `mise.toml`, so your machine and CI
+run the same ones. On macOS you also need Docker.
+
+| | macOS | Linux (and Windows, in [WSL 2](https://learn.microsoft.com/windows/wsl/install)) |
+| --- | --- | --- |
+| Install mise | `brew install mise` | `curl https://mise.run \| sh` |
+| Put it on your shell | `echo 'eval "$(mise activate zsh)"' >> ~/.zshrc` | `echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc` |
+| AWS Emulator, the local copy of AWS | Runs in Docker: install [Docker Desktop](https://www.docker.com/products/docker-desktop/), start it, and give it at least 4 GB of memory (Settings → Resources) | Nothing to install: the first run downloads and verifies it. It needs `gpg` and `dpkg-deb`, already there on Debian and Ubuntu |
+
+Then open a new terminal, so the shell picks mise up. Check it with
+`mise --version`, and on macOS `docker info`.
+
+### 2. See the example running
+
+Before building your own, run the finished example - the Beer Catalogue API:
+
+```sh
+git clone https://github.com/hungovercoders/template-aws-api.git && cd template-aws-api
+git checkout example/implementation
+mise trust && mise install
+```
+
+**Terminal 1** - start the API, and leave it running:
+
+```sh
+task dev
+```
+
+The first run takes a few minutes: it fetches AWS Emulator (on macOS, it
+builds its Docker image), starts it, and applies `infra/` to it with
+Terraform. Then it prints the API's URL and a token. `Ctrl-C` stops it and
+throws the stack away; the next `task dev` starts clean.
+
+**Terminal 2** - use it, in the same folder:
+
+```sh
+task http          # pick a request from http/contract.http and send it
+task events:tail   # follow the events the API publishes
+task data:query    # query the events kept in S3, with SQL
+```
+
+**Run every check** - what CI runs, about ten minutes:
+
+```sh
+task ci                       # with task dev stopped: both use port 9297
+EMULATOR_PORT=9298 task ci    # or beside a running task dev
+```
+
+**macOS, Linux and CI** run the same tasks against the same emulator version.
+The only difference is where the emulator runs:
+
+| | macOS | Linux | CI (GitHub Actions) |
+| --- | --- | --- | --- |
+| AWS Emulator | In Docker, a fresh container each run (ARM on Apple silicon) | Native package, in `.tools/` | Native package, x86 |
+| First run | Builds the emulator's image | Downloads it and checks AWS's signature | The same, every run |
+
+### 3. Build your own
 
 1. **Create your repository.** Click *Use this template* on GitHub, leave
-   "Include all branches" unticked, then run `mise install`.
-2. **Write the spec.** In [Claude Code](https://claude.com/claude-code), run
-   `/write-spec`. It asks what the API should do, drafts the scenarios and
-   contracts with you, and checks them. Prefer to write it yourself?
-   [By hand](#writing-the-spec-by-hand).
+   "Include all branches" unticked, clone it, then run `mise trust && mise install`.
+2. **Write the spec.** In [Claude Code](https://claude.com/claude-code), the
+   AI agent that works with you here, run `/write-spec`. It asks what the API
+   should do, drafts the scenarios and contracts with you, and checks them.
+   Prefer to write it yourself? [By hand](docs/spec.md#writing-it-by-hand).
 3. **Make it yours.** Run `task adopt` once. It removes what is only about
    the template and replaces this README with one that describes your API.
 4. **Have it built.** Run `/implement-api`. The agent generates what follows
@@ -60,7 +119,7 @@ You need [mise](https://mise.jdx.dev). It installs everything else.
    may not edit your spec, weaken a check or rebuild the template.
 5. **Deploy when you are ready.** `task deploy NAME=my-api`, or let CI deploy
    `main` ([Deploying](docs/deploying.md#deploy)). Nothing deploys until you
-   opt in. To see the result first: [See it working](#see-it-working).
+   opt in.
 
 ## The architecture you get
 
@@ -202,7 +261,8 @@ is what implementing one adds.
 ## Everyday tasks
 
 Every command is a task. `task` lists them all; these are the ones you
-start with:
+start with. Only `task dev` keeps its terminal; the tasks that need the stack,
+such as `task features` and `task ci`, start and stop an emulator of their own.
 
 | Task | What it does |
 | --- | --- |
@@ -215,22 +275,6 @@ start with:
 | `task features` | Run the scenarios against the built Lambda |
 | `task queue:send`, `task events:tail`, `task data:query` | Send a message, follow published events, query the events in S3 |
 | `task deploy` | Apply the stack to AWS (opt-in) |
-
-## Writing the spec by hand
-
-`/write-spec` is the quick way. To do it yourself:
-
-- Replace the starter `specs/openapi.v0.yaml` with your contract: paths under
-  `/v0`, `operationId`s ending `_v0`, errors using its `Problem` schema.
-- Add feature files to `specs/features/`, each scenario tagged with the
-  operations it covers: `@operation:<operationId>`.
-- Rules for this API alone go in `.spectral.yaml`
-  ([Contract standards](docs/spec.md#contract-standards)).
-- `task spec:check` says when the spec is complete enough to build from;
-  `task spec:lint` that it meets the standards.
-- `task mock` and `ENV=mock task http` let you and your consumers call the
-  contract before anything is built
-  ([Try the contract before it is built](docs/spec.md#try-the-contract-before-it-is-built)).
 
 ## Where things are
 
