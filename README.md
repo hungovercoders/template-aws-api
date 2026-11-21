@@ -252,7 +252,7 @@ is what implementing one adds.
 
 `task ci` on `example/implementation` (selected lines):
 
-![task ci passing: every gate, 151 unit tests, 67 scenarios, the fuzz run and the data test on the raw JSON and the Parquet](.github/images/task-ci.png)
+![task ci passing: every gate, the unit tests, 67 scenarios, the fuzz run and the data test on the raw JSON and the Parquet](.github/images/task-ci.png)
 
 > **CI on `main` is red on purpose.** There is no spec to build yet, so
 > `task ci` fails until you add one. Changes to the template itself are
