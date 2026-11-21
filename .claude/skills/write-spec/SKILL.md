@@ -262,8 +262,9 @@ what it does and what it integrates with. Settle it before step 8: [skills.md](s
   caller (the starter contract's commented block) and document `401` on each.
 - **Lists** - anything that can grow is paged: a `limit`, a `cursor`, and a
   `next_cursor` in the response. Say what the order is.
-- **Rate limit** - ask how fast a caller may call: root `x-rate-limit`, `429` on every
-  operation, a scenario that calls too fast (`docs/spec.md`).
+- **Non-functional requirements** - how fast a caller may call (root `x-rate-limit`, `429`
+  on every operation, a scenario that calls too fast), how available and quick the API must
+  be, how long its data is kept, what it may cost: follow the `write-nfrs` skill.
 - **`info.version`** is a semantic version whose major is the file's. A new API starts at `0.1.0`.
 
 ## What the template has decided
