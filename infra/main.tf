@@ -296,12 +296,14 @@ resource "aws_apigatewayv2_stage" "default" {
 
   # What each route's contract says callers may do (x-rate-limit): `task spec:check` holds it
   # to two whole numbers, so neither is ever sent as 0, which would refuse every request.
+  # A route an SLO measures on its own (specs/slos, alarms.tf) has its detailed metrics on.
   dynamic "route_settings" {
-    for_each = local.route_limits
+    for_each = setunion(keys(local.route_limits), [for slo in local.operation_latency : slo.route])
     content {
-      route_key              = route_settings.key
-      throttling_rate_limit  = route_settings.value.requests_per_second
-      throttling_burst_limit = route_settings.value.burst
+      route_key                = route_settings.value
+      throttling_rate_limit    = try(local.route_limits[route_settings.value].requests_per_second, null)
+      throttling_burst_limit   = try(local.route_limits[route_settings.value].burst, null)
+      detailed_metrics_enabled = contains([for slo in local.operation_latency : slo.route], route_settings.value)
     }
   }
 

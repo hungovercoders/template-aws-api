@@ -12,7 +12,7 @@ import { gates as componentGates } from "./components-lib.ts";
 
 const STAGES = {
   template: ["skeleton:check", "docs:check", "skills:check", "changelog:check"],
-  spec: ["spec:check", "spec:lint", "spec:compat", "http:check", "readme:check"],
+  spec: ["spec:check", "spec:lint", "spec:compat", "slo:check", "http:check", "readme:check"],
   implemented: ["test:unit", "typecheck", "steps:check"],
 } as const;
 type Stage = keyof typeof STAGES;

@@ -1,0 +1,28 @@
+# A fixture for infra/tests/slo.tftest.hcl.
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: fixture-latency
+  displayName: The fixture answers quickly
+spec:
+  service: fixture
+  indicator:
+    metadata:
+      name: fixture-latency
+    spec:
+      thresholdMetric:
+        metricSource:
+          type: CloudWatch
+          spec:
+            namespace: AWS/ApiGateway
+            metricName: Latency
+            stat: p95
+  timeWindow:
+    - duration: 28d
+      isRolling: true
+  budgetingMethod: Occurrences
+  objectives:
+    - displayName: 95% of requests answered within 800 ms
+      op: lte
+      value: 800
+      target: 0.95
