@@ -40,8 +40,9 @@ So you know what to rely on, and what to check when reporting:
   ecosystem, held to every gate. Turn on Dependabot alerts and security
   updates under Settings → Code security; version updates stay Renovate's.
 - **AWS Emulator is verified** against AWS's signing key before it is used,
-  and is never installed system-wide. The Docker image
-  (`task emulator:docker`) installs the package without that check.
+  and is never installed system-wide. The Docker image used on macOS and
+  Windows (built by `task emulator:install`) installs the package without
+  that check.
 - **Local callers are not a security test.** On the local stack, AWS
   Emulator's authorizer checks a token's shape, issuer and audience but not
   its signature, so `local/token.ts` can mint callers for tests. On AWS the

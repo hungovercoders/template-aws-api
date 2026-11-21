@@ -40,6 +40,12 @@ See [events as data](docs/data.md) for how it is tested and queried.
 
 ## Working on it
 
+You need [mise](https://mise.jdx.dev) and, on macOS, Docker Desktop running.
+Run `mise trust && mise install` once. Then `task dev` keeps the API running
+on AWS Emulator in one terminal, and the tasks below talk to it from another.
+`task ci` starts an emulator of its own: stop `task dev` first, or run
+`EMULATOR_PORT=9298 task ci` ([running it locally](docs/testing.md#aws-emulator)).
+
 | Task | What it does |
 | --- | --- |
 | `task dev` | Run the API on AWS Emulator; prints its URL and a token |

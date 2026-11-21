@@ -153,9 +153,17 @@ task, and stops it. Emulated resources live in memory only.
 - **When it will not start, connect or sign:** the `aws-emulator` skill
   (`.claude/skills/aws-emulator`) has the troubleshooting, and checks whether
   an AWS operation is expected to work on the emulator.
-- **macOS / Windows:** AWS ships no native package; run `task emulator:docker`
-  in one terminal and the other tasks in a second. A running emulator is
-  picked up automatically.
+- **macOS / Windows:** AWS ships no native package, so the emulator runs in
+  Docker: have Docker Desktop (or another Docker engine) running, and the
+  tasks do the rest. `task emulator:install` builds its image once, and each
+  run starts a fresh container and removes it at the end - the same commands
+  and the same clean start as on Linux. `EMULATOR_DOCKER=1` does the same on
+  Linux.
+- **One stack per emulator:** an emulator cannot be reset, so a run refuses
+  one that already has the stack - `task dev` still up, say - rather than fail
+  on everything that exists. Stop `task dev` first, or give the run a port of
+  its own: `EMULATOR_PORT=9298 task ci`. `task emulator:docker` keeps an empty
+  emulator up for your own tools; a stack can be applied to it once.
 - **Port:** `EMULATOR_PORT` (default 9297).
 - **Telemetry:** the emulator reports anonymous usage data to AWS by default.
   The local stack turns it off in CI and leaves it alone elsewhere; set
