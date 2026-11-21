@@ -198,7 +198,7 @@ function lambdaLogs(env, group = "/aws/lambda/api-local") {
   const lines = logs.status === 0 ? logs.stdout.trim().split("\n").filter(Boolean) : [];
   if (lines.length === 0) return;
   // Errors first: in a long run they are far above the end of the log.
-  const errors = lines.filter((line) => /"level":"error"|errorType|\bERROR\b/.test(line));
+  const errors = lines.filter((line) => /"SeverityText":"ERROR"|errorType|\bERROR\b/.test(line));
   if (errors.length > 0) console.error(["", `--- the Lambda logged ${errors.length} errors; the last 10 ---`, ...errors.slice(-10).map((line) => line.slice(0, 2000))].join("\n"));
   console.error(["", "--- the end of the Lambda's log ---", ...lines.slice(-30)].join("\n"));
 }

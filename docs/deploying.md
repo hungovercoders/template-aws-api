@@ -177,10 +177,11 @@ published (`event_log_days`, 1 by default: it is for looking, not keeping).
 
 ## Logging and CORS
 
-- **Logging.** The router writes one JSON line per request - `request_id`,
-  `trace_id` (the caller's, when it sent a W3C `traceparent` header),
-  `route_key`, `operation_id`, `status`, `duration_ms` - and logs any
-  unexpected error with the same `request_id`. Operations get the same logger
+- **Logging.** Every line is an OpenTelemetry log record (`src/lib/log.ts`):
+  `Timestamp`, `SeverityText`, `Body`, `TraceId` and `SpanId` (the caller's trace, when it sent
+  a W3C `traceparent` header), the `Resource` that wrote it, and `Attributes`. The router
+  writes one per request - `request_id`, `route_key`, `operation_id`, `status`, `duration_ms` -
+  and logs any unexpected error with the same `request_id`. Operations get the same logger
   as `context.log`, so their lines can be joined to the request in CloudWatch
   Logs Insights. `LOG_LEVEL` (`debug`, `info`, `warn`, `error`; default `info`)
   sets what is written; test runs use `warn` to keep their output readable.
