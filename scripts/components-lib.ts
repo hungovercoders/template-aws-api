@@ -4,7 +4,7 @@
 //
 // A component owns whole files, listed in components.json, and marked
 // sections of files it shares with the rest of the skeleton:
-//     # component:<name>:start        (any comment syntax; the marker is the text)
+//     # component:<name>:start        (#, //, <!-- --> or mermaid's %%; the marker is the text)
 //     ...
 //     # component:<name>:end
 // Removing a component deletes its files and replaces each section with one
@@ -38,7 +38,7 @@ export function removed(path = RECORD): Set<string> {
 const MARKER = /component:([a-z0-9][a-z0-9-]*):(start|end|removed)\b/;
 // A marker is a comment on a line of its own, so nothing else can ride on one
 // and be left out of what skeleton.lock holds.
-const ALONE = /^\s*(#|\/\/|<!--)\s*component:[a-z0-9][a-z0-9-]*:(start|end|removed)\s*(-->)?\s*$/;
+const ALONE = /^\s*(#|\/\/|<!--|%%)\s*component:[a-z0-9][a-z0-9-]*:(start|end|removed)\s*(-->)?\s*$/;
 
 export type Parts = {
   // The file without any component's sections or placeholders.
