@@ -8,6 +8,7 @@ test("a pull request is listed by its title, with its kind and a link to it", ()
     kind: "feat",
     title: "the raw JSON is kept 7 years",
     pull: 121,
+    from: "org",
   });
 });
 
@@ -22,11 +23,14 @@ test("a title without a known kind is listed as it is, under Other", () => {
 });
 
 test("the changelog is by day, newest first, and by kind in a fixed order within a day", () => {
-  const text = render([
-    { day: "2026-11-21", subject: "Merge pull request #3 from org/b", body: "fix: three" },
-    { day: "2026-11-21", subject: "Merge pull request #2 from org/b", body: "feat: two" },
-    { day: "2026-11-20", subject: "docs: one", body: "" },
-  ]);
+  const text = render(
+    [
+      { day: "2026-11-21", subject: "Merge pull request #3 from org/b", body: "fix: three" },
+      { day: "2026-11-21", subject: "Merge pull request #2 from org/b", body: "feat: two" },
+      { day: "2026-11-20", subject: "docs: one", body: "" },
+    ],
+    "org",
+  );
   expect(text).toContain("## 2026-11-21\n\n### Features\n\n- two ([#2](../../pull/2))\n\n### Fixes\n\n- three ([#3](../../pull/3))\n\n## 2026-11-20\n\n### Documentation\n\n- one\n");
   expect(text.indexOf("## 2026-11-21")).toBeLessThan(text.indexOf("## 2026-11-20"));
 });
@@ -34,4 +38,14 @@ test("the changelog is by day, newest first, and by kind in a fixed order within
 test("the same history always gives the same changelog", () => {
   const history = [{ day: "2026-11-21", subject: "Merge pull request #1 from org/b", body: "ci: one" }];
   expect(render(history)).toBe(render(history));
+});
+
+test("a pull request links to its page only when it was merged here; copied history keeps its number unlinked", () => {
+  const history = [
+    { day: "2026-11-21", subject: "Merge pull request #9 from Org/b", body: "feat: here" },
+    { day: "2026-11-20", subject: "Merge pull request #7 from elsewhere/b", body: "feat: copied" },
+  ];
+  const text = render(history, "org");
+  expect(text).toContain("- here ([#9](../../pull/9))");
+  expect(text).toContain("- copied (#7)");
 });

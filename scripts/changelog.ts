@@ -15,11 +15,12 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { baseline } from "./spec-baseline.ts";
+import { repo } from "./tags.ts";
 
 const FILE = "CHANGELOG.md";
 
 export type Commit = { day: string; subject: string; body: string };
-type Entry = { day: string; kind: string; title: string; pull?: number };
+type Entry = { day: string; kind: string; title: string; pull?: number; from?: string };
 
 // Conventional Commits' kinds, in the order the changelog lists them.
 const KINDS: [kind: string, heading: string][] = [
@@ -37,7 +38,7 @@ const OTHER = "Other";
 
 /** What one commit on the default branch says changed, or nothing for a merge that is not a pull request. */
 export function entryOf(commit: Commit): Entry | undefined {
-  const pull = /^Merge pull request #(\d+)\b/.exec(commit.subject);
+  const pull = /^Merge pull request #(\d+) from ([^/\s]+)\//.exec(commit.subject) ?? /^Merge pull request #(\d+)\b/.exec(commit.subject);
   if (!pull && /^Merge (branch|remote-tracking branch|commit) /.test(commit.subject)) return undefined;
   const line = pull ? (commit.body.split("\n").find((text) => text.trim() !== "") ?? commit.subject) : commit.subject;
   const conventional = /^([a-z]+)(\([^)]*\))?!?:\s*(.+)$/.exec(line.trim());
@@ -46,12 +47,16 @@ export function entryOf(commit: Commit): Entry | undefined {
     day: commit.day,
     kind: known ? conventional![1]! : OTHER,
     title: known ? conventional![3]! : line.trim(),
-    ...(pull ? { pull: Number(pull[1]) } : {}),
+    ...(pull ? { pull: Number(pull[1]), ...(pull[2] ? { from: pull[2] } : {}) } : {}),
   };
 }
 
-/** The changelog for these commits, newest first. */
-export function render(commits: Commit[]): string {
+/**
+ * The changelog for these commits, newest first. A pull request links to its page when it was
+ * merged from `owner`'s own repository; one that came with history copied from elsewhere keeps
+ * its number, unlinked, rather than point at another pull request of the same number here.
+ */
+export function render(commits: Commit[], owner?: string): string {
   const entries = commits.map(entryOf).filter((entry): entry is Entry => entry !== undefined);
   const lines = [
     "# Changelog",
@@ -65,7 +70,10 @@ export function render(commits: Commit[]): string {
       const ofKind = entries.filter((entry) => entry.day === day && entry.kind === kind);
       if (ofKind.length === 0) continue;
       lines.push("", `### ${heading}`, "");
-      for (const entry of ofKind) lines.push(`- ${entry.title}${entry.pull ? ` ([#${entry.pull}](../../pull/${entry.pull}))` : ""}`);
+      for (const entry of ofKind) {
+        const ours = owner !== undefined && entry.from?.toLowerCase() === owner.toLowerCase();
+        lines.push(`- ${entry.title}${entry.pull ? (ours ? ` ([#${entry.pull}](../../pull/${entry.pull}))` : ` (#${entry.pull})`) : ""}`);
+      }
     }
   }
   return lines.join("\n") + "\n";
@@ -95,7 +103,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     console.error("changelog: there is no history to write it from - fetch the default branch (git fetch origin main)");
     process.exit(1);
   }
-  const wanted = render(history(from));
+  // The owner of this repository, from its git remote or GitHub Actions (tags.ts).
+  const owner = new URL(repo()).pathname.split("/").filter(Boolean).at(-2);
+  const wanted = render(history(from), owner);
   if (process.argv[2] === "generate") {
     writeFileSync(FILE, wanted);
     console.log(`changelog:generate - ${FILE} written from the history up to ${from.slice(0, 12)}`);
