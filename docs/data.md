@@ -88,7 +88,7 @@ of its own in the contract, and is deployed with `-var data_server=<name>`.
 
 | Task | What it does |
 | --- | --- |
-| `task data:query -- "select * from beer_rated_v1"` | Runs SQL through DuckDB over the newest major's data, or the one `DATA_MAJOR=v<N>` names. Each event has a view over its Parquet, named after its schema object, and one over its raw JSON, `<name>_raw`, up to the minute; each shows every event once, `data` is a struct (`data.score`) and `dt` the day. With no SQL it opens DuckDB's shell |
+| `task data:query -- "select * from beer_rated_v1"` | Runs SQL through DuckDB over the newest major's data, or the one `DATA_MAJOR=v<N>` names. Each event has a view over its Parquet, named after its schema object, and one over its raw JSON, `<name>_raw`, up to the minute but only for the last 2 days (`DATA_RAW_DAYS` widens it), since the raw JSON is kept for years and the Parquet holds every day compacted; each shows every event once, `data` is a struct (`data.score`) and `dt` the day. With no SQL it opens DuckDB's shell |
 | `task data:compact` | Runs the compactor now, as its schedule does, today included |
 | `task data:browse` | The same views in [Harlequin](https://harlequin.sh) |
 

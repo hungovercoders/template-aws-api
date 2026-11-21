@@ -17,7 +17,7 @@ import { dirname, join, resolve } from "node:path";
 import { gunzipSync } from "node:zlib";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { parquetMetadata, parquetReadObjects } from "hyparquet";
-import { parquetSchema, type Property } from "../src/lib/compactor.ts";
+import { parquetSchema, type Property, recentDays } from "../src/lib/compactor.ts";
 import { parseDocument } from "yaml";
 import { contracts } from "../scripts/contracts.ts";
 import { stackOutputs } from "./outputs.ts";
@@ -307,7 +307,12 @@ const quote = (text: string) => `'${text.replace(/'/g, "''")}'`;
  */
 async function views(canReadS3: boolean): Promise<string> {
   const lines: string[] = [];
-  const objects = await stored();
+  // The raw JSON is kept for years, so its views read only the last DATA_RAW_DAYS days (2): what the
+  // daily compaction has not reached yet. Everything older is in the Parquet views.
+  const given = process.env.DATA_RAW_DAYS ?? "2";
+  if (!/^[1-9]\d*$/.test(given)) fail(`data: DATA_RAW_DAYS is how many recent days of raw JSON the <event>_raw views read, a whole number from 1; it is "${given}"`);
+  const rawDays = recentDays(new Date(), Number(given));
+  const objects = (await stored()).filter((object) => rawDays.includes(object.day));
   const present = new Set(objects.map((object) => object.type));
   const parquetFiles = await stored(parquetPrefix);
   const compactedTypes = new Set(parquetFiles.map((file) => file.type));
@@ -324,7 +329,10 @@ async function views(canReadS3: boolean): Promise<string> {
     const session = credentials.sessionToken ? `, SESSION_TOKEN ${quote(credentials.sessionToken)}` : "";
     lines.push(`CREATE OR REPLACE SECRET data (TYPE s3, KEY_ID ${quote(credentials.accessKeyId)}, SECRET ${quote(credentials.secretAccessKey)}${session}, REGION ${quote(region)}${at});`);
     // Plain or gzipped: DuckDB tells by the file's name.
-    source = (object) => `read_json(${quote(`s3://${bucket}/${prefix}type=${object.physicalName}/*/*`)}, format='newline_delimited', hive_partitioning=true, union_by_name=true)`;
+    // Only the days that have data, each by its partition: a glob over every day would list years of files.
+    const daysOf = (object: SchemaObject) => [...new Set(objects.filter((stored) => stored.type === object.physicalName).map((stored) => stored.day))].sort();
+    source = (object) =>
+      `read_json([${daysOf(object).map((day) => quote(`s3://${bucket}/${prefix}type=${object.physicalName}/dt=${day}/*`)).join(", ")}], format='newline_delimited', hive_partitioning=true, union_by_name=true)`;
     parquetSource = (object) => `read_parquet(${quote(`s3://${bucket}/${parquetPrefix}type=${object.physicalName}/*/*.parquet`)}, hive_partitioning=true)`;
   } else {
     // Where the extension cannot be downloaded (a proxy that only passes HTTPS), the data can only be read from a copy.
@@ -356,7 +364,9 @@ async function views(canReadS3: boolean): Promise<string> {
     defined.push(object.name);
   }
   const quiet = schemas.filter((object) => !defined.includes(object.name)).map((object) => object.name);
-  console.error(`data: ${defined.length > 0 ? `views ${defined.join(", ")}` : "no views"} over s3://${bucket}/${prefix} (<event>_raw) and s3://${bucket}/${parquetPrefix} (<event>)${quiet.length > 0 ? `; no Parquet yet for ${quiet.join(", ")}` : ""}`);
+  console.error(
+    `data: ${defined.length > 0 ? `views ${defined.join(", ")}` : "no views"} over s3://${bucket}/${prefix} (<event>_raw: the last ${given} days, DATA_RAW_DAYS widens it) and s3://${bucket}/${parquetPrefix} (<event>: every day compacted)${quiet.length > 0 ? `; no Parquet yet for ${quiet.join(", ")}` : ""}`,
+  );
   const file = resolve(".local", `data-${where}.sql`);
   mkdirSync(dirname(file), { recursive: true });
   // It holds the credentials the views read with: readable by nobody else, and gone when the task ends,
