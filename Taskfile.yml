@@ -94,6 +94,18 @@ tasks:
     cmds:
       - node scripts/docs-check.ts
 
+  changelog:generate:
+    desc: Write CHANGELOG.md from the history - every change merged into the default branch before this one, newest first, grouped by kind (the template's; an API's branch skips it)
+    deps: [install]
+    cmds:
+      - node scripts/changelog.ts generate
+
+  changelog:check:
+    desc: Gate - CHANGELOG.md is what changelog:generate writes from the history (the template's; an API's branch skips it)
+    deps: [install]
+    cmds:
+      - node scripts/changelog.ts check
+
   # component:asyncapi:start
   asyncapi:install:
     desc: Install AsyncAPI's own tools (parser, diff, Modelina) - a package of their own in tools/asyncapi, so they leave with the component
