@@ -23,8 +23,8 @@ ends `-dev`, `-test`, `-staging` or `-prod` also carries `environment`.
 and what the stack may cost a month in `infra/budget.auto.tfvars.json`
 ([cost](#cost)); commit them. Nothing is applied - locally or to AWS - while one is empty,
 and `task tags` shows what a stack would carry. A resource group named after
-the stack gathers everything tagged with its `service`:
-`aws resource-groups list-group-resources --group-name <NAME>`.
+the stack gathers everything tagged with its `service`; `ENV=aws task resources`
+lists what the stack created, by service, with a link to that group in the console.
 
 `task tags:check` fails for a resource that could carry the tags and would
 not: the AWS provider adds them to everything, and a resource of any other
