@@ -87,7 +87,8 @@ skeleton every API shares.
 
 1. **Open an issue** saying what is missing and what "done" looks like. A
    change that would help only one API belongs in that API.
-2. **Make it on `main`**, with `task skeleton:lock` in the same commit.
+2. **Make it on `main`**, with `task skeleton:lock` in the same commit, and
+   `task changelog:generate` once the branch is up to date with `main`.
    `ci` is red there by design (there is no spec to implement), so the check
    that matters is `template`: every gate, with the example laid over your
    change.

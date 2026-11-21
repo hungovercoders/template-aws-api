@@ -11,7 +11,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { gates as componentGates } from "./components-lib.ts";
 
 const STAGES = {
-  template: ["skeleton:check", "docs:check", "skills:check"],
+  template: ["skeleton:check", "docs:check", "skills:check", "changelog:check"],
   spec: ["spec:check", "spec:lint", "spec:compat", "http:check", "readme:check"],
   implemented: ["test:unit", "typecheck", "steps:check"],
 } as const;

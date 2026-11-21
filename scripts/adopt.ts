@@ -17,8 +17,9 @@ if (Object.keys(contract.paths ?? {}).length === 0) {
 
 const done: string[] = [];
 
-// .github/images holds the template README's own pictures, which go with that README.
-for (const path of [".github/workflows/template.yml", ".github/rulesets", ".github/images"]) {
+// .github/images holds the template README's own pictures, which go with that README, and
+// CHANGELOG.md the template's history, which is not the API's.
+for (const path of [".github/workflows/template.yml", ".github/rulesets", ".github/images", "CHANGELOG.md"]) {
   if (!existsSync(path)) continue;
   rmSync(path, { recursive: true });
   done.push(`deleted ${path}`);
