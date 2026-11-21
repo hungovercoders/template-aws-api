@@ -217,28 +217,28 @@ judge by calling it than by reading it. `task mock` starts
 `specs/openapi.v<N>.yaml` as a mock API:
 
 ```sh
-task mock                       # http://127.0.0.1:4010, answers from the contract's examples
+task mock                       # http://127.0.0.1:4010 (MOCK_PORT), answers from the contract's examples
 task mock -- --dynamic          # generate varied data from the schemas instead
-MOCK_PORT=4011 task mock
 
-curl http://127.0.0.1:4010/things
-curl -X POST http://127.0.0.1:4010/things -H 'content-type: application/json' -d '{}'
-curl http://127.0.0.1:4010/things/123 -H 'Prefer: code=404'   # ask for a documented response
+curl http://127.0.0.1:4010/v0/things
+curl -X POST http://127.0.0.1:4010/v0/things -H 'content-type: application/json' -d '{}'
+curl http://127.0.0.1:4010/v0/things/123 -H 'Prefer: code=404'   # ask for a documented response
 ```
 
 It validates each request against the contract and answers with a documented
 response, so a consumer can build against it while the API is being
 implemented. It is a mock: it holds no data and knows none of the behaviour
-in the feature files - something you create is not there when you list. Good
-examples in the contract make it far more useful.
+in the feature files - something you create is not there when you list. Prism
+is not a gate; the task fetches the version pinned in `Taskfile.yml`.
 
-Prism is not a gate and is not installed with the project; the task fetches
-the version pinned in `Taskfile.yml` the first time you run it.
-
-## Rate limits
+## Rate limits and service levels
 
 How fast a caller may call is part of each `openapi.v<N>.yaml`: `x-rate-limit: {requests_per_second, burst}` at its root.
 API Gateway applies it to each of that major's routes and answers `429` beyond it, which every operation documents (`spec:check`); `this.flood()` lets a scenario prove it.
+
+How well the API must serve is in `specs/slos/<name>.yaml`, one [OpenSLO](https://github.com/OpenSLO/OpenSLO) v1 SLO each, measured on API Gateway's metrics (CloudWatch, `AWS/ApiGateway`):
+**availability**, a `ratioMetric` of `5xx` over `Count`, and **latency**, a `thresholdMetric` of `Latency` at a percentile with `op: lte` and `value` in milliseconds - for the whole API, or for one operation named by `metadata.labels.operation`.
+They set the alarms' thresholds (`infra/alarms.tf`, [runbook](runbook.md)); without them the template's own stand. `task slo:check` runs `oslo validate` and refuses an SLO the alarms cannot measure, or an operation the contract does not have.
 
 ## Conventions the template assumes
 

@@ -4,5 +4,7 @@ task = "3.52"
 terraform = "1.17"
 # Compares two versions of the contract for `task spec:compat`.
 "github:oasdiff/oasdiff" = "1.37.0"
+# OpenSLO's own validator, for `task slo:check`.
+"github:OpenSLO/oslo" = { version = "0.13.0", bin = "oslo" }
 # schemathesis runs through uvx in `task contract:fuzz`.
 uv = "0.11"

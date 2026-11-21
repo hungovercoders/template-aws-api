@@ -1,0 +1,36 @@
+# A fixture for infra/tests/slo.tftest.hcl.
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: fixture-availability
+  displayName: The fixture answers without failing
+spec:
+  description: Callers get an answer that is not a server error.
+  service: fixture
+  indicator:
+    metadata:
+      name: fixture-server-errors
+    spec:
+      ratioMetric:
+        counter: true
+        bad:
+          metricSource:
+            type: CloudWatch
+            spec:
+              namespace: AWS/ApiGateway
+              metricName: 5xx
+              stat: Sum
+        total:
+          metricSource:
+            type: CloudWatch
+            spec:
+              namespace: AWS/ApiGateway
+              metricName: Count
+              stat: Sum
+  timeWindow:
+    - duration: 28d
+      isRolling: true
+  budgetingMethod: Occurrences
+  objectives:
+    - displayName: 99.9% of requests answered without a server error
+      target: 0.999

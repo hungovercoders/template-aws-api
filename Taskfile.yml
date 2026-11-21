@@ -401,6 +401,12 @@ tasks:
     cmds:
       - node scripts/spec-check.ts
 
+  slo:check:
+    desc: Gate - each SLO in specs/slos is valid OpenSLO (oslo validate) and one the alarms act on - availability, or latency for the API or one operation (none - the template's thresholds)
+    deps: [install]
+    cmds:
+      - node scripts/slo.ts check
+
   spec:lint:
     desc: Gate - every major's contract (specs/openapi.v<N>.yaml) meets the house rules (rules/house.yaml) and this API's own (.spectral.yaml); warnings fail
     deps: [install]
@@ -648,6 +654,7 @@ tasks:
       - task: spec:check
       - task: spec:lint
       - task: spec:compat
+      - task: slo:check
       - task: http:check
       - task: readme:check
       - task: test:unit

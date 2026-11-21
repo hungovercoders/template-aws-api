@@ -1,0 +1,30 @@
+# A fixture for infra/tests/slo.tftest.hcl.
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: list-things-v1-latency
+  displayName: Listing the things is quick
+  labels:
+    operation: list_things_v1
+spec:
+  service: fixture
+  indicator:
+    metadata:
+      name: list-things-v1-latency
+    spec:
+      thresholdMetric:
+        metricSource:
+          type: CloudWatch
+          spec:
+            namespace: AWS/ApiGateway
+            metricName: Latency
+            stat: p99
+  timeWindow:
+    - duration: 28d
+      isRolling: true
+  budgetingMethod: Occurrences
+  objectives:
+    - displayName: 99% of lists answered within 500 ms
+      op: lte
+      value: 500
+      target: 0.99

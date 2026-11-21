@@ -202,5 +202,5 @@ cost allocation tag: in the Billing console, activate `service` once per account
 
 Without a limit a caller can make the API do, and cost, as much as the
 account allows. The limit is the contract's, where callers read it:
-`x-rate-limit` in each `specs/openapi.v<N>.yaml` ([rate limits](spec.md#rate-limits)).
+`x-rate-limit` in each `specs/openapi.v<N>.yaml` ([rate limits](spec.md#rate-limits-and-service-levels)).
 A deploy applies it to that major's routes; over it the API answers 429.
