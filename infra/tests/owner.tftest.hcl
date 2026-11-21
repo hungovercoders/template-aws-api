@@ -13,7 +13,9 @@ mock_provider "awscc" {}
 mock_provider "archive" {}
 
 variables {
-  name   = "plan-test"
+  name = "plan-test"
+  # A fixture contract, so the plan is the same whatever this API's own contract says.
+  specs  = "tests/http"
   repo   = "https://example.com/plan-test"
   domain = "plan-test"
   team   = "plan-test"
