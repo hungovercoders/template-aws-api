@@ -29,18 +29,19 @@ The agent writes the logic: one small function per operation, and the glue
 for your sentences. From the example, shortened:
 
 ```ts
-export async function create_beer({ body }: Context<"create_beer">) {
+export async function create_beer_v0({ body }: Context<"create_beer_v0">) {
   const beer = { id: randomUUID(), name: body.name.trim(), style: body.style, abv: oneDecimal(body.abv) };
   await putNewBeer(beer);
-  return json(201, toBeer(beer), { location: `/beers/${beer.id}` });
+  return json(201, toBeer(beer), { location: `/v0/beers/${beer.id}` });
 }
 ```
 
 `task ci` then runs your scenarios against the real Lambda, on a local copy
 of AWS, and says whether it is finished. Here it is running: a request, a
-refusal, the event published and that event queried in S3 (real output, shortened).
+refusal, the event it published, and that event compacted to Parquet in S3
+and queried there (real output, shortened).
 
-![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, and the same event is read back from S3 with SQL](.github/images/api-in-action.gif)
+![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, then compacted to Parquet in S3 and read back with SQL](.github/images/api-in-action.gif)
 
 ## Start here
 
@@ -68,17 +69,25 @@ One service, every way in and out of it described by a contract:
 ```mermaid
 flowchart TB
   caller(["API callers"]) <-->|"HTTP (OpenAPI)"| gateway["API Gateway"]
-  sender(["Other services"]) -->|"messages (AsyncAPI)"| queue[["SQS queue"]]
   gateway --> api["Lambda: your operations"]
+  api --> table[("DynamoDB: your data and the outbox")]
+  %% component:consume:start
+  sender(["Other services"]) -->|"messages (AsyncAPI)"| queue[["SQS queue"]]
   queue --> consumer["Lambda: your consumers"]
   queue -.->|"after retries"| dlq[["Dead-letter queue"]]
-  api --> table[("DynamoDB: your data and the outbox")]
   consumer --> table
+  %% component:consume:end
+  %% component:publish:start
   table -->|"stream"| forwarder["Lambda: forwarder"]
   forwarder -->|"events (AsyncAPI, CloudEvents)"| bus{{"EventBridge bus"}}
   bus --> subscriber(["Subscribers"])
-  bus --> firehose["Firehose"] --> bucket[("S3: raw JSON, compacted daily to Parquet")]
-  bucket -->|"data contract (ODCS)"| analyst(["Analysts: DuckDB, Harlequin"])
+  %% component:publish:end
+  %% component:data:start
+  bus --> firehose["Firehose"] --> raw[("S3: raw JSON")]
+  schedule["EventBridge Scheduler: daily"] --> compactor["Lambda: compactor"]
+  raw --> compactor --> parquet[("S3: Parquet, a file per event type and day")]
+  raw & parquet -->|"data contract (ODCS)"| analyst(["Analysts: DuckDB, Harlequin"])
+  %% component:data:end
 ```
 
 | Interface | Direction | Contract | Optional |
@@ -105,7 +114,8 @@ need an optional part removes it, and can bring it back later:
 
 - A queue with retries and duplicate handling: one function per message.
 - Events published with the change they describe: `outbox(event)` in a write.
-- Those events kept in S3 and compacted daily to typed Parquet, both tested against a data contract, with DuckDB and Harlequin to query them.
+- Those events kept in S3 and compacted daily to typed Parquet, both tested
+  against a data contract, with DuckDB and Harlequin to query them.
 
 **Tests that mean something**
 
@@ -150,8 +160,9 @@ specs/openapi.v<N>.yaml   ─┬─► request validation inside the Lambda
 specs/asyncapi.v<N>.yaml  ─┬─► every message and event validated as a CloudEvent
  (messages, events)        └─► a typed stub per message, a typed function per event
 
-specs/datacontract.v<N>.yaml ─► per major: a stream, its retention, a freshness
- (events as data)               alarm (Terraform reads it), a test of what landed
+specs/datacontract.v<N>.yaml ─┬─► per major: a stream, its retention and alarms (Terraform reads it)
+ (events as data)             ├─► a daily compaction to Parquet, typed by the contract
+                              └─► a test of what landed, raw and in Parquet
 
 specs/features/*.feature ──► cucumber, strict, against the built Lambda
    (the behaviour)           on infra/ applied to AWS Emulator
@@ -161,7 +172,7 @@ specs/features/*.feature ──► cucumber, strict, against the built Lambda
 | --- | --- | --- |
 | `specs/openapi.v<N>.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
 | `specs/asyncapi.v<N>.yaml`, if it has messages or events | The queue, the outbox, the event bus | `src/consumers/`, and `outbox(event)` in a write |
-| `specs/datacontract.v<N>.yaml`: owner, retention, sensitivity | The bucket, delivery, the data test | |
+| `specs/datacontract.v<N>.yaml`: owner, retention, sensitivity | The bucket, delivery, the daily Parquet compaction, the data test | |
 | Who owns it: `domain` and `team` | Tags and a resource group | |
 
 ## See it working
@@ -182,7 +193,7 @@ is what implementing one adds.
 
 `task ci` on `example/implementation` (selected lines):
 
-![task ci passing: every gate, 127 unit tests, 67 scenarios, the fuzz run and the data test](.github/images/task-ci.png)
+![task ci passing: every gate, 151 unit tests, 67 scenarios, the fuzz run and the data test on the raw JSON and the Parquet](.github/images/task-ci.png)
 
 > **CI on `main` is red on purpose.** There is no spec to build yet, so
 > `task ci` fails until you add one. Changes to the template itself are
