@@ -1,11 +1,15 @@
 openapi: 3.1.0
 info:
   title: Beer Catalogue API
-  version: 0.1.0
+  version: 0.2.0
   description: >
     A brewery's beer catalogue. Signed-in staff add the beers they brew, keep
     the details current and retire beers. Anyone can browse the catalogue, and
     drinkers rate beers from 1 to 5.
+
+x-rate-limit:
+  requests_per_second: 20
+  burst: 40
 
 tags:
   - name: beers
@@ -41,6 +45,8 @@ paths:
             minLength: 1
             maxLength: 1024
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "200":
           description: >
             A page of beers in name order, ignoring case and accents. Follow
@@ -90,6 +96,8 @@ paths:
       security:
         - bearer_auth: []
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "201":
           description: The beer was added.
           headers:
@@ -116,6 +124,8 @@ paths:
       summary: Fetch one beer
       tags: [beers]
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "200":
           description: The beer.
           content:
@@ -141,6 +151,8 @@ paths:
       security:
         - bearer_auth: []
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "200":
           description: The beer with the changes applied.
           content:
@@ -162,6 +174,8 @@ paths:
       security:
         - bearer_auth: []
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "204":
           description: The beer was retired.
         "401":
@@ -187,6 +201,8 @@ paths:
             example:
               score: 4
       responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
         "201":
           description: The rating was recorded; the beer with its new average.
           content:
@@ -323,6 +339,18 @@ components:
                 type: string
 
   responses:
+    TooManyRequests:
+      description: The caller called faster than the catalogue allows (x-rate-limit). API Gateway answers this itself; wait and try again.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message:
+                type: string
+          example:
+            message: Too Many Requests
     Unauthorized:
       description: The caller is not signed in. Only staff may change the catalogue.
       content:
