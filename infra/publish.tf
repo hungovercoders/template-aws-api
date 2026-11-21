@@ -225,6 +225,8 @@ resource "aws_lambda_function" "forwarder" {
 
   environment {
     variables = {
+      # Names the service on every log line (src/lib/log.ts), in OpenTelemetry's terms.
+      OTEL_SERVICE_NAME     = var.name
       TABLE_NAME            = aws_dynamodb_table.this.name
       EVENT_BUS_NAME        = local.bus_name
       UNPUBLISHED_QUEUE_URL = aws_sqs_queue.unpublished.url

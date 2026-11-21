@@ -11,7 +11,6 @@ import { asyncOperations } from "../generated/async-operations.ts";
 import { type CloudEvent, InvalidEvent, events } from "./cloudevents.ts";
 import { dynamo, tableName } from "./dynamo.ts";
 import { createLogger, type Logger } from "./log.ts";
-import { traceId } from "./trace.ts";
 
 /** A message that has already passed contract validation. */
 export type MessageContext<Event extends CloudEvent = CloudEvent> = {
@@ -175,7 +174,7 @@ export function createConsumer(consumers: Consumers, given: Partial<Dependencies
       return true;
     }
     const operation = operationFor(event.type);
-    const log = createLogger({ ...base, trace_id: traceId(), event_id: event.id, event_type: event.type, operation_id: operation });
+    const log = createLogger({ ...base, event_id: event.id, event_type: event.type, operation_id: operation });
     const consumer = operation === undefined ? undefined : (consumers[operation] as Consumer | undefined);
     if (!consumer) {
       await deadLetter(record, `no consumer for ${event.type}`);

@@ -102,8 +102,8 @@ export function createForwarder(given: Partial<Dependencies> = {}) {
       // Not enough time left to be sure of one more: stop cleanly rather than time out.
       if (context?.getRemainingTimeInMillis && context.getRemainingTimeInMillis() < MARGIN_MS) return again();
       const event = found.event as CloudEvent | undefined;
-      const traceId = typeof event?.traceparent === "string" ? event.traceparent.split("-")[1] : undefined;
-      const log = createLogger({ event_id: found.id, event_type: event?.type, trace_id: traceId });
+      // Its lines are in the trace the event carries, as the event is.
+      const log = createLogger({ event_id: found.id, event_type: event?.type }, typeof event?.traceparent === "string" ? event.traceparent : undefined);
       try {
         try {
           if (found.unreadable) throw new Unpublishable(found.unreadable);

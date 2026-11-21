@@ -54,13 +54,14 @@ to add; these cover the platform.
 
 Find the alarm's name in the notification and go to its entry. Every entry
 starts from the same place: the Lambda's log group, `/aws/lambda/<name>`, in
-CloudWatch Logs Insights. Each request is one JSON line with `request_id`,
-`operation_id`, `status`, `duration_ms` and `api_version`; an unexpected
-error is a line with `level` `error` and the same `request_id`.
+CloudWatch Logs Insights. Each line is an OpenTelemetry log record: `SeverityText`, `Body`,
+`TraceId`, and its `Attributes` - for a request, `request_id`, `operation_id`, `status`,
+`duration_ms` and `api_version`. An unexpected error is an `ERROR` line with the same
+`request_id`, and `TraceId` finds everything the request caused, events and messages included.
 
 ```
-fields @timestamp, operation_id, status, duration_ms, request_id
-| filter level = "error" or status >= 500
+fields @timestamp, Attributes.operation_id, Attributes.status, Attributes.duration_ms, Attributes.request_id, TraceId
+| filter SeverityText = "ERROR" or Attributes.status >= 500
 | sort @timestamp desc
 ```
 
@@ -162,12 +163,12 @@ copy back what was lost; a deploy never restores over the live table.
 
 The consumer's log group is `/aws/lambda/<name>-consumer`. Every message is
 one JSON line, `message`, with `message_id`, `event_id`, `event_type`,
-`operation_id`, `receive_count`, `trace_id` and its `outcome`: `handled`,
+`operation_id`, `receive_count` and its `outcome`, in its `Attributes`, with its `TraceId`: `handled`,
 `duplicate`, `busy`, `failed` or `dead_lettered` (with the `reason`).
 
 ```
-fields @timestamp, outcome, operation_id, event_type, event_id, reason, receive_count
-| filter message = "message" and outcome not in ["handled", "duplicate"]
+fields @timestamp, Attributes.outcome, Attributes.operation_id, Attributes.event_type, Attributes.event_id, Attributes.reason, TraceId
+| filter Body = "message" and Attributes.outcome not in ["handled", "duplicate"]
 | sort @timestamp desc
 ```
 
@@ -224,7 +225,7 @@ See `lambda-throttles`: the cause and the remedy are the same.
 
 An operation writes each event to the table with the change it is about. The
 forwarder (`/aws/lambda/<name>-forwarder`) puts it on the bus and logs one
-JSON line, `event`, with `event_id`, `event_type`, `trace_id` and `outcome`:
+line, `event`, in the event's own `TraceId`, with `event_id`, `event_type` and `outcome`:
 `published`, `retrying` or `set_aside` (with the `reason`). `ENV=aws task
 events:tail` follows what is on the bus; its archive can replay a period.
 
