@@ -1,0 +1,11 @@
+# A fixture for infra/tests/slo.tftest.hcl: the operations its SLOs (slos/) name.
+openapi: 3.1.0
+info: { title: Fixture, version: 1.0.0 }
+paths:
+  /v1/things:
+    get:
+      operationId: list_things_v1
+      responses: { "200": { description: Listed } }
+    post:
+      operationId: add_thing_v1
+      responses: { "201": { description: Added } }

@@ -27,6 +27,8 @@ Each gate fails for one reason and says what it is:
   `info.version` does not say so: a breaking change (it belongs in the next
   major's file), an API change without a new minor, an edit without a new
   version, or a major deleted that was not published deprecated.
+- **`slo:check`** - an SLO in `specs/slos` that is not valid OpenSLO, that
+  the alarms cannot measure, or that names an operation the contract lacks.
 <!-- component:asyncapi:start -->
 - **`asyncapi:check`**, **`asyncapi:lint`**, **`asyncapi:compat`**,
   **`asyncapi:examples:check`** - the same four failures for
