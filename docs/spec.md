@@ -12,7 +12,23 @@ then a contract that carries exactly that behaviour, runs the spec gates, and
 has you try the result on the mock before you approve it. It stops there;
 `/implement-api` builds it.
 
-**Changing it.** A published contract has consumers, so every change is
+### Writing it by hand
+
+`/write-spec` is the quick way. To do it yourself:
+
+- Replace the starter `specs/openapi.v0.yaml` with your contract: paths under
+  `/v0`, `operationId`s ending `_v0`, errors using its `Problem` schema.
+- Add feature files to `specs/features/`, each scenario tagged with the
+  operations it covers: `@operation:<operationId>`.
+- Rules for this API alone go in `.spectral.yaml` ([Contract standards](#contract-standards)).
+- `task spec:check` says when the spec is complete enough to build from;
+  `task spec:lint` that it meets the standards.
+- `task mock` and `ENV=mock task http` let you and your consumers call the
+  contract before anything is built ([Try the contract before it is built](#try-the-contract-before-it-is-built)).
+
+### Changing it
+
+A published contract has consumers, so every change is
 versioned. Each contract is a file per live major - `specs/openapi.v1.yaml`,
 `specs/openapi.v2.yaml` - whose `info.version` is a semantic version of that
 major, and `task spec:compat` - a gate in `task ci` - holds each file to what
