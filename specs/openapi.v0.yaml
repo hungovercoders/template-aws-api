@@ -44,6 +44,15 @@ paths: {}
 #                 type: string
 #           example:
 #             message: Unauthorized
+#
+# To limit how fast a caller may call each operation, say so at the root and
+# document 429 on every operation - API Gateway answers it beyond the limit:
+#
+# x-rate-limit:
+#   requests_per_second: 50
+#   burst: 100
+#
+# and under components.responses, as Unauthorized but `message: Too Many Requests`.
 
 components:
   schemas:

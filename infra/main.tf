@@ -56,9 +56,17 @@ locals {
   jwt_issuer = try(coalesce(var.jwt_issuer), null)
   # CI passes an unset repository variable as "".
   permissions_boundary = try(coalesce(var.permissions_boundary), null)
-  throttle_rate        = try(tonumber(coalesce(var.throttle_rate_limit)), null)
-  throttle_burst       = try(tonumber(coalesce(var.throttle_burst_limit)), null)
   jwt_audience         = compact(split(",", var.jwt_audience))
+
+  # Each major's rate limit (x-rate-limit) is in its contract, where its callers read it;
+  # API Gateway applies it to each of that major's routes and answers 429 beyond it.
+  route_limits = merge([
+    for contract in local.contracts : {
+      for route in flatten([
+        for path, item in try(contract.paths, {}) : [for method, operation in item : "${upper(method)} ${path}" if contains(local.methods, method)]
+      ]) : route => contract["x-rate-limit"]
+    } if try(contract["x-rate-limit"], null) != null
+  ]...)
 
   routes = toset(flatten([
     for contract in local.contracts : [
@@ -283,22 +291,19 @@ resource "aws_apigatewayv2_stage" "default" {
   name        = "$default"
   auto_deploy = true
 
-  # A limit on what callers can make the API do, and cost, when you set one.
-  dynamic "default_route_settings" {
-    for_each = local.throttle_rate != null && local.throttle_burst != null ? [1] : []
+  # What each route's contract says callers may do (x-rate-limit): `task spec:check` holds it
+  # to two whole numbers, so neither is ever sent as 0, which would refuse every request.
+  dynamic "route_settings" {
+    for_each = local.route_limits
     content {
-      throttling_rate_limit  = local.throttle_rate
-      throttling_burst_limit = local.throttle_burst
+      route_key              = route_settings.key
+      throttling_rate_limit  = route_settings.value.requests_per_second
+      throttling_burst_limit = route_settings.value.burst
     }
   }
 
-  lifecycle {
-    # One without the other would be sent as a limit of 0: every request refused.
-    precondition {
-      condition     = (local.throttle_rate == null) == (local.throttle_burst == null)
-      error_message = "Set throttle_rate_limit and throttle_burst_limit together, or neither."
-    }
-  }
+  # A route's settings can only name a route that exists.
+  depends_on = [aws_apigatewayv2_route.operation]
 }
 
 resource "aws_lambda_permission" "api" {

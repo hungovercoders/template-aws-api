@@ -1,5 +1,5 @@
-import { expect, test } from "vitest";
-import { asyncapiNameProblems, type Contract, datacontractNameProblems, deprecated, majorOf, openapiNameProblems, versionProblems } from "../scripts/contracts.ts";
+import { describe, expect, test } from "vitest";
+import { asyncapiNameProblems, type Contract, datacontractNameProblems, deprecated, majorOf, openapiNameProblems, rateLimitProblems, versionProblems } from "../scripts/contracts.ts";
 
 const v1 = (kind: Contract["kind"]): Contract => ({ kind, path: `specs/${kind}.v1.yaml`, major: 1 });
 
@@ -48,4 +48,26 @@ test("a major is deprecated as each kind of contract says", () => {
   expect(deprecated("asyncapi", { info: { "x-deprecated": true } })).toBe(true);
   expect(deprecated("datacontract", { status: "deprecated" })).toBe(true);
   expect(deprecated("datacontract", { status: "active" })).toBe(false);
+});
+
+describe("a rate limit and its 429 go together", () => {
+  const operation = (responses: Record<string, unknown>) => ({ paths: { "/v1/things": { get: { operationId: "list_things_v1", responses } } } });
+
+  test("a limit of two whole numbers, with 429 documented everywhere, is accepted", () => {
+    expect(rateLimitProblems("specs/openapi.v1.yaml", { "x-rate-limit": { requests_per_second: 10, burst: 20 }, ...operation({ "200": {}, "429": {} }) })).toEqual([]);
+    expect(rateLimitProblems("specs/openapi.v1.yaml", operation({ "200": {} }))).toEqual([]);
+  });
+
+  test("a limit without a documented 429, or a 429 without a limit, misleads a caller", () => {
+    expect(rateLimitProblems("specs/openapi.v1.yaml", { "x-rate-limit": { requests_per_second: 10, burst: 20 }, ...operation({ "200": {} }) })).toEqual([expect.stringContaining("list_things_v1 does not document 429")]);
+    expect(rateLimitProblems("specs/openapi.v1.yaml", operation({ "200": {}, "429": {} }))).toEqual([expect.stringContaining("no x-rate-limit")]);
+  });
+
+  test("a limit is two whole numbers from 1, its burst at least a second's requests", () => {
+    const limited = (limit: unknown) => rateLimitProblems("specs/openapi.v1.yaml", { "x-rate-limit": limit as never, ...operation({ "429": {} }) });
+    expect(limited({ requests_per_second: 0, burst: 20 })).toEqual([expect.stringContaining("whole numbers from 1")]);
+    expect(limited({ requests_per_second: 10 })).toEqual([expect.stringContaining("whole numbers from 1")]);
+    expect(limited({ requests_per_second: 2.5, burst: 20 })).toEqual([expect.stringContaining("whole numbers from 1")]);
+    expect(limited({ requests_per_second: 20, burst: 10 })).toEqual([expect.stringContaining("below its requests_per_second")]);
+  });
 });

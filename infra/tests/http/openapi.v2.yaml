@@ -1,0 +1,8 @@
+# A fixture for infra/tests/http.tftest.hcl: a major without one.
+openapi: 3.1.0
+info: { title: Fixture, version: 2.0.0 }
+paths:
+  /v2/things:
+    get:
+      operationId: list_things_v2
+      responses: { "200": { description: Listed } }

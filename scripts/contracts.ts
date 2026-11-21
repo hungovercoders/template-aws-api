@@ -77,6 +77,36 @@ export function openapiNameProblems(contract: Contract, document: OpenApi): stri
   return problems;
 }
 
+export type RateLimit = { requests_per_second?: unknown; burst?: unknown };
+type Limited = { "x-rate-limit"?: RateLimit; paths?: Record<string, Record<string, { operationId?: string; responses?: Record<string, unknown> }>> };
+
+/**
+ * A major's rate limit is part of its contract, where its callers read it: `x-rate-limit` at the
+ * root, which API Gateway applies to each of its routes and answers 429 beyond. A limit and a
+ * documented 429 go together - the one without the other misleads a caller.
+ */
+export function rateLimitProblems(path: string, document: Limited): string[] {
+  const problems: string[] = [];
+  const limit = document["x-rate-limit"];
+  const whole = (value: unknown) => Number.isInteger(value) && (value as number) >= 1;
+  if (limit !== undefined) {
+    if (!whole(limit.requests_per_second) || !whole(limit.burst)) {
+      problems.push(`${path}: x-rate-limit needs requests_per_second and burst, whole numbers from 1 - how fast a caller may call each operation, and how many requests at once`);
+    } else if ((limit.burst as number) < (limit.requests_per_second as number)) {
+      problems.push(`${path}: x-rate-limit's burst (${limit.burst}) is below its requests_per_second (${limit.requests_per_second}); a second's requests could never all arrive together`);
+    }
+  }
+  for (const [route, item] of Object.entries(document.paths ?? {})) {
+    for (const method of METHODS.filter((m) => item?.[m])) {
+      const name = item[method]!.operationId ?? `${method.toUpperCase()} ${route}`;
+      const documented = Boolean(item[method]!.responses?.["429"]);
+      if (limit !== undefined && !documented) problems.push(`${path}: ${name} does not document 429, though the contract has a rate limit - API Gateway answers it beyond the limit`);
+      if (limit === undefined && documented) problems.push(`${path}: ${name} documents 429, but the contract has no x-rate-limit to say when`);
+    }
+  }
+  return problems;
+}
+
 type Message = { name: string; type?: string };
 type AsyncOperation = { id: string; messages: Message[] };
 
