@@ -35,7 +35,7 @@ locals {
   # The contracts are the single source of the API's routes: API Gateway gets
   # exactly the operations every live major (specs/openapi.v<N>.yaml) declares,
   # nothing more. Each major's paths start /v<N>, so they never collide.
-  contracts        = [for name in sort(fileset("${path.module}/../specs", "openapi.v*.yaml")) : yamldecode(file("${path.module}/../specs/${name}"))]
+  contracts        = [for name in sort(fileset("${path.module}/${var.specs}", "openapi.v*.yaml")) : yamldecode(file("${path.module}/${var.specs}/${name}"))]
   methods          = ["get", "put", "post", "delete", "patch", "head", "options"]
   indexes          = ["gsi1", "gsi2"]
   index_attributes = flatten([for index in local.indexes : ["${index}pk", "${index}sk"]])

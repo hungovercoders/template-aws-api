@@ -1,0 +1,21 @@
+# A fixture for infra/tests/data.tftest.hcl: no raw retention, so the default, P7Y.
+apiVersion: v3.2.0
+kind: DataContract
+id: fixture-events-v1
+servers:
+  - server: production
+    type: s3
+    location: s3://fixture-events/events/v1/
+    format: json
+    delimiter: new_line
+  - server: production-parquet
+    type: s3
+    location: s3://fixture-events/parquet/v1/
+    format: parquet
+slaProperties:
+  - property: retention
+    value: 400
+    unit: d
+  - property: latency
+    value: 1
+    unit: h

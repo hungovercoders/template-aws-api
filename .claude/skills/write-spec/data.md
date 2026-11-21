@@ -27,8 +27,11 @@ If the user does not want the events kept, propose removing the component
      (globally unique; propose `<org>-<api>-events`) and a prefix ending
      `/v<N>/`; and `production-parquet`, the same bucket, `parquet/v<N>/`,
      where each day is compacted (`docs/data.md`);
-   - **how long it is kept** (`slaProperties`, `retention`) - ask what law
-     or policy applies to personal data before proposing a number;
+   - **how long it is kept** - ask what law or policy applies to personal
+     data before proposing a number. Two copies, each said once: the Parquet
+     for `slaProperties` `retention`, and the raw JSON, the audit copy, for
+     the `production` server's `customProperties` `retention` (`P7Y` unless
+     the owner says otherwise; at least `P7D`);
    - **how fresh it must be** (`slaProperties`, `latency`): how soon after
      an event happens a reader can rely on it being there;
    - **quality rules** the data must keep beyond its types - a count that

@@ -47,9 +47,10 @@ Each file is typed by the contract - a column per property, `data` a struct -
 and holds each event once. Rewriting a day gives the same file, so a run
 again is harmless, and an event that arrives late is in the next run. An event
 the contract's types cannot hold is left out, logged with its id, and is
-still in the raw JSON. The raw JSON is kept for `data_raw_retention_days`
-(30), the Parquet for the contract's retention; read the Parquet for any whole
-day, the raw JSON for today.
+still in the raw JSON. The raw JSON is the audit copy, kept for its server's
+own retention (7 years unless the contract says otherwise); the Parquet is kept
+for the contract's retention. Read the Parquet for any whole day, the raw JSON
+for today.
 
 ## The contract
 
@@ -64,8 +65,9 @@ changes; it keeps everything a person wrote. The rest is the owner's to say:
 | `team`, `description.purpose` | Who owns the data and what it is for | Required by `data:lint` |
 | `classification` on every property | `public`, `internal`, `confidential` or `restricted` | Required by `data:lint` |
 | `servers`, the one named `production` | `type: s3`, `location: s3://<bucket>/<prefix>/`, `format: json`, `delimiter: new_line` | The bucket and prefix Terraform creates and Firehose writes to |
+| `customProperties`, `retention`, on that server | How long the raw JSON is kept: an ISO 8601 duration in years or days, `P7Y` (the default, which `data:generate` writes) or `P30D`, at least `P7D` | The raw prefix's lifecycle rule |
 | `servers`, `production-parquet` | `type: s3`, the same bucket, a prefix of its own, `format: parquet` | Where the compactor writes each day |
-| `slaProperties`, `retention` | How long an event is kept (`unit: d` or `y`) | The bucket's lifecycle rule |
+| `slaProperties`, `retention` | How long an event is kept in Parquet (`unit: d` or `y`) | The Parquet prefix's lifecycle rule |
 | `slaProperties`, `latency` | How soon an event is there to read (`unit: s`, `m`, `h` or `d`) | The threshold of the `data-freshness` alarm |
 | `quality` | Rules the data keeps, on an object or a property | Tested against what landed |
 | `context` (optional) | How to use the data, for people and for AI | Nothing is required of it |

@@ -1,0 +1,24 @@
+# A fixture for infra/tests/data.tftest.hcl: a raw retention of its own.
+apiVersion: v3.2.0
+kind: DataContract
+id: fixture-events-v0
+servers:
+  - server: production
+    type: s3
+    location: s3://fixture-events/events/v0/
+    format: json
+    delimiter: new_line
+    customProperties:
+      - property: retention
+        value: P30D
+  - server: production-parquet
+    type: s3
+    location: s3://fixture-events/parquet/v0/
+    format: parquet
+slaProperties:
+  - property: retention
+    value: 2
+    unit: y
+  - property: latency
+    value: 15
+    unit: m

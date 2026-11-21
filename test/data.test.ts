@@ -5,7 +5,7 @@ import { parse } from "yaml";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { generated, needs, published, read } from "../scripts/data.ts";
+import { declared, generated, needs, published, rawRetention, read } from "../scripts/data.ts";
 
 const rated = {
   name: "beer_rated",
@@ -174,4 +174,35 @@ test("what is read from the AsyncAPI contract: only published events, a nullable
     { name: "note", logicalType: "string", required: false, description: undefined, options: { maxLength: 200 } },
     { name: "at", logicalType: "date", required: false, description: undefined },
   ]);
+});
+
+test("the raw JSON is kept for its server's own retention: 7 years unless the contract says otherwise", () => {
+  expect(rawRetention({ server: "production" })).toEqual({ value: "P7Y", days: 2555 });
+  expect(rawRetention({ server: "production", customProperties: [{ property: "retention", value: "P30D" }] })).toEqual({ value: "P30D", days: 30 });
+  expect(rawRetention({ server: "production", customProperties: [{ property: "retention", value: "P10Y" }] })).toEqual({ value: "P10Y", days: 3650 });
+  expect(rawRetention({ server: "production", customProperties: [{ property: "retention", value: "P6D" }] })).toEqual(expect.stringContaining("at least P7D"));
+  expect(rawRetention({ server: "production", customProperties: [{ property: "retention", value: "7 years" }] })).toEqual(expect.stringContaining("ISO 8601 duration"));
+  expect(rawRetention({ server: "production", customProperties: [{ property: "retention", value: "P1M" }] })).toEqual(expect.stringContaining("years or days"));
+});
+
+test("data:generate writes the default raw retention where it is changed, on every raw server and only once", () => {
+  const contract =
+    "servers:\n  - server: production\n    type: s3\n  - server: production-parquet\n    type: s3\n" +
+    "  - server: staging\n    type: s3\n    customProperties:\n      - property: retention\n        value: P30D\n";
+  const once = declared(contract);
+  const servers = parse(once).servers;
+  expect(servers[0].customProperties).toEqual([{ property: "retention", value: "P7Y" }]);
+  expect(servers[1].customProperties).toBeUndefined();
+  expect(servers[2].customProperties).toEqual([{ property: "retention", value: "P30D" }]);
+  expect(declared(once)).toBe(once);
+});
+
+test("a raw retention in the wrong form is refused by data:check", () => {
+  const contract = (retention: string) =>
+    "servers:\n  - server: production\n    type: s3\n    location: s3://catalogue-events/events/\n    format: json\n    delimiter: new_line\n" +
+    `    customProperties:\n      - property: retention\n        value: ${retention}\n` +
+    "  - server: production-parquet\n    type: s3\n    location: s3://catalogue-events/parquet/\n    format: parquet\n" +
+    "slaProperties:\n  - property: retention\n    value: 2\n    unit: y\n  - property: latency\n    value: 15\n    unit: m\n";
+  expect(needs(read(contract("P7Y")))).toEqual([]);
+  expect(needs(read(contract("P3D")))).toEqual([expect.stringContaining("at least P7D")]);
 });
