@@ -9,7 +9,7 @@ import SwaggerParser from "@apidevtools/swagger-parser";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { contracts, misnamed, openapiNameProblems, versionProblems } from "./contracts.ts";
+import { contracts, misnamed, openapiNameProblems, rateLimitProblems, versionProblems } from "./contracts.ts";
 
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
 const problems: string[] = [...misnamed("openapi"), ...misnamed("asyncapi")];
@@ -33,7 +33,7 @@ for (const contract of files) {
     problems.push(`${contract.path} is not a valid OpenAPI document: ${(error as Error).message}`);
     continue;
   }
-  problems.push(...versionProblems(contract, api), ...openapiNameProblems(contract, api));
+  problems.push(...versionProblems(contract, api), ...openapiNameProblems(contract, api), ...rateLimitProblems(contract.path, api as Parameters<typeof rateLimitProblems>[1]));
   for (const [path, item] of Object.entries(api.paths ?? {})) {
     for (const method of METHODS.filter((m) => item[m])) {
       const id = item[method]!.operationId;

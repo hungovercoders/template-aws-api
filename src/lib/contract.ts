@@ -20,7 +20,11 @@ type OperationObject = {
   requestBody?: { required?: boolean; content?: Record<string, Media> };
   responses?: Record<string, Response>;
   "x-api-version"?: string;
+  "x-rate-limit"?: RateLimit;
 };
+
+/** A major's `x-rate-limit`: what API Gateway applies to each of its routes, answering 429 beyond. */
+export type RateLimit = { requests_per_second: number; burst: number };
 
 export type Operation = {
   operationId: string;
@@ -35,6 +39,8 @@ export type Operation = {
   secured: boolean;
   /** The version of the contract this operation is from (info.version of its specs/openapi.v<N>.yaml). */
   version: string;
+  /** Its major's rate limit, if the contract has one. */
+  rateLimit?: RateLimit;
 };
 
 /** OpenAPI: an operation's own `security` replaces the document's; an empty requirement ({}) allows anonymous calls. */
@@ -63,6 +69,7 @@ export const operations: Operation[] = Object.entries(contract.paths ?? {}).flat
       responses: op.responses ?? {},
       secured: requiresCaller(op.security ?? contract.security),
       version: op["x-api-version"] ?? contract.info?.version ?? "0.0.0",
+      ...(op["x-rate-limit"] ? { rateLimit: op["x-rate-limit"] } : {}),
     };
   }),
 );

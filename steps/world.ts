@@ -52,6 +52,24 @@ export class ApiWorld extends World {
     assert.deepEqual(violations, [], `${method} ${path} broke the contract:\n  ${violations.join("\n  ")}\n  body: ${text}`);
     return this.last;
   }
+
+  /**
+   * Call one operation faster than its contract's `x-rate-limit` allows - its burst and two
+   * seconds' worth more, all at once - and count the answers by status. Every answer is held to
+   * the contract, so a 429 must be documented. Then wait for the limit to refill, so the next
+   * scenario is not refused for this one's haste. Use a cheap operation, a read.
+   */
+  async flood(method: string, path: string, body?: unknown): Promise<Record<number, number>> {
+    const match = matchRoute(method, new URL(path, "http://api").pathname);
+    const limit = match?.operation.rateLimit;
+    assert.ok(limit, `${method} ${path} has no x-rate-limit in its contract to call faster than`);
+    const replies = await Promise.all(Array.from({ length: limit.burst + 2 * limit.requests_per_second }, () => this.call(method, path, body)));
+    const counts: Record<number, number> = {};
+    for (const reply of replies) counts[reply.status] = (counts[reply.status] ?? 0) + 1;
+    const refill = (limit.burst / limit.requests_per_second + 5) * 1000;
+    await eventually(async () => assert.notEqual((await this.call(method, path, body)).status, 429, "the rate limit has not refilled"), { timeout: refill, every: 1000 });
+    return counts;
+  }
 }
 
 setWorldConstructor(ApiWorld);

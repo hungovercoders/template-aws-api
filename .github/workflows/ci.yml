@@ -75,8 +75,6 @@ jobs:
       # Set once the bootstrap has made one: the boundary every role of the stack carries.
       TF_VAR_permissions_boundary: ${{ vars.PERMISSIONS_BOUNDARY_ARN }}
       # Optional, and only together: a limit on requests (docs/deploying.md).
-      TF_VAR_throttle_rate_limit: ${{ vars.THROTTLE_RATE_LIMIT }}
-      TF_VAR_throttle_burst_limit: ${{ vars.THROTTLE_BURST_LIMIT }}
       STACK_NAME: ${{ vars.STACK_NAME }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
