@@ -109,9 +109,9 @@ spec it is an API, and should say so. Most of that is generated:
   contract cannot say. Ask the user for it - why the API exists, who owns it,
   where it is deployed - and write only what they tell you.
 - **Who owns it** is also on every AWS resource: when the user has said
-  which business domain and which team own the API, record them as `domain`
-  and `team` in `infra/tags.auto.tfvars.json`, so they are asked for once.
-  Never guess either; `task tags` shows what is set.
+  which business domain and which team own the API, record them as `domain` and `team` in
+  `infra/tags.auto.tfvars.json`, and what it may cost a month as `monthly_budget_usd` in
+  `infra/budget.auto.tfvars.json`. Never guess; `task tags` shows what is set.
 
 The first time a spec is written in a repository created from the template,
 run **`task adopt`**, after confirming with the user. It removes what is only

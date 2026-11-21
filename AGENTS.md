@@ -47,8 +47,8 @@ files) is the requirement; `task ci` is the definition of done.
   removed one by hand, and never remove or restore one unasked: with the
   user's agreement, `task component:remove -- <name>` or
   `task component:add -- <name>`, which brings it back from the template.
-- `specs/` is read-only unless the user asks for a spec change. The tags in
-  `infra/tags.auto.tfvars.json` are the owner's to say: ask, never guess.
+- `specs/` is read-only unless the user asks for a spec change. The tags and budget
+  in `infra/{tags,budget}.auto.tfvars.json` are the owner's to say: ask, never guess.
 - A contract is a file per live major (`specs/openapi.v<N>.yaml`, paths `/v<N>`,
   names `_v<N>`); `task spec:compat` holds each to its version. A breaking
   change is a new major beside the old, and the user's decision.

@@ -47,6 +47,11 @@ jobs:
             git checkout origin/example/implementation -- infra/tags.auto.tfvars.json
           fi
           task tags > /dev/null || echo '{ "domain": "brewing", "team": "catalogue" }' > infra/tags.auto.tfvars.json
+          # The same for its budget.
+          if git cat-file -e origin/example/implementation:infra/budget.auto.tfvars.json 2>/dev/null; then
+            git checkout origin/example/implementation -- infra/budget.auto.tfvars.json
+          fi
+          grep -q '"monthly_budget_usd": *[1-9]' infra/budget.auto.tfvars.json || echo '{ "monthly_budget_usd": 20 }' > infra/budget.auto.tfvars.json
           # ...and everything the skeleton owns stays as proposed here: every file of
           # skeleton.lock among those, so a new skeleton test is never the example's old one.
           git checkout HEAD -- $(awk '$2 ~ /^(steps|test)\// { print $2 }' skeleton.lock)
