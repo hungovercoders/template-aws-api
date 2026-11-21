@@ -250,3 +250,11 @@ test("sections are replaced by one placeholder each and restored in order", () =
   expect(split(without).core).toBe("a\nb\nc");
   expect(split("# component:x:start\nnever closed").problems).toEqual(["component:x:start with no end"]);
 });
+
+test("a section of a mermaid diagram is marked with mermaid's own comment, so the diagram still renders", () => {
+  const text = ["flowchart TB", "  a --> b", "  %% component:x:start", "  b --> c", "  %% component:x:end", "  a --> d"].join("\n");
+  expect(split(text).problems).toEqual([]);
+  const without = withoutSections(text, "x");
+  expect(without).toBe(["flowchart TB", "  a --> b", "  %% component:x:removed", "  a --> d"].join("\n"));
+  expect(withSections(without, "x", split(text).sections.get("x")!)).toBe(text);
+});
