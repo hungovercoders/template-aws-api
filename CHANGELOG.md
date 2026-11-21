@@ -7,6 +7,7 @@ Every change merged into the template's default branch, newest first. Written by
 
 ### Features
 
+- the contracts live in specs/contracts, and specs/ starts with an inert starter of every part ([#135](../../pull/135))
 - the worked example is kept on main as overlays, one per step, not as branches ([#134](../../pull/134))
 - task resources lists what a stack is made of, local or deployed ([#132](../../pull/132))
 - a write-nfrs skill captures the non-functional requirements, each in its one home ([#131](../../pull/131))
