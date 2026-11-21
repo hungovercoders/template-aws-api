@@ -5,7 +5,12 @@
 # line of JSON - the whole CloudEvent - under that major's location:
 #   <prefix ending /v<N>/>type=<event type>/dt=<date>/
 # so a new major's readers and an old one's are served side by side, from one
-# bucket.
+# bucket. Once a day a compactor turns each of the last few days into Parquet,
+# under the major's second server, <server>-parquet:
+#   <its prefix, ending /v<N>/>type=<event type>/dt=<the day it happened>/events.parquet
+# one file per event type and day, typed by the contract, each event once. The
+# raw JSON is kept for data_raw_retention_days; the Parquet for the contract's
+# retention.
 #
 # What is kept, where, for how long and how fresh is each data contract's to
 # say, and is read from it here, so the contracts and the infrastructure
@@ -35,6 +40,17 @@ variable "data_compression" {
   }
 }
 
+variable "data_raw_retention_days" {
+  description = "How long the raw JSON is kept, in days: long enough to compact it and to look at what arrived. The Parquet is kept for the data contract's retention."
+  type        = number
+  default     = 30
+
+  validation {
+    condition     = var.data_raw_retention_days >= 7
+    error_message = "data_raw_retention_days is at least 7, so every day is compacted before its raw JSON goes."
+  }
+}
+
 variable "data_reader_accounts" {
   description = "AWS account ids that may read the data."
   type        = list(string)
@@ -49,8 +65,9 @@ locals {
   }
   data_majors = {
     for major, contract in local.data_contracts : major => {
-      server = [for server in try(contract.servers, []) : server if try(server.server, "") == var.data_server][0]
-      sla    = { for entry in try(contract.slaProperties, []) : entry.property => entry }
+      server  = [for server in try(contract.servers, []) : server if try(server.server, "") == var.data_server][0]
+      parquet = [for server in try(contract.servers, []) : server if try(server.server, "") == "${var.data_server}-parquet"]
+      sla     = { for entry in try(contract.slaProperties, []) : entry.property => entry }
     } if length([for server in try(contract.servers, []) : server if try(server.server, "") == var.data_server]) > 0
   }
   data_enabled = length(local.data_majors) > 0
@@ -58,8 +75,10 @@ locals {
 
   # s3://<bucket>/<prefix>/ - `task data:check` holds each contract to this form, and every major to one bucket.
   data_locations = { for major, entry in local.data_majors : major => regex("^s3://(?P<bucket>[^/]+)/(?P<prefix>.*)$", entry.server.location) }
-  data_buckets   = distinct([for location in values(local.data_locations) : location.bucket])
-  data_bucket    = local.data_enabled ? local.data_buckets[0] : ""
+  # `task data:check` holds every major to a <server>-parquet server in the same bucket.
+  data_parquet = { for major, entry in local.data_majors : major => regex("^s3://(?P<bucket>[^/]+)/(?P<prefix>.*)$", one(entry.parquet).location) }
+  data_buckets = distinct(concat([for location in values(local.data_locations) : location.bucket], [for location in values(local.data_parquet) : location.bucket]))
+  data_bucket  = local.data_enabled ? local.data_buckets[0] : ""
 
   data_retention = { for major, entry in local.data_majors : major => entry.sla["retention"].value * (entry.sla["retention"].unit == "y" ? 365 : 1) }
   data_latency   = { for major, entry in local.data_majors : major => entry.sla["latency"].value * { s = 1, m = 60, h = 3600, d = 86400 }[entry.sla["latency"].unit] }
@@ -116,7 +135,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
   }
 }
 
-# Each contract's retention, under its own prefix: an event is deleted when it is that old.
+# Under each major's prefixes: the raw JSON is deleted after data_raw_retention_days (or
+# the contract's retention, if that is shorter), the Parquet after the contract's retention.
 resource "aws_s3_bucket_lifecycle_configuration" "data" {
   count = local.data_count
 
@@ -127,6 +147,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
 
     content {
       id     = "retention-${rule.key}"
+      status = "Enabled"
+
+      filter {
+        prefix = rule.value.prefix
+      }
+
+      expiration {
+        days = min(var.data_raw_retention_days, local.data_retention[rule.key])
+      }
+    }
+  }
+
+  dynamic "rule" {
+    for_each = local.data_parquet
+
+    content {
+      id     = "retention-${rule.key}-parquet"
       status = "Enabled"
 
       filter {
@@ -160,7 +197,7 @@ data "aws_iam_policy_document" "data_readers" {
   statement {
     sid       = "Read"
     actions   = ["s3:GetObject", "s3:ListBucket", "s3:GetBucketLocation"]
-    resources = concat([one(awscc_s3_bucket.data[*].arn)], [for location in values(local.data_locations) : "${one(awscc_s3_bucket.data[*].arn)}/${location.prefix}*"])
+    resources = concat([one(awscc_s3_bucket.data[*].arn)], [for location in concat(values(local.data_locations), values(local.data_parquet)) : "${one(awscc_s3_bucket.data[*].arn)}/${location.prefix}*"])
 
     principals {
       type        = "AWS"
@@ -311,6 +348,129 @@ resource "aws_cloudwatch_event_target" "data" {
   input_path = "$.detail"
 }
 
+# --- The daily compaction to Parquet -------------------------------------------
+# One function for every major (src/compactor.ts), started by a schedule a little
+# after midnight UTC, and by `task data:compact`. Its role is assumed by the
+# function to read the raw JSON and write the Parquet, and by the schedule to start it.
+
+locals {
+  data_compactor = "${var.name}-data-compactor"
+}
+
+data "aws_iam_policy_document" "data_compactor_assume" {
+  statement {
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com", "scheduler.amazonaws.com"]
+    }
+  }
+}
+
+data "aws_iam_policy_document" "data_compactor" {
+  count = local.data_count
+
+  statement {
+    sid       = "Logs"
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${one(aws_cloudwatch_log_group.data_compactor[*].arn)}:*"]
+  }
+
+  statement {
+    sid       = "List"
+    actions   = ["s3:ListBucket"]
+    resources = [one(awscc_s3_bucket.data[*].arn)]
+  }
+
+  statement {
+    sid       = "ReadRaw"
+    actions   = ["s3:GetObject"]
+    resources = [for location in values(local.data_locations) : "${one(awscc_s3_bucket.data[*].arn)}/${location.prefix}*"]
+  }
+
+  statement {
+    sid       = "WriteParquet"
+    actions   = ["s3:PutObject"]
+    resources = [for location in values(local.data_parquet) : "${one(awscc_s3_bucket.data[*].arn)}/${location.prefix}*"]
+  }
+
+  statement {
+    sid       = "Start"
+    actions   = ["lambda:InvokeFunction"]
+    resources = ["arn:${data.aws_partition.current.partition}:lambda:${var.region}:${data.aws_caller_identity.data.account_id}:function:${local.data_compactor}"]
+  }
+}
+
+resource "aws_iam_role" "data_compactor" {
+  count = local.data_count
+
+  name                 = local.data_compactor
+  assume_role_policy   = data.aws_iam_policy_document.data_compactor_assume.json
+  permissions_boundary = local.permissions_boundary
+}
+
+resource "aws_iam_role_policy" "data_compactor" {
+  count = local.data_count
+
+  name   = "runtime"
+  role   = one(aws_iam_role.data_compactor[*].id)
+  policy = one(data.aws_iam_policy_document.data_compactor[*].json)
+}
+
+resource "aws_cloudwatch_log_group" "data_compactor" {
+  count = local.data_count
+
+  name              = "/aws/lambda/${local.data_compactor}"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "data_compactor" {
+  count = local.data_count
+
+  function_name    = local.data_compactor
+  role             = one(aws_iam_role.data_compactor[*].arn)
+  runtime          = "nodejs22.x"
+  architectures    = ["arm64"]
+  handler          = "compactor.handler"
+  filename         = data.archive_file.lambda.output_path
+  source_code_hash = data.archive_file.lambda.output_base64sha256
+  memory_size      = 1024
+  timeout          = 300
+
+  environment {
+    variables = {
+      DATA_BUCKET    = local.data_bucket
+      DATA_LOCATIONS = jsonencode({ for major, location in local.data_locations : major => { raw = location.prefix, parquet = local.data_parquet[major].prefix } })
+      LOOKBACK_DAYS  = "3"
+    }
+  }
+
+  depends_on = [aws_cloudwatch_log_group.data_compactor, aws_iam_role_policy.data_compactor]
+}
+
+resource "aws_scheduler_schedule" "data_compaction" {
+  count = local.data_count
+
+  name                = "${var.name}-data-compaction"
+  description         = "Compacts the events ${var.name} kept as data into Parquet, the last three days, every day."
+  schedule_expression = "cron(17 0 * * ? *)"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = one(aws_lambda_function.data_compactor[*].arn)
+    role_arn = one(aws_iam_role.data_compactor[*].arn)
+    input    = jsonencode({})
+
+    retry_policy {
+      maximum_retry_attempts = 2
+    }
+  }
+}
+
 # --- Alarms -------------------------------------------------------------------
 
 resource "aws_cloudwatch_metric_alarm" "data_delivery" {
@@ -367,6 +527,24 @@ resource "aws_cloudwatch_metric_alarm" "data_rule" {
   ok_actions          = local.alarm_action
 }
 
+resource "aws_cloudwatch_metric_alarm" "data_compaction" {
+  count = local.data_count
+
+  alarm_name          = "${var.name}-data-compaction"
+  alarm_description   = "The daily compaction to Parquet failed: the Parquet is behind the raw JSON until it succeeds. Runbook: docs/data.md#data-compaction"
+  namespace           = "AWS/Lambda"
+  metric_name         = "Errors"
+  dimensions          = { FunctionName = one(aws_lambda_function.data_compactor[*].function_name) }
+  statistic           = "Sum"
+  period              = local.alarm_period
+  evaluation_periods  = 1
+  comparison_operator = "GreaterThanThreshold"
+  threshold           = 0
+  treat_missing_data  = "notBreaching"
+  alarm_actions       = local.alarm_action
+  ok_actions          = local.alarm_action
+}
+
 # --- Outputs ------------------------------------------------------------------
 
 output "data_bucket" {
@@ -377,6 +555,16 @@ output "data_bucket" {
 output "data_prefixes" {
   description = "Where each major of the data contract keeps them, as JSON: {\"v1\": \"<prefix ending /v1/>\"}, each holding type=<event type>/dt=<date>/."
   value       = jsonencode({ for major, location in local.data_locations : major => location.prefix })
+}
+
+output "data_parquet_prefixes" {
+  description = "Where each major's Parquet is, as JSON: {\"v1\": \"<prefix ending /v1/>\"}, each holding type=<event type>/dt=<day>/events.parquet."
+  value       = jsonencode({ for major, location in local.data_parquet : major => location.prefix })
+}
+
+output "data_compactor" {
+  description = "The function that compacts the raw JSON into Parquet; empty when the API has no data contract."
+  value       = local.data_enabled ? local.data_compactor : ""
 }
 
 output "data_compression" {

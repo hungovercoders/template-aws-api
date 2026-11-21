@@ -77,7 +77,7 @@ flowchart TB
   table -->|"stream"| forwarder["Lambda: forwarder"]
   forwarder -->|"events (AsyncAPI, CloudEvents)"| bus{{"EventBridge bus"}}
   bus --> subscriber(["Subscribers"])
-  bus --> firehose["Firehose"] --> bucket[("S3: events as data")]
+  bus --> firehose["Firehose"] --> bucket[("S3: raw JSON, compacted daily to Parquet")]
   bucket -->|"data contract (ODCS)"| analyst(["Analysts: DuckDB, Harlequin"])
 ```
 
@@ -105,7 +105,7 @@ need an optional part removes it, and can bring it back later:
 
 - A queue with retries and duplicate handling: one function per message.
 - Events published with the change they describe: `outbox(event)` in a write.
-- Those events kept in S3, with DuckDB and Harlequin to query them.
+- Those events kept in S3 and compacted daily to typed Parquet, both tested against a data contract, with DuckDB and Harlequin to query them.
 
 **Tests that mean something**
 

@@ -38,6 +38,19 @@ def connection() -> "duckdb.DuckDBPyConnection":
     return con
 
 
+# The one thing the CLI says it cannot do yet: check a Parquet column's type.
+# local/data.ts checks those itself, against the schema the contract gives, so
+# a run whose only warnings are these has passed. Any other warning still fails.
+UNSUPPORTED = "Checking types in parquet files is not supported yet"
+
+
+def only_unsupported_parquet_types(run) -> bool:
+    others = [check for check in run.checks if str(getattr(check.result, "value", check.result)) != "passed"]
+    return bool(others) and all(
+        str(getattr(check.result, "value", check.result)) == "warning" and UNSUPPORTED in (check.reason or "") for check in others
+    )
+
+
 def main() -> int:
     server, *contracts = sys.argv[1:]
     console = Console()
@@ -48,7 +61,7 @@ def main() -> int:
             write_test_result(run, console, None, None)
         except click.exceptions.Exit:
             pass
-        if not run.has_passed():
+        if not (run.has_passed() or only_unsupported_parquet_types(run)):
             failed += 1
     return 1 if failed else 0
 
