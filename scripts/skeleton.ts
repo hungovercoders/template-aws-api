@@ -61,7 +61,7 @@ const SKELETON = [
 ];
 // A tool package's dependencies move with Renovate, like the root package.json, which is not skeleton either.
 // The tags' values are the API's own to set.
-const NOT_SOURCE = /(^|\/)\.terraform(\/|\.lock\.hcl$)|\.tfstate|^tools\/[^/]+\/package(-lock)?\.json$|^infra\/tags\.auto\.tfvars\.json$/;
+const NOT_SOURCE = /(^|\/)\.terraform(\/|\.lock\.hcl$)|\.tfstate|^tools\/[^/]+\/package(-lock)?\.json$|^infra\/(tags|budget)\.auto\.tfvars\.json$/;
 
 // Routine version bumps are not skeleton changes: pins are read as "some version".
 function normalised(path: string, text: string): string {

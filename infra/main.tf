@@ -125,6 +125,7 @@ resource "aws_dynamodb_table" "this" {
     }
   }
 
+  # Restorable to any second of the last 35 days: docs/runbook.md#restore-the-table.
   point_in_time_recovery {
     enabled = true
   }

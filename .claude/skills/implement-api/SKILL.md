@@ -175,10 +175,9 @@ it tells you exactly what is missing.
    - `task features -- --tags @operation:<operationId>` runs the scenarios
      tagged for one operation. Expect them to stay red until the operations
      they also use exist.
-7. **`task features`** - every scenario green, strict. First `task tags`:
-   nothing is applied until `domain` and `team` are in
-   `infra/tags.auto.tfvars.json`. Ask the user for one that is missing -
-   never guess; `service` and `repo` are derived.
+7. **`task features`** - every scenario green, strict. First `task tags`: nothing is
+   applied until `domain`, `team` (`infra/tags.auto.tfvars.json`) and `monthly_budget_usd`
+   (`infra/budget.auto.tfvars.json`) are set. Ask for a missing one - never guess.
    `task acceptance` then runs `responses:check`: a response the contract
    documents that no scenario received is a gap in the spec, not the code.
    Report it to the user; do not write a scenario or drop the response yourself.
