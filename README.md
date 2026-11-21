@@ -85,6 +85,7 @@ throws the stack away; the next `task dev` starts clean.
 
 ```sh
 task http          # pick a request from http/contract.http and send it
+task resources     # list what the stack is made of - ENV=aws for the deployed one
 task events:tail   # follow the events the API publishes
 task data:query    # query the events kept in S3, with SQL
 ```
@@ -274,6 +275,7 @@ such as `task features` and `task ci`, start and stop an emulator of their own.
 | `task scaffold` | Write what follows from the spec: a stub per operation, a pending step per sentence |
 | `task features` | Run the scenarios against the built Lambda |
 | `task queue:send`, `task events:tail`, `task data:query` | Send a message, follow published events, query the events in S3 |
+| `task resources` | List every AWS resource the stack created, by service - local, or `ENV=aws` |
 | `task deploy` | Apply the stack to AWS (opt-in) |
 
 ## Where things are
