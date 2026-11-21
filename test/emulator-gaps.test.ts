@@ -1,7 +1,7 @@
 // What `task emulator:gaps` reports, without an emulator: which gaps are this
 // repository's, what a closed one asks for, and how its issue is found again.
 import { describe, expect, test } from "vitest";
-import { applies, issue, next, type Outcome, report, summary } from "../tools/emulator/report.ts";
+import { applies, issue, next, type Outcome, report, s3ControlUnreachable, summary } from "../tools/emulator/report.ts";
 
 const gap = (over: Partial<Outcome> = {}): Outcome => ({
   id: "queue-url-host",
@@ -72,5 +72,22 @@ describe("the issue for a closed gap", () => {
     expect(issue(gap({ result: "closed", kind: "blocked", issue: 84 }), "1").body).toContain("#84 says this no longer blocks it");
     expect(issue(gap({ result: "closed", kind: "limit" }), "1").body).toContain("`docs/testing.md` no longer says");
     expect(issue(gap({ result: "closed" }), "1").body).toContain("removed from `tools/emulator/gaps/`");
+  });
+});
+
+describe("the s3-control gap's evidence", () => {
+  const call = "operation error S3 Control: ListTagsForResource, https response error StatusCode: 0, RequestID: , HostID: , request send failed";
+
+  test("is the provider retrying the call, as it does behind a proxy", () => {
+    expect(s3ControlUnreachable("[DEBUG] retrying request S3 Control/ListTagsForResource, attempt 3")).toBe(true);
+  });
+
+  test("is the account-prefixed host not resolving, as on a CI runner", () => {
+    expect(s3ControlUnreachable(`Error: listing tags for S3 (Simple Storage) Bucket (gap-s3-control): ${call}, Get "https://000000000000.127.0.0.1:9298/v20180820/tags/x": dial tcp: lookup 000000000000.127.0.0.1: no such host`)).toBe(true);
+  });
+
+  test("is not some other failure of the apply", () => {
+    expect(s3ControlUnreachable("Error: creating S3 Bucket (gap-s3-control): AccessDenied")).toBe(false);
+    expect(s3ControlUnreachable(`Error: ${call}, Get "https://example.com/": dial tcp: lookup example.com: no such host`)).toBe(false);
   });
 });
