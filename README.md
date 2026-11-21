@@ -35,7 +35,7 @@ Messages and events have contracts of their own - [v0](specs/asyncapi.v0.yaml) (
 
 ## Events kept as data
 
-Every event it publishes is also kept in S3, under a data contract - [v0](specs/datacontract.v0.yaml) (0.2.0): owned by the catalogue team, kept for 2 years, there to read within 15 minutes.
+Every event it publishes is also kept in S3, under a data contract - [v0](specs/datacontract.v0.yaml) (0.3.0): owned by the catalogue team, kept for 2 years, there to read within 15 minutes.
 See [events as data](docs/data.md) for how it is tested and queried.
 
 ## Working on it

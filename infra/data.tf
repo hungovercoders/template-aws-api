@@ -9,8 +9,8 @@
 # under the major's second server, <server>-parquet:
 #   <its prefix, ending /v<N>/>type=<event type>/dt=<the day it happened>/events.parquet
 # one file per event type and day, typed by the contract, each event once. The
-# raw JSON is kept for data_raw_retention_days; the Parquet for the contract's
-# retention.
+# raw JSON is kept for its server's own retention (customProperties, 7 years when
+# the contract does not say); the Parquet for the contract's retention.
 #
 # What is kept, where, for how long and how fresh is each data contract's to
 # say, and is read from it here, so the contracts and the infrastructure
@@ -40,16 +40,6 @@ variable "data_compression" {
   }
 }
 
-variable "data_raw_retention_days" {
-  description = "How long the raw JSON is kept, in days: long enough to compact it and to look at what arrived. The Parquet is kept for the data contract's retention."
-  type        = number
-  default     = 30
-
-  validation {
-    condition     = var.data_raw_retention_days >= 7
-    error_message = "data_raw_retention_days is at least 7, so every day is compacted before its raw JSON goes."
-  }
-}
 
 variable "data_reader_accounts" {
   description = "AWS account ids that may read the data."
@@ -60,8 +50,8 @@ variable "data_reader_accounts" {
 locals {
   # Every live major, by name (v0, v1, ...), with this stack's server in it.
   data_contracts = {
-    for name in sort(fileset("${path.module}/../specs", "datacontract.v*.yaml")) :
-    regex("^datacontract\\.(v[0-9]+)\\.yaml$", name)[0] => yamldecode(file("${path.module}/../specs/${name}"))
+    for name in sort(fileset("${path.module}/${var.specs}", "datacontract.v*.yaml")) :
+    regex("^datacontract\\.(v[0-9]+)\\.yaml$", name)[0] => yamldecode(file("${path.module}/${var.specs}/${name}"))
   }
   data_majors = {
     for major, contract in local.data_contracts : major => {
@@ -80,8 +70,19 @@ locals {
   data_buckets = distinct(concat([for location in values(local.data_locations) : location.bucket], [for location in values(local.data_parquet) : location.bucket]))
   data_bucket  = local.data_enabled ? local.data_buckets[0] : ""
 
-  data_retention = { for major, entry in local.data_majors : major => entry.sla["retention"].value * (entry.sla["retention"].unit == "y" ? 365 : 1) }
-  data_latency   = { for major, entry in local.data_majors : major => entry.sla["latency"].value * { s = 1, m = 60, h = 3600, d = 86400 }[entry.sla["latency"].unit] }
+  # yamldecode reads a bare `unit: y` as YAML 1.1's boolean true, so years are "y" or true.
+  data_retention = { for major, entry in local.data_majors : major => entry.sla["retention"].value * (contains(["y", "true"], tostring(entry.sla["retention"].unit)) ? 365 : 1) }
+  # The raw JSON's own retention, on its server: an ISO 8601 duration (P7Y, P30D), P7Y when unsaid.
+  # `task data:check` holds it to that form and to at least P7D, so each day is compacted first.
+  data_raw_retention = {
+    for major, entry in local.data_majors : major => (
+      tonumber(regex("^P([0-9]+)[YD]$", local.data_raw_duration[major])[0]) * (endswith(local.data_raw_duration[major], "Y") ? 365 : 1)
+    )
+  }
+  data_raw_duration = {
+    for major, entry in local.data_majors : major => try([for custom in entry.server.customProperties : custom.value if custom.property == "retention"][0], "P7Y")
+  }
+  data_latency = { for major, entry in local.data_majors : major => entry.sla["latency"].value * { s = 1, m = 60, h = 3600, d = 86400 }[entry.sla["latency"].unit] }
 }
 
 provider "awscc" {
@@ -135,8 +136,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
   }
 }
 
-# Under each major's prefixes: the raw JSON is deleted after data_raw_retention_days (or
-# the contract's retention, if that is shorter), the Parquet after the contract's retention.
+# Under each major's prefixes: the raw JSON is deleted after its server's retention, the
+# Parquet after the contract's retention.
 resource "aws_s3_bucket_lifecycle_configuration" "data" {
   count = local.data_count
 
@@ -154,7 +155,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
       }
 
       expiration {
-        days = min(var.data_raw_retention_days, local.data_retention[rule.key])
+        days = local.data_raw_retention[rule.key]
       }
     }
   }
@@ -186,7 +187,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "data" {
     }
 
     expiration {
-      days = max(concat([1], values(local.data_retention))...)
+      days = max(concat([1], values(local.data_retention), values(local.data_raw_retention))...)
     }
   }
 }

@@ -67,3 +67,9 @@ variable "throttle_burst_limit" {
     error_message = "throttle_burst_limit is a whole number of requests."
   }
 }
+
+variable "specs" {
+  description = "Where the contracts are read from, relative to infra/. Only the plan tests in infra/tests/ change it, to read fixtures of their own."
+  type        = string
+  default     = "../specs"
+}
