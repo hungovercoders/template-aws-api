@@ -441,9 +441,11 @@ resource "aws_lambda_function" "data_compactor" {
 
   environment {
     variables = {
-      DATA_BUCKET    = local.data_bucket
-      DATA_LOCATIONS = jsonencode({ for major, location in local.data_locations : major => { raw = location.prefix, parquet = local.data_parquet[major].prefix } })
-      LOOKBACK_DAYS  = "3"
+      # Names the service on every log line (src/lib/log.ts), in OpenTelemetry's terms.
+      OTEL_SERVICE_NAME = var.name
+      DATA_BUCKET       = local.data_bucket
+      DATA_LOCATIONS    = jsonencode({ for major, location in local.data_locations : major => { raw = location.prefix, parquet = local.data_parquet[major].prefix } })
+      LOOKBACK_DAYS     = "3"
     }
   }
 

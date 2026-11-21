@@ -122,6 +122,8 @@ resource "aws_lambda_function" "consumer" {
 
   environment {
     variables = {
+      # Names the service on every log line (src/lib/log.ts), in OpenTelemetry's terms.
+      OTEL_SERVICE_NAME     = var.name
       TABLE_NAME            = aws_dynamodb_table.this.name
       EVENT_SOURCE          = "/${var.name}"
       DEAD_LETTER_QUEUE_URL = aws_sqs_queue.dead_letter.url

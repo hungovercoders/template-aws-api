@@ -217,7 +217,9 @@ resource "aws_lambda_function" "api" {
 
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.this.name
+      # Names the service on every log line (src/lib/log.ts), in OpenTelemetry's terms.
+      OTEL_SERVICE_NAME = var.name
+      TABLE_NAME        = aws_dynamodb_table.this.name
       # component:asyncapi:start
       # The `source` of every CloudEvent this API publishes.
       EVENT_SOURCE = "/${var.name}"

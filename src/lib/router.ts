@@ -4,7 +4,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from "aws-lambd
 import type { operations } from "../generated/api.d.ts";
 import { operationForRouteKey, validateRequest } from "./contract.ts";
 import { createLogger, type Logger } from "./log.ts";
-import { continueTrace, traceId } from "./trace.ts";
+import { continueTrace } from "./trace.ts";
 import { HttpProblem, problem, unauthorized, type Result } from "./problem.ts";
 
 type OperationId = keyof operations;
@@ -50,7 +50,6 @@ export function createHandler(routes: Routes): APIGatewayProxyHandlerV2 {
     continueTrace(event.headers?.traceparent);
     const log = createLogger({
       request_id: event.requestContext?.requestId,
-      trace_id: traceId(),
       route_key: event.routeKey,
       operation_id: operationForRouteKey(event.routeKey)?.operationId,
     });
