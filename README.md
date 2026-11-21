@@ -285,7 +285,7 @@ src/consumers/          one file per message received        ← written from th
 src/domain/, src/store/ your rules and data access           ← written from the spec
 steps/                  glue for your feature sentences      ← written from the spec
 src/lib/, src/handler.ts  router, validation, DynamoDB, queue, outbox: the template's
-infra/                  Terraform; tags.auto.tfvars.json     ← you say who owns it
+infra/                  Terraform; tags and budget .auto.tfvars.json ← you say who owns it, and its budget
 local/                  runs the stack on AWS Emulator; the queue, event and data tasks
 docs/                   one guide per reader; runbook.md for alarms
 messages/, http/        examples of every message; requests to explore by hand

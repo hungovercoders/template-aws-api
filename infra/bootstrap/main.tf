@@ -581,6 +581,13 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["arn:${local.partition}:sns:${var.region}:${local.account}:${var.name}-alarms"]
   }
 
+  # The stack's budget (infra/budget.tf), named after it. Budgets is global: no Region.
+  statement {
+    sid       = "Budget"
+    actions   = ["budgets:ModifyBudget", "budgets:ViewBudget", "budgets:ListTagsForResource", "budgets:TagResource", "budgets:UntagResource"]
+    resources = ["arn:${local.partition}:budgets::${local.account}:budget/${var.name}"]
+  }
+
   # API Gateway HTTP APIs cannot be scoped by name before they exist.
   statement {
     sid     = "HttpApi"

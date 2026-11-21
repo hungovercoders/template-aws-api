@@ -19,8 +19,9 @@ it is: `domain` and `team` (who owns it), `service` (the stack's name) and
 `repo` (this repository's URL, read from the git remote). A stack whose name
 ends `-dev`, `-test`, `-staging` or `-prod` also carries `environment`.
 
-`domain` and `team` are yours to say, once, in `infra/tags.auto.tfvars.json`;
-commit it. Nothing is applied - locally or to AWS - while either is empty,
+`domain` and `team` are yours to say, once, in `infra/tags.auto.tfvars.json`,
+and what the stack may cost a month in `infra/budget.auto.tfvars.json`
+([cost](#cost)); commit them. Nothing is applied - locally or to AWS - while one is empty,
 and `task tags` shows what a stack would carry. A resource group named after
 the stack gathers everything tagged with its `service`:
 `aws resource-groups list-group-resources --group-name <NAME>`.
@@ -187,6 +188,14 @@ published (`event_log_days`, 1 by default: it is for looking, not keeping).
   deploy with `-- -var 'cors_allowed_origins=["https://app.example.com"]'`.
   API Gateway answers the preflight requests itself; no gate covers CORS on
   the local stack.
+
+## Cost
+
+`monthly_budget_usd` in `infra/budget.auto.tfvars.json` is what the stack may
+cost a month. An AWS Budgets budget named after the stack counts what carries
+its `service` tag and notifies the alarm topic at 80% of it and at a forecast of
+100% (`docs/runbook.md#budget`). AWS counts a tag only once it is activated as a
+cost allocation tag: in the Billing console, activate `service` once per account.
 
 ## Limiting requests
 
