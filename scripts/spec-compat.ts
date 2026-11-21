@@ -1,5 +1,5 @@
 // Gate: a change to the spec is deliberate, visible and versioned.
-// Each major's contract (specs/openapi.v<N>.yaml) is compared with what was
+// Each major's contract (specs/contracts/openapi.v<N>.yaml) is compared with what was
 // last published of that same major, and its info.version is held to
 // semantic versioning:
 //   - a breaking contract change needs a new MAJOR version (while the major is
@@ -130,7 +130,7 @@ async function compare(contract: Contract): Promise<void> {
     problems.push(
       oldMajor === 0
         ? `${contract.path} has breaking changes but info.version went from ${from} to ${current.info?.version}; while the API is 0.x a breaking change needs a new minor version`
-        : `${contract.path} has breaking changes: v${contract.major}'s consumers would fail. Make the change in specs/openapi.v${contract.major + 1}.yaml, a new major served beside this one, and leave v${contract.major} as it is`,
+        : `${contract.path} has breaking changes: v${contract.major}'s consumers would fail. Make the change in specs/contracts/openapi.v${contract.major + 1}.yaml, a new major served beside this one, and leave v${contract.major} as it is`,
     );
   } else if (changes.length > 0 && !bumped.minor) {
     problems.push(`${contract.path}: the API changed but info.version went from ${from} to ${current.info?.version}; a change to the API needs at least a new minor version`);

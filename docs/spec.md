@@ -16,10 +16,10 @@ has you try the result on the mock before you approve it. It stops there;
 
 `/write-spec` is the quick way. To do it yourself:
 
-- Replace the starter `specs/openapi.v0.yaml` with your contract: paths under
+- `specs/contracts/`, `features/` and `slos/` start with an inert starter of each part, saying what to write; leave one you do not need.
+- Replace the starter `specs/contracts/openapi.v0.yaml` with your contract: paths under
   `/v0`, `operationId`s ending `_v0`, errors using its `Problem` schema.
-- Add feature files to `specs/features/`, each scenario tagged with the
-  operations it covers: `@operation:<operationId>`.
+- Replace `specs/features/example.feature`, each scenario tagged `@operation:<operationId>`.
 - Rules for this API alone go in `.spectral.yaml` ([Contract standards](#contract-standards)).
 - `task spec:check` says when the spec is complete enough to build from;
   `task spec:lint` that it meets the standards.
@@ -29,8 +29,8 @@ has you try the result on the mock before you approve it. It stops there;
 ### Changing it
 
 A published contract has consumers, so every change is
-versioned. Each contract is a file per live major - `specs/openapi.v1.yaml`,
-`specs/openapi.v2.yaml` - whose `info.version` is a semantic version of that
+versioned. Each contract is a file per live major - `specs/contracts/openapi.v1.yaml`,
+`specs/contracts/openapi.v2.yaml` - whose `info.version` is a semantic version of that
 major, and `task spec:compat` - a gate in `task ci` - holds each file to what
 changed since that same major was last published:
 
@@ -65,7 +65,7 @@ Consumers of a major do not move the day the next one ships, so one stack
 serves every live major at once, over the same data. Whatever two majors
 would share a name in carries the major, and `spec:check` holds each file to it:
 
-| In `specs/openapi.v2.yaml` | Is |
+| In `specs/contracts/openapi.v2.yaml` | Is |
 | --- | --- |
 | `info.version` | `2.x.x` - the major the file name says |
 | Every path | under `/v2` - `/v2/beers/{beer_id}` |
@@ -85,7 +85,7 @@ deprecated. Events, and the data kept from them, are versioned the same way.
 ## Contract standards
 
 `task spec:lint` runs [Spectral](https://github.com/stoplightio/spectral)
-over `specs/openapi.v<N>.yaml`. It is a gate in `task ci`, so a contract that
+over `specs/contracts/openapi.v<N>.yaml`. It is a gate in `task ci`, so a contract that
 breaks a rule cannot be implemented green.
 
 **House rules** (`rules/house.yaml`) ship with the template and apply to every
@@ -127,7 +127,7 @@ the template, once, not in one API.
 ## Messages and events: the AsyncAPI contract
 
 An API that takes work from a queue, or publishes what happened, has a second
-contract: `specs/asyncapi.v<N>.yaml`, an [AsyncAPI](https://www.asyncapi.com) 3.1
+contract: `specs/contracts/asyncapi.v<N>.yaml`, an [AsyncAPI](https://www.asyncapi.com) 3.1
 document per live major, versioned apart from the HTTP one. A `receive`
 operation is a message the API accepts; a `send` operation is an event it
 publishes; the stack does what every live major says. An API with neither has
@@ -153,7 +153,7 @@ and adds only what is its own, the `type` it fixes and the shape of `data`:
 ```yaml
 payload:
   allOf:
-    - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
+    - $ref: '../../tools/asyncapi/cloudevent.yaml#/CloudEvent'
     - type: object
       required: [data]
       properties:
@@ -206,7 +206,7 @@ wants the CloudEvent alone gives its rule's target `input_path = "$.detail"`.
 <!-- component:publish:end -->
 <!-- component:data:start -->
 **The events as data.** Kept in S3, the events have a third contract,
-`specs/datacontract.v<N>.yaml`: see [Events as data](data.md).
+`specs/contracts/datacontract.v<N>.yaml`: see [Events as data](data.md).
 <!-- component:data:end -->
 
 ## Try the contract before it is built
@@ -214,7 +214,7 @@ wants the CloudEvent alone gives its rule's target `input_path = "$.detail"`.
 In the spec phase there is nothing to run yet, but a contract is easier to
 judge by calling it than by reading it. `task mock` starts
 [Prism](https://github.com/stoplightio/prism), which serves
-`specs/openapi.v<N>.yaml` as a mock API:
+`specs/contracts/openapi.v<N>.yaml` as a mock API:
 
 ```sh
 task mock                       # http://127.0.0.1:4010 (MOCK_PORT), answers from the contract's examples

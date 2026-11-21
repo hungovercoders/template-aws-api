@@ -5,7 +5,7 @@
 //   node local/data.ts compact       - compact the raw JSON into Parquet now, as the daily schedule does
 // ENV=local (the default) is the local stack on AWS Emulator; ENV=aws is the
 // deployed stack, with your AWS credentials. Each live major of the data
-// contract (specs/datacontract.v<N>.yaml) keeps its data under a prefix of its
+// contract (specs/contracts/datacontract.v<N>.yaml) keeps its data under a prefix of its
 // own: `test` tests every one; `query` and `browse` read the newest, or the one
 // DATA_MAJOR names (DATA_MAJOR=v1).
 import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
@@ -18,7 +18,7 @@ import { gunzipSync } from "node:zlib";
 import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { parquetMetadata, parquetReadObjects } from "hyparquet";
 import { parquetSchema, type Property, recentDays } from "../src/lib/compactor.ts";
-import { parseDocument } from "yaml";
+import { parse, parseDocument } from "yaml";
 import { contracts } from "../scripts/contracts.ts";
 import { stackOutputs } from "./outputs.ts";
 
@@ -28,11 +28,12 @@ const fail = (message: string): never => {
 };
 
 const where = process.env.ENV ?? "local";
-const majors = contracts("datacontract");
+// A contract that names no server yet - the template's starter - keeps nothing, as infra/data.tf reads it.
+const majors = contracts("datacontract").filter((contract) => ((parse(readFileSync(contract.path, "utf8")) as { servers?: unknown[] } | null)?.servers ?? []).length > 0);
 // An API that keeps no data has nothing to test; asking to read it is a mistake.
 if (majors.length === 0) {
-  if (process.argv[2] !== "test") fail("data: there is no specs/datacontract.v<N>.yaml, so the events this API publishes are not kept as data");
-  console.log("data:test - no specs/datacontract.v<N>.yaml, so the events this API publishes are not kept as data");
+  if (process.argv[2] !== "test") fail("data: no specs/contracts/datacontract.v<N>.yaml names a server, so the events this API publishes are not kept as data");
+  console.log("data:test - no specs/contracts/datacontract.v<N>.yaml names a server, so the events this API publishes are not kept as data");
   process.exit(0);
 }
 // Every major is tested, each in a run of its own.

@@ -1,14 +1,14 @@
 # template-aws-api
 
-BDD and contract driven AWS Lambda API. `specs/` (OpenAPI contract + feature
-files) is the requirement; `task ci` is the definition of done.
+BDD and contract driven AWS Lambda API. `specs/` (`contracts/`, `features/`,
+`slos/`) is the requirement; `task ci` is the definition of done.
 
 - The skeleton (router, validation, harness, gates, CI, infra) is the same for
   every API and is already built. Do not rebuild or restructure it; write only
   the business logic the specs describe: `steps/`, `src/operations/`,
   `src/domain/`, `src/store/` and their tests.
 <!-- component:consume:start -->
-- A message the API receives is a `receive` operation in `specs/asyncapi.v<N>.yaml`
+- A message the API receives is a `receive` operation in `specs/contracts/asyncapi.v<N>.yaml`
   and one function in `src/consumers/`; the queue and retries are the skeleton's.
 <!-- component:consume:end -->
 <!-- component:publish:start -->
@@ -49,7 +49,7 @@ files) is the requirement; `task ci` is the definition of done.
   `task component:add -- <name>`, which brings it back from the template.
 - `specs/` is read-only unless the user asks for a spec change. The tags and budget
   in `infra/{tags,budget}.auto.tfvars.json` are the owner's to say: ask, never guess.
-- A contract is a file per live major (`specs/openapi.v<N>.yaml`, paths `/v<N>`,
+- A contract is a file per live major (`specs/contracts/openapi.v<N>.yaml`, paths `/v<N>`,
   names `_v<N>`); `task spec:compat` holds each to its version. A breaking
   change is a new major beside the old, and the user's decision.
 - Never weaken a gate (Taskfile, cucumber config, the spec and backlog

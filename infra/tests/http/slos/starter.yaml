@@ -1,0 +1,5 @@
+# A fixture for infra/tests/slo.tftest.hcl: an SLO still all comments, as the
+# template starts, is not an SLO - the template's thresholds stand.
+#
+# apiVersion: openslo/v1
+# kind: SLO

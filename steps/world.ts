@@ -46,7 +46,7 @@ export class ApiWorld extends World {
     this.last = { status: res.status, headers: res.headers, body: parsed };
 
     const match = matchRoute(method, new URL(path, "http://api").pathname);
-    assert.ok(match, `${method} ${path} is not an operation in any specs/openapi.v<N>.yaml`);
+    assert.ok(match, `${method} ${path} is not an operation in any specs/contracts/openapi.v<N>.yaml`);
     answered.add(`${match.operation.operationId} ${res.status}`);
     const violations = validateResponse(match.operation, res.status, contentType, parsed);
     assert.deepEqual(violations, [], `${method} ${path} broke the contract:\n  ${violations.join("\n  ")}\n  body: ${text}`);

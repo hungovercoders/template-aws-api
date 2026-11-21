@@ -1,4 +1,4 @@
-// The data contracts (specs/datacontract.v<N>.yaml, one for each live major):
+// The data contracts (specs/contracts/datacontract.v<N>.yaml, one for each live major):
 // what the events this API publishes are once they have landed in S3 - an Open
 // Data Contract Standard document, with a schema object for every event. Every
 // live major receives every event, under its own location (ending /v<N>/), so
@@ -25,7 +25,7 @@ import { merged, type Schema } from "./sample.ts";
 import { baseline } from "./spec-baseline.ts";
 
 /** How the contracts are named in what this says. */
-export const CONTRACT = "specs/datacontract.v<N>.yaml";
+export const CONTRACT = "specs/contracts/datacontract.v<N>.yaml";
 const ASYNCAPI = "src/generated/asyncapi.json";
 /** The one place the ODCS version is chosen (Taskfile.yml); moving to the next is one change there. */
 const ODCS = process.env.ODCS_VERSION ?? "v3.2.0";
@@ -173,7 +173,7 @@ function generate(): void {
   if (files.length === 0 && events.length === 0) return console.log("data:generate - the API publishes no events, so there is nothing to describe");
   // Every live major describes every event; with none yet, major 0 is started.
   const made = files.length === 0;
-  for (const path of made ? ["specs/datacontract.v0.yaml"] : files.map((file) => file.path)) {
+  for (const path of made ? ["specs/contracts/datacontract.v0.yaml"] : files.map((file) => file.path)) {
     const { text, strays } = generated(made ? starter() : readFileSync(path, "utf8"), events);
     writeFileSync(path, declared(text));
     console.log(`data:generate - ${path} ${made ? "started" : "brought up to date"}: ${events.length} events, from the AsyncAPI contract`);
@@ -283,7 +283,8 @@ function check(): void {
     const { text: wanted, strays } = generated(text, events);
     own.push(...strays);
     if (wanted !== text) own.push("it differs from what the AsyncAPI contract says (an event, a property, a type or whether it is required) - run `task data:generate` and commit the result");
-    own.push(...needs(contract));
+    // A contract that names no server yet - the template's starter - keeps nothing, so holds nothing to the stack's needs.
+    if ((contract.servers ?? []).length > 0) own.push(...needs(contract));
     problems.push(...own.map((problem) => (problem.startsWith(file.path) ? problem : `${file.path}: ${problem}`)));
     for (const server of contract.servers ?? []) {
       const bucket = /^s3:\/\/([^/]+)\//.exec(server.location ?? "")?.[1];
@@ -295,7 +296,11 @@ function check(): void {
     if (names.size > 1) problems.push(`the ${server} server is in more than one bucket (${[...names].join(", ")}); every major keeps its data in the same bucket, under its own /v<N>/ prefix`);
   }
   if (problems.length > 0) stop(["data:check failed", ...problems.map((problem) => `  - ${problem}`)].join("\n"));
-  console.log(`data:check ok - ODCS ${ODCS}, ${files.map((file) => `v${file.major}`).join(" and ")}: ${events.length} events described as the AsyncAPI contract has them`);
+  const unkept = files.filter((file) => (read(readFileSync(file.path, "utf8")).servers ?? []).length === 0).map((file) => file.path);
+  console.log(
+    `data:check ok - ODCS ${ODCS}, ${files.map((file) => `v${file.major}`).join(" and ")}: ${events.length} events described as the AsyncAPI contract has them` +
+      (unkept.length > 0 ? `; ${unkept.join(", ")} names no server yet, so nothing is kept` : ""),
+  );
 }
 
 // --- Gate: a change is versioned ----------------------------------------------
@@ -365,7 +370,7 @@ function compareOne(file: File, ref: string, problems: string[], report: string[
     problems.push(
       oldMajor === 0
         ? `${file.path} has breaking changes but its version went from ${from} to ${current.version}; while the contract is 0.x that needs a new minor version`
-        : `${file.path} has breaking changes: v${file.major}'s readers would fail. Make the change in specs/datacontract.v${file.major + 1}.yaml, whose data lands beside this one's, and leave v${file.major} as it is`,
+        : `${file.path} has breaking changes: v${file.major}'s readers would fail. Make the change in specs/contracts/datacontract.v${file.major + 1}.yaml, whose data lands beside this one's, and leave v${file.major} as it is`,
     );
   } else if (!bumped.any) {
     problems.push(`${file.path} was edited but its version is still ${current.version}; every published edit needs a new version`);

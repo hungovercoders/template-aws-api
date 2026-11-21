@@ -1,6 +1,6 @@
 ---
 name: write-spec
-description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/openapi.v<N>.yaml and the BDD feature files in specs/features, and where the API takes messages, publishes events or keeps them as data, the AsyncAPI contract and the data contract - and to change that spec safely for the rest of the API's life. Use when asked to design, specify or define an API, and whenever an existing API should do something new, different or less, or has a bug - every such change starts here, before any code. Ends with a spec the gates accept and the user has approved; it does not implement.
+description: Work with the user to turn requirements into the spec for an AWS Lambda API built on this template - the OpenAPI contract in specs/contracts/openapi.v<N>.yaml and the BDD feature files in specs/features, and where the API takes messages, publishes events or keeps them as data, the AsyncAPI contract and the data contract - and to change that spec safely for the rest of the API's life. Use when asked to design, specify or define an API, and whenever an existing API should do something new, different or less, or has a bug - every such change starts here, before any code. Ends with a spec the gates accept and the user has approved; it does not implement.
 ---
 
 # Write the spec with the user
@@ -13,10 +13,10 @@ Its outputs, and nothing else:
 
 - **`specs/features/*.feature`** - the behaviour: what the API does, in the
   user's business language, whichever way it is asked.
-- **`specs/openapi.v<N>.yaml`** - the HTTP contract: every operation, request and
+- **`specs/contracts/openapi.v<N>.yaml`** - the HTTP contract: every operation, request and
   response.
-- **`specs/asyncapi.v<N>.yaml`** - where the API takes messages or publishes
-  events - and **`specs/datacontract.v<N>.yaml`** - where it keeps those events as
+- **`specs/contracts/asyncapi.v<N>.yaml`** - where the API takes messages or publishes
+  events - and **`specs/contracts/datacontract.v<N>.yaml`** - where it keeps those events as
   data. Each has a section below, present while the repository has that part.
 
 Stop when the spec is done. Implementing it is the `implement-api` skill.
@@ -46,7 +46,7 @@ you assumed something, say so and get a yes.
 ## Workflow
 
 1. **Understand what exists.** Run `task component:list` and see
-   [Optional components](#optional-components). Read `specs/openapi.v<N>.yaml` and
+   [Optional components](#optional-components). Read `specs/contracts/openapi.v<N>.yaml` and
    `specs/features/`. If the contract has operations, this is a *change* to a
    published spec: read [Changing a spec](#changing-a-spec) before anything
    else. If it is the starter (`paths: {}`), this is a new API.
@@ -147,7 +147,7 @@ write by hand what a removed component would have provided.
 ## Messages the API receives
 
 Work that arrives on a queue is specified like a request: a scenario says
-what happens, and `specs/asyncapi.v<N>.yaml` (see `docs/spec.md`) says what the
+what happens, and `specs/contracts/asyncapi.v<N>.yaml` (see `docs/spec.md`) says what the
 message is, as a `receive` operation. Ask the user, and confirm:
 
 - **what arrives and from whom** - name the message for what happened where
@@ -172,7 +172,7 @@ is handled first.
 ## Events the API publishes
 
 What other services are told is specified too: a scenario says when an
-event is published, and `specs/asyncapi.v<N>.yaml` says what it is, as a `send`
+event is published, and `specs/contracts/asyncapi.v<N>.yaml` says what it is, as a `send`
 operation. Ask the user, and confirm:
 
 - **what others need to know happened** - name each event for the thing and
@@ -239,7 +239,7 @@ what it does and what it integrates with. Settle it before step 8: [skills.md](s
 
 ## Writing the contract
 
-- **Start from `specs/openapi.v0.yaml` as it is.** It carries the `Problem`
+- **Start from `specs/contracts/openapi.v0.yaml` as it is.** It carries the `Problem`
   schema and reusable error responses the template's router produces.
 - **`operationId`** names the operation everywhere - the handler, the file,
   the tag in the features. Lower snake_case, verb first, its major last:

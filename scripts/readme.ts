@@ -50,7 +50,7 @@ const majors = (kind: "openapi" | "asyncapi" | "datacontract", only?: Set<number
     .map((contract) => `[v${contract.major}](${contract.path}) (${versionOf(kind, parseYaml(readFileSync(contract.path, "utf8"))) ?? "?"})${kind === "openapi" ? ` at \`/v${contract.major}\`` : ""}`)
     .join(", ");
 
-// An API with an asynchronous side has a second contract, specs/asyncapi.v<N>.yaml:
+// An API with an asynchronous side has a second contract, specs/contracts/asyncapi.v<N>.yaml:
 // the messages it receives and the events it publishes are its front page too.
 type Async = {
   info?: { version?: string };
@@ -79,7 +79,7 @@ const asyncSection = (title: string, received: boolean) => {
 // What the API has is what its contracts say and its repository still carries: a
 // removed component's tasks and guides are not there to point at.
 const gone = removed();
-// Events kept as data have a third contract, specs/datacontract.v<N>.yaml: who
+// Events kept as data have a third contract, specs/contracts/datacontract.v<N>.yaml: who
 // owns the data, how long it is kept and how fresh it is belong on the front
 // page. The newest major says it; every live one is linked.
 type Data = { version?: string; team?: string | { name?: string }; slaProperties?: { property?: string; value?: unknown; unit?: string }[] };

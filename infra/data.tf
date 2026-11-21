@@ -1,6 +1,6 @@
 # The events as data: every event the API publishes is also kept in S3, where
 # analysts and other systems read it long after it was sent. For each live
-# major of the data contract (specs/datacontract.v<N>.yaml) a rule on the bus
+# major of the data contract (specs/contracts/datacontract.v<N>.yaml) a rule on the bus
 # sends every event to that major's Firehose stream, which writes it as one
 # line of JSON - the whole CloudEvent - under that major's location:
 #   <prefix ending /v<N>/>type=<event type>/dt=<date>/
@@ -50,8 +50,8 @@ variable "data_reader_accounts" {
 locals {
   # Every live major, by name (v0, v1, ...), with this stack's server in it.
   data_contracts = {
-    for name in sort(fileset("${path.module}/${var.specs}", "datacontract.v*.yaml")) :
-    regex("^datacontract\\.(v[0-9]+)\\.yaml$", name)[0] => yamldecode(file("${path.module}/${var.specs}/${name}"))
+    for name in sort(fileset("${path.module}/${var.specs}", "contracts/datacontract.v*.yaml")) :
+    regex("^contracts/datacontract\\.(v[0-9]+)\\.yaml$", name)[0] => yamldecode(file("${path.module}/${var.specs}/${name}"))
   }
   data_majors = {
     for major, contract in local.data_contracts : major => {

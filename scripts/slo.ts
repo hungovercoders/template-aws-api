@@ -124,7 +124,7 @@ export function sloProblems(
       !operations.includes(shape.operation)
     ) {
       problems.push(
-        `${path}: its operation label names ${shape.operation}, which is not an operationId of any specs/openapi.v<N>.yaml`,
+        `${path}: its operation label names ${shape.operation}, which is not an operationId of any specs/contracts/openapi.v<N>.yaml`,
       );
     }
   }
@@ -171,15 +171,17 @@ function operationIds(): string[] {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  // A file that is all comments - the template's starter - is an SLO not written yet: infra/alarms.tf skips it too.
   const paths = existsSync(DIR)
     ? readdirSync(DIR)
         .filter((name) => /\.ya?ml$/.test(name))
         .sort()
         .map((name) => `${DIR}/${name}`)
+        .filter((path) => parse(readFileSync(path, "utf8")) != null)
     : [];
   if (paths.length === 0) {
     console.log(
-      `slo:check - no ${DIR}/*.yaml, so the API's alarms keep the template's own thresholds`,
+      `slo:check - no SLO in ${DIR}/*.yaml yet, so the API's alarms keep the template's own thresholds`,
     );
     process.exit(0);
   }

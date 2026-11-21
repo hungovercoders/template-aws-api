@@ -55,7 +55,7 @@ locals {
 # bootstrap again when the contract gains a server.
 locals {
   data_buckets = distinct(flatten([
-    for name in fileset("${path.module}/../../specs", "datacontract.v*.yaml") : [
+    for name in fileset("${path.module}/../../specs", "contracts/datacontract.v*.yaml") : [
       for server in try(yamldecode(file("${path.module}/../../specs/${name}")).servers, []) : regex("^s3://([^/]+)/", server.location)[0] if try(server.type, "") == "s3"
     ]
   ]))

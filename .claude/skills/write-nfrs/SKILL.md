@@ -23,7 +23,7 @@ the template's default, and you say so in the summary.
 | How long the Parquet is kept | data contract: `slaProperties` `retention` (`value`, `unit: d` or `y`) | `data:check`, the same plan test |
 | How fresh the data is | data contract: `slaProperties` `latency` | `data:check`; the compaction schedule |
 | How sensitive each property is | data contract: each property's `classification` | `data:lint` (`rules/datacontract.yaml`) |
-| How fast a caller may call | each `specs/openapi.v<N>.yaml`: root `x-rate-limit {requests_per_second, burst}`, `429` on every operation | `spec:check`; a scenario using `this.flood()` against the real stack; `infra/tests/http.tftest.hcl` |
+| How fast a caller may call | each `specs/contracts/openapi.v<N>.yaml`: root `x-rate-limit {requests_per_second, burst}`, `429` on every operation | `spec:check`; a scenario using `this.flood()` against the real stack; `infra/tests/http.tftest.hcl` |
 | How available the API is | `specs/slos/<name>.yaml`: an availability SLO (`5xx` over `Count`, `target`) | `slo:check` (`oslo validate`); the `api-5xx` alarm in production |
 | How quick the API, or one operation, is | `specs/slos/<name>.yaml`: a latency SLO (a percentile, `op: lte`, `value` in ms; `metadata.labels.operation` for one operation) | `slo:check`; the `api-latency` or `latency-<operationId>` alarm |
 | How it recovers | fixed by the template: point-in-time recovery, any second of the last 35 days (`docs/runbook.md#restore-the-table`) | `infra/tests/owner.tftest.hcl` |

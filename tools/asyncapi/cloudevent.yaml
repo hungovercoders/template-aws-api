@@ -1,11 +1,11 @@
 # The CloudEvents 1.0 envelope, in structured JSON mode: what every message
 # this API receives and every event it publishes is wrapped in. It is the
-# skeleton's; a message in specs/asyncapi.yaml extends it and adds only what
+# skeleton's; a message in specs/contracts/asyncapi.yaml extends it and adds only what
 # is its own - the `type` it fixes and the shape of `data`:
 #
 #   payload:
 #     allOf:
-#       - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
+#       - $ref: '../../tools/asyncapi/cloudevent.yaml#/CloudEvent'
 #       - type: object
 #         required: [data]
 #         properties:

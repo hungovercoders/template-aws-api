@@ -1,5 +1,5 @@
 # The contract linter's ruleset (https://docs.stoplight.io/docs/spectral).
-# `task spec:lint` holds specs/openapi.yaml to it; warnings fail too.
+# `task spec:lint` holds specs/contracts/openapi.yaml to it; warnings fail too.
 #
 # rules/house.yaml carries the standards every API from this template shares.
 # Add the rules that are specific to THIS API below - your own naming,

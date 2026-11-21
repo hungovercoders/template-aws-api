@@ -85,7 +85,11 @@ resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
 # The API's service level objectives (specs/slos/*.yaml, OpenSLO, held to the shapes below by
 # `task slo:check`) set these alarms' thresholds. Without them the template's own stand.
 locals {
-  slos = [for name in sort(fileset("${path.module}/${var.specs}", "slos/*.yaml")) : yamldecode(file("${path.module}/${var.specs}/${name}"))]
+  # A file that is all comments - the template's starter - is not an SLO yet (slo:check skips it too).
+  slos = [
+    for name in sort(fileset("${path.module}/${var.specs}", "slos/*.yaml")) : yamldecode(file("${path.module}/${var.specs}/${name}"))
+    if length(regexall("(?m)^[^#\\s]", file("${path.module}/${var.specs}/${name}"))) > 0
+  ]
 
   # Availability: the share of requests answered 5xx may not pass 1 - target.
   availability = one([for slo in local.slos : {

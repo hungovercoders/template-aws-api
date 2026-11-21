@@ -2,7 +2,7 @@
   "name": "template-aws-api-asyncapi-tools",
   "private": true,
   "type": "module",
-  "description": "AsyncAPI's own tools, for the gates and generators of specs/asyncapi.yaml. A package of its own so that removing the asyncapi component (task component:remove) takes its dependencies with it.",
+  "description": "AsyncAPI's own tools, for the gates and generators of specs/contracts/asyncapi.yaml. A package of its own so that removing the asyncapi component (task component:remove) takes its dependencies with it.",
   "devDependencies": {
     "@asyncapi/diff": "0.6.1",
     "@asyncapi/modelina": "5.10.1",
