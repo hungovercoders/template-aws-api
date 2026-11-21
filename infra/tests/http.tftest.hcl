@@ -5,6 +5,9 @@ mock_provider "aws" {
   mock_data "aws_iam_policy_document" {
     defaults = { json = "{}" }
   }
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "123456789012" }
+  }
 }
 mock_provider "awscc" {}
 mock_provider "archive" {}
@@ -15,6 +18,8 @@ variables {
   repo   = "https://example.com/plan-test"
   domain = "plan-test"
   team   = "plan-test"
+
+  monthly_budget_usd = 20
 }
 
 run "each_route_is_throttled_as_its_contract_says" {

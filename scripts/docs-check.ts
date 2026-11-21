@@ -15,6 +15,7 @@ const BUDGETS: [pattern: RegExp, lines: number, why: string][] = [
   [/^README\.md$/, 330, "the front page: the pitch, the architecture and how to start"],
   [/^CONTRIBUTING\.md$/, 150, "how the template itself is changed"],
   [/^SECURITY\.md$/, 60, "how to report a vulnerability, and what to rely on"],
+  [/^docs\/runbook\.md$/, 300, "an entry for every alarm, for whoever is on call"],
   [/^docs\/[^/]+\.md$/, 250, "a guide for one reader at one moment"],
 ];
 

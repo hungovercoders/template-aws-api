@@ -15,6 +15,7 @@ Every stack is deployed with the same alarms: the baseline in
 | `<name>-api-5xx` | Any 5xx response in 5 minutes | The API failed, or API Gateway could not reach the Lambda |
 | `<name>-api-latency` | p99 latency above 3 seconds for 15 minutes | Callers are waiting |
 | `<name>-table-throttles` | Any throttled DynamoDB read or write in 5 minutes | The table is refusing work |
+| Budget `<name>` | 80% of `monthly_budget_usd` spent, or 100% forecast for the month | The stack costs more than its owner said |
 <!-- component:consume:start -->
 | `<name>-queue-age` | The oldest message has waited longer than a message can take to be given up on, twice over | The consumer is failing, throttled or too slow |
 | `<name>-dead-letters` | Any message on the dead-letter queue | A message could not be handled |
@@ -141,6 +142,20 @@ callers see slowness before errors.
 **Usually** a hot partition: one item everything touches, or a list that
 grew. Spread the key or page the read. A brief burst after a long quiet
 spell is DynamoDB scaling up and clears on its own.
+
+### budget
+
+**Means** AWS Budgets has counted 80% of the month's `monthly_budget_usd`
+(`infra/budget.auto.tfvars.json`) against the `service` tag, or forecasts 100%.
+Cost Explorer, filtered on that tag and grouped by service, shows which part. A
+surge of calls is `api-5xx` and `lambda-throttles`' cause too; a rate limit in the
+contract (`x-rate-limit`) bounds it. A new normal is a new budget: the owner's to say.
+
+### restore-the-table
+
+The table keeps point-in-time recovery: any second of the last 35 days. Restore
+it to a new table (`aws dynamodb restore-table-to-point-in-time`), check it, and
+copy back what was lost; a deploy never restores over the live table.
 
 <!-- component:consume:start -->
 ## Messages
