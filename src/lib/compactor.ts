@@ -155,6 +155,9 @@ export function compact(object: SchemaObject, lines: Iterable<string>, days?: Se
   return { files, rejected };
 }
 
+/** The last `count` days, today included: what the raw JSON's query view reads. */
+export const recentDays = (today: Date, count: number): string[] => window(today, count - 1, true);
+
 /** The days a run rewrites: the last `lookback` whole days before `today`, and today itself when asked. */
 export function window(today: Date, lookback: number, includeToday: boolean): string[] {
   const start = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());

@@ -288,7 +288,7 @@ tasks:
       - node local/data.ts test
 
   data:query:
-    desc: Query the events kept in S3 with SQL through DuckDB, a view per event already defined - task data:query -- "select * from beer_rated_v1"; with no SQL, its shell. The newest data contract major, or DATA_MAJOR=v<N> (ENV=local|aws, default local)
+    desc: Query the events kept in S3 with SQL through DuckDB, a view per event already defined, <event> over the Parquet and <event>_raw over the last 2 days of raw JSON (DATA_RAW_DAYS) - task data:query -- "select * from beer_rated_v1"; with no SQL, its shell. The newest data contract major, or DATA_MAJOR=v<N> (ENV=local|aws, default local)
     interactive: true
     env:
       DUCKDB_VERSION: '{{.DUCKDB_VERSION}}'
