@@ -66,8 +66,9 @@ Before building your own, run the finished example - the Beer Catalogue API:
 
 ```sh
 git clone https://github.com/hungovercoders/template-aws-api.git && cd template-aws-api
-git checkout example/implementation
 mise trust && mise install
+task example -- beer-catalogue implementation      # made in .local/examples/, a repository of its own
+cd .local/examples/beer-catalogue-implementation && mise trust
 ```
 
 **Terminal 1** - start the API, and leave it running:
@@ -81,7 +82,7 @@ builds its Docker image), starts it, and applies `infra/` to it with
 Terraform. Then it prints the API's URL and a token. `Ctrl-C` stops it and
 throws the stack away; the next `task dev` starts clean.
 
-**Terminal 2** - use it, in the same folder:
+**Terminal 2** - use it, in that same folder:
 
 ```sh
 task http          # pick a request from http/contract.http and send it
@@ -237,27 +238,26 @@ specs/features/*.feature ──► cucumber, strict, against the built Lambda
 
 ## See it working
 
-The Beer Catalogue API is built on this template, one branch per step:
+The Beer Catalogue API is built on this template. `examples/beer-catalogue/`
+keeps what each step adds to it:
 
-| Branch | What it is | `task ci` |
+| Step | What it is | `task ci` |
 | --- | --- | --- |
-| [`main`](../../tree/main) | The template, ready to use | Red - no spec yet |
-| [`example/spec`](../../tree/example/spec) | The template and a complete spec | Red - not implemented yet |
-| [`example/implementation`](../../tree/example/implementation) | That spec, delivered with `/implement-api` | Green |
+| The template | This repository, ready to use | Red - no spec yet |
+| [`spec/`](examples/beer-catalogue/spec) | A complete spec: contracts, features, SLOs and its README | Red - not implemented yet |
+| [`implementation/`](examples/beer-catalogue/implementation) | That spec, delivered with `/implement-api` | Green |
 
-Compare them:
-[`main...example/spec`](../../compare/main...example/spec) is what a spec
-looks like, and
-[`example/spec...example/implementation`](../../compare/example/spec...example/implementation)
-is what implementing one adds.
+`task example -- beer-catalogue spec` (or `implementation`) makes either step,
+the template with it laid over, as a repository of its own to run and read.
 
-`task ci` on `example/implementation` (selected lines):
+`task ci` on the example's implementation (selected lines):
 
 ![task ci passing: every gate, the unit tests, 67 scenarios, the fuzz run and the data test on the raw JSON and the Parquet](.github/images/task-ci.png)
 
 > **CI on `main` is red on purpose.** There is no spec to build yet, so
 > `task ci` fails until you add one. Changes to the template itself are
-> proved by a separate check, `template`, which lays the example over them.
+> proved by a separate check, `template`, which makes every step of the
+> example over them and runs its gates.
 
 ## Everyday tasks
 
@@ -297,6 +297,7 @@ scripts/, tools/        the generators and checks
 AGENTS.md               instructions for coding agents
 CONTRIBUTING.md         how the API is changed: spec first, then implementation
 skeleton.lock, components.json  what the template is, and its optional parts
+examples/               the worked example, step by step; task adopt deletes it
 ```
 
 ## Guides

@@ -1,0 +1,52 @@
+# Generated from specs/openapi.v<N>.yaml by `task http:generate` - do not edit; commit it when the contract changes.
+# Send with `task http`, or open in an editor with an HTTP client (httpYac, JetBrains).
+# Environments (mock, local, aws) are in http/http-client.env.json.
+
+@beer_id = 00000000-0000-4000-8000-000000000000
+
+### List the beers in the catalogue
+# @name list_beers_v0
+# optional query: style=lager
+# optional query: limit=20
+# optional query: cursor=cursor
+GET {{base_url}}/v0/beers
+
+### Add a beer to the catalogue
+# @name create_beer_v0
+POST {{base_url}}/v0/beers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Morning After",
+  "style": "ipa",
+  "abv": 5.6
+}
+
+### Fetch one beer
+# @name get_beer_v0
+GET {{base_url}}/v0/beers/{{beer_id}}
+
+### Retire a beer from the catalogue
+# @name retire_beer_v0
+DELETE {{base_url}}/v0/beers/{{beer_id}}
+Authorization: Bearer {{token}}
+
+### Change a beer's details
+# @name update_beer_v0
+PATCH {{base_url}}/v0/beers/{{beer_id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "abv": 5.8
+}
+
+### Rate a beer
+# @name rate_beer_v0
+POST {{base_url}}/v0/beers/{{beer_id}}/ratings
+Content-Type: application/json
+
+{
+  "score": 4
+}

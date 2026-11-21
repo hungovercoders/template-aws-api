@@ -1,7 +1,7 @@
 // Turn a repository created from the template into an API's repository.
 // Run once, after the first spec is written (`task adopt`). It removes what
 // is only about the template itself and leaves everything an API needs:
-//   - deletes the template's self-test workflow and its branch ruleset
+//   - deletes the template's self-test workflow, its branch ruleset and its worked examples
 //   - removes the sections marked template-only from the Markdown files
 //   - names AGENTS.md after the API
 //   - writes the README from the contract (task readme:generate)
@@ -17,9 +17,9 @@ if (Object.keys(contract.paths ?? {}).length === 0) {
 
 const done: string[] = [];
 
-// .github/images holds the template README's own pictures, which go with that README, and
-// CHANGELOG.md the template's history, which is not the API's.
-for (const path of [".github/workflows/template.yml", ".github/rulesets", ".github/images", "CHANGELOG.md"]) {
+// .github/images holds the template README's own pictures, which go with that README,
+// CHANGELOG.md the template's history, which is not the API's, and examples/ its worked examples.
+for (const path of [".github/workflows/template.yml", ".github/rulesets", ".github/images", "CHANGELOG.md", "examples"]) {
   if (!existsSync(path)) continue;
   rmSync(path, { recursive: true });
   done.push(`deleted ${path}`);

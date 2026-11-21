@@ -15,6 +15,6 @@ Closes #
 <!-- template-only:start - removed by `task adopt` when a repository becomes an API -->
 ## For a change to the template itself
 
-- [ ] Made on `main`, not on an example branch; the `template` check is green (`ci` on `main` is red by design)
-- [ ] After merging: merged down `main` → `example/spec` → `example/implementation`, and `example/implementation` is green
+- [ ] The `template` check is green: every step of every example made over this change passes its gates (`ci` on `main` is red by design)
+- [ ] Where the example had to move with the change, it moved in this pull request (`task example:save`)
 <!-- template-only:end -->

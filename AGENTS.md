@@ -65,15 +65,14 @@ files) is the requirement; `task ci` is the definition of done.
 ## Changing the template itself
 
 This repository is the template. Before changing the skeleton or the
-branches, read "Changing the template itself" in `CONTRIBUTING.md` and
+examples, read "Changing the template itself" in `CONTRIBUTING.md` and
 follow it. The rules that prevent damage, so they are always in view:
 
-- Skeleton changes go on `main`, then merge down: `main` → `example/spec` →
-  `example/implementation`. Run `task skeleton:lock` on `main` in the same
-  commit. Never change a skeleton file on an example branch.
-- Never rebase, amend, reset or force-push `main` or `example/*`.
-- When merging a starter-contract change down, the example keeps its own
-  `specs/openapi.v0.yaml`; never resolve with `-X ours` or `-X theirs`.
+- Skeleton changes go on `main`, with `task skeleton:lock` in the same commit.
+  The worked example is on `main` too, as what each step adds
+  (`examples/<name>/{spec,implementation}`): change it in the same pull
+  request, through `task example` and `task example:save`, never by hand.
+- Never rebase, amend, reset or force-push `main`.
 - Write a document only when no gate, generator or task description can
   carry it; give it one reader and one home. Do not raise a `task docs:check`
   budget to fit new text - cut, or ask the user.

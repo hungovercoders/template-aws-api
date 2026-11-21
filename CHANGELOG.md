@@ -7,6 +7,7 @@ Every change merged into the template's default branch, newest first. Written by
 
 ### Features
 
+- task resources lists what a stack is made of, local or deployed ([#132](../../pull/132))
 - a write-nfrs skill captures the non-functional requirements, each in its one home ([#131](../../pull/131))
 - SLOs in specs/slos (OpenSLO) set the API's alarms, held by task slo:check ([#130](../../pull/130))
 - a changelog of the template, written from its history and held to it by a gate ([#129](../../pull/129))

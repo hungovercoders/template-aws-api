@@ -1,10 +1,10 @@
 # For the template repository itself - delete this file in an API created from it.
 #
 # `ci` is red on main by design: there is no spec to implement. This is the
-# green signal for the skeleton instead. It lays the example's spec and
-# implementation (the example/implementation branch) over the skeleton being
-# proposed and runs every gate, so a change to the skeleton - a Renovate
-# update included - is proven before it is merged down.
+# green signal for the skeleton instead. It makes every phase of every worked
+# example (examples/<name>/<phase>, laid over the skeleton being proposed) and
+# runs that phase's gates there, so a change to the skeleton - a Renovate update
+# included - and any change to an example it needs are proven together.
 name: template
 
 on:
@@ -20,7 +20,7 @@ jobs:
   skeleton:
     name: skeleton delivers the example
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,33 +37,18 @@ jobs:
           for name in $(echo "$names" | tac); do task component:add -- "$name" --from "$PWD"; done
           git diff --exit-code
           task skeleton:check
-      - name: Lay the example over this skeleton
+      - name: Every example's spec phase passes its gates
         run: |
-          git fetch origin example/implementation
-          # Everything an API owns comes from the example...
-          git checkout origin/example/implementation -- README.md specs http/contract.http messages src/operations src/consumers src/domain src/store steps test
-          # Its tags are its own too. Until the example has said them, the proof says them for it.
-          if git cat-file -e origin/example/implementation:infra/tags.auto.tfvars.json 2>/dev/null; then
-            git checkout origin/example/implementation -- infra/tags.auto.tfvars.json
-          fi
-          task tags > /dev/null || echo '{ "domain": "brewing", "team": "catalogue" }' > infra/tags.auto.tfvars.json
-          # The same for its budget.
-          if git cat-file -e origin/example/implementation:infra/budget.auto.tfvars.json 2>/dev/null; then
-            git checkout origin/example/implementation -- infra/budget.auto.tfvars.json
-          fi
-          grep -q '"monthly_budget_usd": *[1-9]' infra/budget.auto.tfvars.json || echo '{ "monthly_budget_usd": 20 }' > infra/budget.auto.tfvars.json
-          # ...and everything the skeleton owns stays as proposed here: every file of
-          # skeleton.lock among those, so a new skeleton test is never the example's old one.
-          git checkout HEAD -- $(awk '$2 ~ /^(steps|test)\// { print $2 }' skeleton.lock)
-      - name: The README is written by the generator proposed here
-        # The example's README was written by the generator it had, so a change to the generator
-        # would always fail readme:check here. What the change does to it is shown, to be read in
-        # review; the gate itself runs, unsoftened, on the example branches after the merge down.
+          for name in $(node scripts/example.ts list | cut -d: -f1); do
+            task example -- "$name" spec
+            (cd ".local/examples/$name-spec" && mise trust --quiet && task check)
+          done
+      - name: Every example's implementation passes task ci
         run: |
-          task readme:generate
-          git diff --stat -- README.md
-          git diff -- README.md
-      - run: task ci
+          for name in $(node scripts/example.ts list | cut -d: -f1); do
+            task example -- "$name" implementation
+            (cd ".local/examples/$name-implementation" && mise trust --quiet && task ci)
+          done
       - name: AWS Emulator log
         if: failure()
-        run: tail -n 200 .local/emulator.log 2>/dev/null || true
+        run: tail -n 200 .local/examples/*/.local/emulator.log 2>/dev/null || true
