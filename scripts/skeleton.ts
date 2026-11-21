@@ -60,6 +60,7 @@ const SKELETON = [
   // `task skills:check` instead, so adding or updating one is not a skeleton change.
   ".claude/skills/implement-api/",
   ".claude/skills/write-spec/",
+  ".claude/skills/write-nfrs/",
 ];
 // A tool package's dependencies move with Renovate, like the root package.json, which is not skeleton either.
 // The tags' values are the API's own to set.

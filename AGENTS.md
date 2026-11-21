@@ -27,8 +27,8 @@ files) is the requirement; `task ci` is the definition of done.
   a new feature, a changed rule, a bug fix (a bug is a missing or wrong
   scenario) and a removal alike. Never change behaviour in the code alone.
   `CONTRIBUTING.md` has the route for each kind of change.
-- To write or change the spec with the user, follow the `write-spec` skill.
-  The user owns the requirements: ask, propose and confirm; never invent them.
+- To write or change the spec with the user, follow `write-spec` (and `write-nfrs`
+  for its NFRs). The user owns the requirements: ask, propose, confirm; never invent.
 - To implement or change the API from the specs, follow the `implement-api` skill.
 - A skill is the instructions in `.claude/skills/<name>/SKILL.md`. If your
   tool does not load skills itself, read that file and follow it.
