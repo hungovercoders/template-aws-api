@@ -29,18 +29,18 @@ The agent writes the logic: one small function per operation, and the glue
 for your sentences. From the example, shortened:
 
 ```ts
-export async function create_beer({ body }: Context<"create_beer">) {
+export async function create_beer_v0({ body }: Context<"create_beer_v0">) {
   const beer = { id: randomUUID(), name: body.name.trim(), style: body.style, abv: oneDecimal(body.abv) };
   await putNewBeer(beer);
-  return json(201, toBeer(beer), { location: `/beers/${beer.id}` });
+  return json(201, toBeer(beer), { location: `/v0/beers/${beer.id}` });
 }
 ```
 
-`task ci` then runs your scenarios against the real Lambda, on a local copy
-of AWS, and says whether it is finished. Here it is running: a request, a
-refusal, the event published and that event queried in S3 (real output, shortened).
+`task ci` then runs your scenarios against the real Lambda, on a local copy of AWS,
+and says whether it is finished. Here it is running: a request, a refusal, the event
+published, then compacted to Parquet in S3 and queried (real output, shortened).
 
-![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, and the same event is read back from S3 with SQL](.github/images/api-in-action.gif)
+![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, then compacted to Parquet in S3 and read back with SQL](.github/images/api-in-action.gif)
 
 ## Start here
 
@@ -77,8 +77,9 @@ flowchart TB
   table -->|"stream"| forwarder["Lambda: forwarder"]
   forwarder -->|"events (AsyncAPI, CloudEvents)"| bus{{"EventBridge bus"}}
   bus --> subscriber(["Subscribers"])
-  bus --> firehose["Firehose"] --> bucket[("S3: raw JSON, compacted daily to Parquet")]
-  bucket -->|"data contract (ODCS)"| analyst(["Analysts: DuckDB, Harlequin"])
+  bus --> firehose["Firehose"] --> raw[("S3: raw JSON")]
+  raw --> compactor["Lambda: compactor, daily (EventBridge Scheduler)"] --> parquet[("S3: Parquet, a file per day")]
+  raw & parquet -->|"data contract (ODCS)"| analyst(["Analysts: DuckDB, Harlequin"])
 ```
 
 | Interface | Direction | Contract | Optional |
@@ -109,9 +110,8 @@ need an optional part removes it, and can bring it back later:
 
 **Tests that mean something**
 
-- Your scenarios run against the built Lambda, through the stack your own
-  Terraform created on [AWS Emulator](https://github.com/aws/aws-emulator).
-  Nothing is mocked.
+- Your scenarios run against the built Lambda, through the stack your own Terraform
+  created on [AWS Emulator](https://github.com/aws/aws-emulator). Nothing is mocked.
 - Every response is checked against the contract, and the API is fuzzed.
 
 **Ready for production**
@@ -182,7 +182,7 @@ is what implementing one adds.
 
 `task ci` on `example/implementation` (selected lines):
 
-![task ci passing: every gate, 127 unit tests, 67 scenarios, the fuzz run and the data test](.github/images/task-ci.png)
+![task ci passing: every gate, 151 unit tests, 67 scenarios, the fuzz run and the data test on the raw JSON and the Parquet](.github/images/task-ci.png)
 
 > **CI on `main` is red on purpose.** There is no spec to build yet, so
 > `task ci` fails until you add one. Changes to the template itself are
