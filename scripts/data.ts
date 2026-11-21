@@ -175,7 +175,7 @@ function generate(): void {
   const made = files.length === 0;
   for (const path of made ? ["specs/datacontract.v0.yaml"] : files.map((file) => file.path)) {
     const { text, strays } = generated(made ? starter() : readFileSync(path, "utf8"), events);
-    writeFileSync(path, text);
+    writeFileSync(path, declared(text));
     console.log(`data:generate - ${path} ${made ? "started" : "brought up to date"}: ${events.length} events, from the AsyncAPI contract`);
     for (const stray of strays) console.log(`  - ${stray}; remove it`);
   }
@@ -184,10 +184,42 @@ function generate(): void {
 
 // --- Gate: agrees with the AsyncAPI contract, and says what infra/ reads -------
 
+type Server = { server?: string; type?: string; location?: string; format?: string; delimiter?: string; customProperties?: { property?: string; value?: unknown }[] };
+
+// The raw JSON is the audit copy: kept for its server's own retention, an ISO 8601
+// duration in years or days, 7 years when the contract does not say. The contract's
+// slaProperties retention is the Parquet's. infra/data.tf reads both the same way.
+export const RAW_RETENTION = "P7Y";
+const DURATION = /^P([1-9][0-9]*)([YD])$/;
+export function rawRetention(server: Server): { value: string; days: number } | string {
+  const value = server.customProperties?.find((entry) => entry.property === "retention")?.value ?? RAW_RETENTION;
+  const parts = typeof value === "string" ? DURATION.exec(value) : null;
+  if (!parts) return `the ${server.server} server's retention is ${JSON.stringify(value)}: an ISO 8601 duration in years or days, such as P7Y or P30D - how long its raw JSON is kept`;
+  const days = Number(parts[1]) * (parts[2] === "Y" ? 365 : 1);
+  if (days < 7) return `the ${server.server} server's retention is ${value}: at least P7D, so every day is compacted to Parquet before its raw JSON goes`;
+  return { value: String(value), days };
+}
+
+/** Every raw server says how long its JSON is kept, so the default is written where it is changed. */
+export function declared(text: string): string {
+  const doc = parseDocument(text);
+  const servers = doc.get("servers");
+  if (!isSeq(servers)) return text;
+  for (const server of servers.items) {
+    if (!isMap(server) || String(server.get("server") ?? "").endsWith("-parquet")) continue;
+    const custom = server.get("customProperties");
+    if (isSeq(custom) && custom.items.some((entry) => isMap(entry) && entry.get("property") === "retention")) continue;
+    const entry = doc.createNode({ property: "retention", value: RAW_RETENTION });
+    if (isSeq(custom)) custom.add(entry);
+    else server.set("customProperties", doc.createNode([{ property: "retention", value: RAW_RETENTION }]));
+  }
+  return doc.toString({ lineWidth: 0 });
+}
+
 type Contract = {
   apiVersion?: string;
   version?: string;
-  servers?: { server?: string; type?: string; location?: string; format?: string; delimiter?: string }[];
+  servers?: Server[];
   slaProperties?: { property?: string; value?: unknown; unit?: string }[];
   schema?: { name?: string; physicalName?: string }[];
 };
@@ -213,6 +245,8 @@ export function needs(contract: Contract): string[] {
       continue;
     }
     if (server.format !== "json" || server.delimiter !== "new_line") problems.push(`${name} must say format: json and delimiter: new_line - one event per line is what is written`);
+    const kept = rawRetention(server);
+    if (typeof kept === "string") problems.push(kept);
     const twin = servers.find((candidate) => candidate.server === `${server.server}-parquet`);
     if (!twin) {
       problems.push(`${name} has no ${server.server}-parquet server beside it: where the compactor writes each day as Parquet (type: s3, format: parquet, the same bucket, a prefix of its own)`);
