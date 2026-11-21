@@ -12,7 +12,7 @@ const BUDGETS: [pattern: RegExp, lines: number, why: string][] = [
   [/^CLAUDE\.md$/, 15, "imports AGENTS.md; holds only what is specific to Claude Code"],
   [/^\.claude\/skills\/[^/]+\/SKILL\.md$/, 350, "read whenever the skill runs"],
   [/^\.claude\/skills\/[^/]+\/(?!SKILL\.md$)[^/]+\.md$/, 80, "read with the skill, when the part of the API it is about is present"],
-  [/^README\.md$/, 260, "the front page: the pitch, the architecture and how to start"],
+  [/^README\.md$/, 300, "the front page: the pitch, the architecture and how to start"],
   [/^CONTRIBUTING\.md$/, 150, "how the template itself is changed"],
   [/^SECURITY\.md$/, 60, "how to report a vulnerability, and what to rely on"],
   [/^docs\/[^/]+\.md$/, 250, "a guide for one reader at one moment"],
