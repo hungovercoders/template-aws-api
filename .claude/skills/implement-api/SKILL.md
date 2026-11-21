@@ -185,7 +185,7 @@ it tells you exactly what is missing.
    invalid, and checks every response against the contract. A failure here is
    a real input your code mishandles (usually a 500, or a status the contract
    does not document): fix the code, never the check. See
-   [What the fuzzer sends](#what-the-fuzzer-sends).
+   [what the fuzzer sends](gates.md#what-the-fuzzer-sends).
 9. **`task ci`** - all gates, in CI order. Done only when this exits 0. Then
    run `task stage -- implemented` and commit `.stage`, so the pre-push hook
    checks the code from now on. Report the final output, and every choice
@@ -193,43 +193,9 @@ it tells you exactly what is missing.
 
 ## When the spec has changed
 
-The same workflow serves every change after the first build. Behaviour never
-changes in the code alone - if a change has no scenario, stop: it needs the
-spec changed first (`write-spec`).
+The same workflow serves every change after the first build; behaviour never changes in the
+code alone. Start from what changed in `specs/`, then follow [changing.md](changing.md).
 
-**Start by reading what changed:** `git diff <the commit the code was last
-green at> -- specs`. A rule that changed while the contract kept its shape,
-or a new row in a scenario outline, shows only when `task features` runs. A
-new major (`openapi.v2.yaml`) is new operations, `_v2`, over the same store.
-
-- **Something new** - `task scaffold` adds a stub for each new operation and
-  a pending step for each new sentence, and touches nothing you have written.
-  Implement them as in steps 5 and 6, in your existing step files; extend an
-  existing pattern rather than add a near-duplicate of it.
-- **Something changed** - nothing is scaffolded. `task features` goes red on
-  the scenarios whose behaviour moved, and `task typecheck` on every use of a
-  type the contract reshaped. Fix the code until both pass, and update any
-  unit test in `test/` that states the old rule. Do not edit a scenario or
-  the contract to match the code.
-- **A bug** - the spec should now hold a scenario for it. If it fails, fix
-  the code. If it passes once its steps exist, the bug is not reproduced:
-  change no code and say so. Never fix a bug no scenario demonstrates.
-- **Something removed** - `task typecheck` fails on the operation file whose
-  `operationId` has left the contract, and `task steps:check` lists step
-  definitions no sentence uses. Delete both, and any domain or store code
-  only they used.
-<!-- component:asyncapi:start -->
-  A message no longer received and an event no longer published fail
-  `task typecheck` too: in the consumer's file in `src/consumers/`, and where
-  the event's function was called. Delete the file, or the `outbox(...)` item.
-<!-- component:asyncapi:end -->
-- **Data that is already stored** - scenarios start from an empty table, so
-  no gate sees old items. When the contract gains a required response field,
-  give items stored before it a value when they are read.
-
-Afterwards the whole of `task ci` must pass, not only the gates you touched:
-`http:check` and `readme:check` if the contract changed (regenerate and
-commit), and `spec:compat`, which is the user's to resolve.
 
 ## Writing operations
 
@@ -243,8 +209,8 @@ commit), and `spec:compat`, which is the user's to resolve.
   already logs every request and any unexpected error.
 - **Answering** - return `json(status, body, headers?)` or `noContent()` from
   `src/lib/problem.ts`; the return type is `Result`. Set response headers such
-  as `location` through `headers`; a `location` is a path from the API's root
-  (`/things/<id>`), which a step can pass straight to `this.call`. Throw
+  as `location` through `headers`; a `location` is a path from the API's root,
+  its major first (`/v0/things/<id>`), which a step can pass straight to `this.call`. Throw
   `HttpProblem` for errors (rule 5).
 - **Authentication** is already enforced for every operation the contract
   secures: never check tokens yourself. `context.caller` is always set on a
@@ -301,47 +267,10 @@ indexes are the skeleton's. Before writing `src/store/`, read
 [store.md](store.md): listing and paging, what is consistent, atomic changes,
 and the retries a concurrent write needs.
 
-## What the fuzzer sends
+## Running the gates, and what the fuzzer sends
 
-Schemathesis generates whatever the contract allows, and a good deal it does
-not. Before `task contract:fuzz`, check your code against:
-
-- **Any text a string schema allows** - control characters, emoji, text that
-  is all punctuation, very long values up to `maxLength`. Anything that ends
-  up in a key must cope: a sort key is limited to 1024 bytes.
-- **Numbers at the edges** - the minimum and maximum, `-0`, values with many
-  decimal places, values too small for DynamoDB to store unless you round.
-- **Random values for opaque strings** such as cursors and ids. They must get
-  a documented 4xx, never a 500.
-- **Every documented status is fair game** - if your code can answer with a
-  status the contract does not document for that operation, that is a failure.
-
-## Running the gates
-
-`task` installs what it needs the first time, AWS Emulator included; the other
-tools come from `mise install`. If the emulator will not start, connect or
-sign, use the `aws-emulator` skill - but never upgrade it; its version is pinned.
-
-The scenarios and the fuzz run call the API through AWS Emulator's API
-Gateway, authorizer and Lambda - the built bundle is the function. Its Node
-runtime is not the whole of Node, and a unit test cannot see the difference:
-
-- no `node:http`, `node:https` or `node:module` - a dependency that needs
-  one fails every request with `Runtime.ImportModuleError`;
-- no `structuredClone`, and decoding malformed base64 throws: parse
-  anything a caller supplies inside try/catch;
-- it runs on the AWS SDK the runtime provides, so tell SDK errors by
-  `error.name`, not `instanceof` ([store.md](store.md) has the rest).
-
-When a task that uses the stack fails it prints what the functions logged,
-errors first (it needs the AWS CLI): read that before guessing why a request
-answered 500. `task emulator:gaps:list` names what else the emulator cannot
-do yet; read it before deciding the emulator, not your code, is at fault.
-
-If the local stack cannot run where you are working, `task check`,
-`task build`, `task infra:validate` and the cucumber dry run still do, and
-`handler` from `dist/handler.mjs` can be called with an event. That is not
-done: say so in your report, and leave the features and fuzz gates to CI.
+The scenarios and the fuzz run go through AWS Emulator, whose Node runtime is not the whole of
+Node; the fuzzer sends what the contract allows and more. Read [gates.md](gates.md) first.
 
 ## What the gates prove
 
