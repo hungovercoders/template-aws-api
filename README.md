@@ -3,7 +3,7 @@
 
 A brewery's beer catalogue. Signed-in staff add the beers they brew, keep the details current and retire beers. Anyone can browse the catalogue, and drinkers rate beers from 1 to 5.
 
-**Versions** [v0](specs/openapi.v0.yaml) (0.1.0) at `/v0` · [behaviour](specs/features) · [try it](http/contract.http)
+**Versions** [v0](specs/openapi.v0.yaml) (0.2.0) at `/v0` · [behaviour](specs/features) · [try it](http/contract.http)
 
 ## Operations
 

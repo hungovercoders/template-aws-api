@@ -280,9 +280,9 @@ breaks the contract gets `application/problem+json`:
 
 - **`this.call(method, path, body?)`** sends the request, checks the response
   against the contract, and **returns** `{ status, headers, body }`. It also
-  sets `this.last` - which a later call overwrites, so when a step makes
-  several calls, or several at once with `Promise.all`, use the returned
-  replies rather than `this.last`.
+  sets `this.last`, which a later call overwrites: when a step makes several calls,
+  or several at once with `Promise.all`, use the returned replies. **`this.flood(method,
+  path)`** calls faster than the contract's `x-rate-limit` and counts answers by status.
 - **`this.remembered`** is a `Map<string, any>` for anything a later step needs: a record a
   Given created (by name), the replies of concurrent calls, the query a "next
   page" step must repeat. Do not edit `steps/world.ts`.

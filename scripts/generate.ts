@@ -40,7 +40,9 @@ for (const { path, major } of files) {
     for (const method of METHODS.filter((m) => item[m])) {
       const operation = item[method] as Operation;
       // A document's own security applies to each operation that does not say otherwise: it stays true once merged.
-      copy[method] = { ...operation, security: operation.security ?? document.security ?? [], "x-api-version": version };
+      // So is its major's rate limit, which API Gateway applies to each of its routes.
+      const limit = (document as { "x-rate-limit"?: unknown })["x-rate-limit"];
+      copy[method] = { ...operation, security: operation.security ?? document.security ?? [], "x-api-version": version, ...(limit ? { "x-rate-limit": limit } : {}) };
     }
     merged.paths[route] = copy;
   }

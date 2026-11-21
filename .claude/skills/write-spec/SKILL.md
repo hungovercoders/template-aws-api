@@ -275,11 +275,12 @@ is. Ask the user to check a skill's licence allows the copy.
   rule only a scenario states.
 - **Examples everywhere** - on request bodies and responses. The mock and the
   generated `.http` requests answer with them.
-- **Authentication** - declare `security` on the operations that need a
-  signed-in caller (see the commented block in the starter contract) and
-  document `401` on each.
+- **Authentication** - declare `security` on the operations that need a signed-in
+  caller (the starter contract's commented block) and document `401` on each.
 - **Lists** - anything that can grow is paged: a `limit`, a `cursor`, and a
   `next_cursor` in the response. Say what the order is.
+- **Rate limit** - ask how fast a caller may call: root `x-rate-limit`, `429` on every
+  operation, a scenario that calls too fast (`docs/spec.md`).
 - **`info.version`** is a semantic version whose major is the file's. A new API starts at `0.1.0`.
 
 ## What the template has decided
@@ -288,7 +289,7 @@ Do not ask the user about these; apply them.
 
 - JSON requests and responses.
 - Errors are RFC 9457 `application/problem+json` using the `Problem` schema,
-  except `401`, which API Gateway answers as `application/json` with a `message`.
+  except `401` and `429`, which API Gateway answers as `application/json` with a `message`.
 - Names are lower snake_case: properties, parameters, `operationId`s, path
   segments, string enum values. Schema names are PascalCase.
 - Authentication is a bearer JWT verified by API Gateway.
