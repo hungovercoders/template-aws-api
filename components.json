@@ -110,7 +110,9 @@
         "tools/emulator/terraform/cloud-control-bucket-settings/",
         "src/compactor.ts",
         "src/lib/compactor.ts",
-        "test/compactor.test.ts"
+        "test/compactor.test.ts",
+        "infra/tests/data.tftest.hcl",
+        "infra/tests/data/"
       ],
       "gates": {
         "generate": [

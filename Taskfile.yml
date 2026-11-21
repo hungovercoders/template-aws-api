@@ -603,11 +603,12 @@ tasks:
         --outdir=dist --out-extension:.js=.mjs --external:@aws-sdk/* --log-level=warning
 
   infra:validate:
-    desc: Gate - the Terraform is formatted and valid
+    desc: Gate - the Terraform is formatted and valid, and its plan tests pass (infra/tests/, planned against fixture contracts with mock providers - no AWS account)
     cmds:
       - terraform -chdir=infra fmt -check -recursive
       - terraform -chdir=infra init -backend=false -input=false
       - terraform -chdir=infra validate
+      - test -z "$(ls infra/tests/*.tftest.hcl 2>/dev/null)" || terraform -chdir=infra test
       - terraform -chdir=infra/bootstrap init -backend=false -input=false
       - terraform -chdir=infra/bootstrap validate
 
