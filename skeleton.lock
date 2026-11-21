@@ -1,20 +1,25 @@
 # The skeleton as last accepted. Checked by `task skeleton:check`; rewritten by `task skeleton:lock`.
 # A change to this file means the skeleton was changed on purpose - review what, and why.
-cbc732c22aabd4e2310d3cd9e9f0e71c6102d642147c0dd4bf302325c042e100  .claude/skills/implement-api/SKILL.md
-a32a5a8368be115c64e587ee2f426dc011de87243b6a01b9fd0d94dbdd2779e5  .claude/skills/implement-api/SKILL.md#asyncapi
+5abb5be6c12e71c10eceae1cf1653940fecde73a4129097b8edb9a83e5fe48a6  .claude/skills/implement-api/SKILL.md
+72f456701c800886bec03d9391be7b74894948d4f4d0d8b5853ba9d3146b2b15  .claude/skills/implement-api/SKILL.md#asyncapi
 4e9e6f4b3b11b3811b0672c2baf23627f2ef1492767743340bf2c78ff670f86e  .claude/skills/implement-api/SKILL.md#consume
 796ebb03caf74dd871839e0897fa4b3079226e554b58a6b985ec7d40a68ac3ed  .claude/skills/implement-api/SKILL.md#publish
 f3c4188aff572cb5f971765b5e939f33a81aa84ce2c935d126fa7b45eb979a5a  .claude/skills/implement-api/SKILL.md#data
+579e316b9e7323ea06b4ffcbea080d10260a4d825c5259bfdd6ef9a4a1d1db1c  .claude/skills/implement-api/changing.md
+4206d103a1426111de9eca32511cf96a44956e01b346cde5df59235d272a23e4  .claude/skills/implement-api/changing.md#asyncapi
 7a4bafe632398fec6d3cb9b646fc9a8aa7d6c720f6828444c409b1b6eb21f68e  .claude/skills/implement-api/data.md
 892e923f52075a1b18334662f0a94ae3faa0e650be8703361a70d6c46b03c2c2  .claude/skills/implement-api/events.md
+3cee2c8cd09d0215938b0dcb090dbc0b34c3b00bdb92bfd5f842b9e4d1def702  .claude/skills/implement-api/gates.md
 cada10b95f9433cd917fcd146816a0430f6b3648ee4b8530917e81d8a118ebc6  .claude/skills/implement-api/messages.md
 c045e0b36baa4dfdf9bf4855b41bdadbb930932335ef684e585ecd68498c86fb  .claude/skills/implement-api/store.md
-8b11f25b024ba4e37e67bd4824524719e92359da5f72cb198cd24664c91fe642  .claude/skills/write-spec/SKILL.md
+3b4daac4cab8d3f41671aca21ec1a6980670653b5363720fbcc777455a361902  .claude/skills/write-spec/SKILL.md
 ec0f2755d445a04922729cf94fa6f35d82578913bf5173642a95b73d8763b0f8  .claude/skills/write-spec/SKILL.md#consume
 e66143c0dbf7c4897de0f2549a1c75f03f78481a5a28e13148d6df7ae8088985  .claude/skills/write-spec/SKILL.md#publish
 5f5f1efac824f787aa025e7b243393f93f3696fef0026eb602119588c76efe55  .claude/skills/write-spec/SKILL.md#data
 46065efc20f0ffea2a00f9760f50898f06cdc7992708741f12913e7e9bf7b93e  .claude/skills/write-spec/SKILL.md#asyncapi
+af60c60507dc9b60683d86dfe7da21c9704477c0f3f668128a45f1b52ce5927b  .claude/skills/write-spec/changing.md
 e9bebaa5d874b6ba544afd3b8f954f82d6347d1153117b7c7bc861d98fda2aea  .claude/skills/write-spec/data.md
+5c269633ef577db37aa9a2f5cf59788fef430859ff3f156492ca713918df01c2  .claude/skills/write-spec/skills.md
 8117bdb6db21c708fbb50ea9f06aac121130b2c505916d9de7890e76c51f1161  .githooks/pre-push
 146db82fd19b217c2c6b829e47bf2bc184d3515c87662accd7abfe9d10ad77da  .github/workflows/ci.yml
 e4086fb27145e2b8154457549cf232c7765e0b478a38a11e4079a3898b76ea65  .github/workflows/emulator.yml
