@@ -1,6 +1,6 @@
 // Where the contracts are, and the names that let two major versions of one
-// live side by side. An API keeps a file per live major of each contract,
-//   specs/openapi.v<N>.yaml   specs/asyncapi.v<N>.yaml   specs/datacontract.v<N>.yaml
+// live side by side. An API keeps a file per live major of each contract, in specs/contracts/:
+//   openapi.v<N>.yaml   asyncapi.v<N>.yaml   datacontract.v<N>.yaml
 // where N is the major of the version the file declares. The stack serves,
 // sends, receives and keeps the data of every one of them at once, so whatever
 // two majors would share a name in carries the version:
@@ -19,25 +19,38 @@ export type Kind = "openapi" | "asyncapi" | "datacontract";
 export type Contract = { kind: Kind; path: string; major: number };
 
 const SPECS = "specs";
-const file = (kind: Kind, major: number) => `${SPECS}/${kind}.v${major}.yaml`;
+export const CONTRACTS = `${SPECS}/contracts`;
+const file = (kind: Kind, major: number) => `${CONTRACTS}/${kind}.v${major}.yaml`;
 const pattern = (kind: Kind) => new RegExp(`^${kind}\\.v(0|[1-9][0-9]*)\\.yaml$`);
+
+/** The operationIds a feature file's scenarios are tagged with - on tag lines, never in a comment. */
+export function operationTags(feature: string): string[] {
+  return feature
+    .split("\n")
+    .filter((line) => line.trim().startsWith("@"))
+    .flatMap((line) => [...line.matchAll(/@operation:([\w.-]+)/g)].map(([, id]) => id!));
+}
 
 /** Every live major of a contract, oldest first. */
 export function contracts(kind: Kind): Contract[] {
-  if (!existsSync(SPECS)) return [];
-  return readdirSync(SPECS)
+  if (!existsSync(CONTRACTS)) return [];
+  return readdirSync(CONTRACTS)
     .map((name) => pattern(kind).exec(name))
     .filter((match): match is RegExpExecArray => match !== null)
-    .map((match) => ({ kind, path: `${SPECS}/${match[0]}`, major: Number(match[1]) }))
+    .map((match) => ({ kind, path: `${CONTRACTS}/${match[0]}`, major: Number(match[1]) }))
     .sort((a, b) => a.major - b.major);
 }
 
 /** Files that name a contract the way the template no longer reads: what to call them instead. */
 export function misnamed(kind: Kind): string[] {
-  if (!existsSync(SPECS)) return [];
-  return readdirSync(SPECS)
-    .filter((name) => name.startsWith(`${kind}.`) && /\.(ya?ml|json)$/.test(name) && !pattern(kind).test(name))
-    .map((name) => `${SPECS}/${name} is not read: a contract is ${SPECS}/${kind}.v<major>.yaml, the major of the version it declares (e.g. ${file(kind, 1)} for 1.4.0)`);
+  const named = (dir: string) => (existsSync(dir) ? readdirSync(dir).filter((name) => name.startsWith(`${kind}.`) && /\.(ya?ml|json)$/.test(name)) : []);
+  return [
+    // Where contracts were kept before specs/contracts/: read from nowhere, so said loudly.
+    ...named(SPECS).map((name) => `${SPECS}/${name} is not read: the contracts are in ${CONTRACTS}/ - move it to ${CONTRACTS}/${name}`),
+    ...named(CONTRACTS)
+      .filter((name) => !pattern(kind).test(name))
+      .map((name) => `${CONTRACTS}/${name} is not read: a contract is ${CONTRACTS}/${kind}.v<major>.yaml, the major of the version it declares (e.g. ${file(kind, 1)} for 1.4.0)`),
+  ];
 }
 
 /** The version a contract declares. */
@@ -166,25 +179,35 @@ const HOW = {
  */
 export function retired(kind: Kind, ref: string): { gone: Contract[]; problems: string[] } {
   const live = new Set(contracts(kind).map((contract) => contract.major));
-  const listed = spawnNames(ref) ?? [];
-  const before = listed.map((name) => pattern(kind).exec(name)).filter((match): match is RegExpExecArray => match !== null);
-  const gone = before.map((match) => ({ kind, path: `${SPECS}/${match[0]}`, major: Number(match[1]) })).filter((contract) => !live.has(contract.major));
+  const gone = published(kind, ref).filter((contract) => !live.has(contract.major));
   const problems = gone
     .filter((contract) => !deprecated(kind, parse(show(ref, contract.path) ?? "") ?? {}))
     .map((contract) => `${contract.path} was removed, but the published one was not deprecated: whoever uses v${contract.major} breaks. First publish it deprecated (${HOW[kind]}), then remove it in a later change.`);
   return { gone, problems };
 }
 
-/** The baseline's version of one major: its own file, or a contract from before files were versioned when its major matches. */
+/** The baseline's version of one major: its own file, where it was kept before specs/contracts/, or a contract from before files were versioned when its major matches. */
 export function atBaseline(contract: Contract, ref: string): string | undefined {
-  const own = show(ref, contract.path);
+  const own = show(ref, contract.path) ?? show(ref, `${SPECS}/${contract.kind}.v${contract.major}.yaml`);
   if (own !== undefined) return own;
   const legacy = show(ref, `${SPECS}/${contract.kind}.yaml`);
   if (legacy === undefined) return undefined;
   return majorOf(versionOf(contract.kind, parse(legacy))) === contract.major ? legacy : undefined;
 }
 
-function spawnNames(ref: string): string[] | undefined {
-  const result = spawnSync("git", ["ls-tree", "--name-only", `${ref}:${SPECS}`], { encoding: "utf8" });
+/** The majors published at ref, wherever they were kept then: specs/contracts/, or specs/ before it. */
+function published(kind: Kind, ref: string): Contract[] {
+  const found = new Map<number, Contract>();
+  for (const dir of [SPECS, CONTRACTS]) {
+    for (const name of namesAt(ref, dir) ?? []) {
+      const match = pattern(kind).exec(name);
+      if (match) found.set(Number(match[1]), { kind, path: `${dir}/${match[0]}`, major: Number(match[1]) });
+    }
+  }
+  return [...found.values()].sort((a, b) => a.major - b.major);
+}
+
+function namesAt(ref: string, dir: string): string[] | undefined {
+  const result = spawnSync("git", ["ls-tree", "--name-only", `${ref}:${dir}`], { encoding: "utf8" });
   return result.status === 0 ? result.stdout.split("\n").filter(Boolean) : undefined;
 }

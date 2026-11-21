@@ -55,11 +55,11 @@ test("an event to publish gets its envelope from the skeleton", () => {
 });
 
 test("an event that does not match the contract cannot be created", () => {
-  expect(() => events.create<BeerCreated>(CREATED, { beer_id: "b1", abv: -1 })).toThrow(/does not match specs\/asyncapi\.v<N>\.yaml: \/data\/abv must be >= 0/);
+  expect(() => events.create<BeerCreated>(CREATED, { beer_id: "b1", abv: -1 })).toThrow(/does not match specs\/contracts\/asyncapi\.v<N>\.yaml: \/data\/abv must be >= 0/);
   expect(() => events.create<BeerCreated>(CREATED, { beer_id: "b1" } as never)).toThrow(/must have required property 'abv'/);
-  expect(() => events.create("com.example.beer_catalogue.beer.exploded.v1", {})).toThrow(/is not an event specs\/asyncapi\.v<N>\.yaml says this API publishes/);
+  expect(() => events.create("com.example.beer_catalogue.beer.exploded.v1", {})).toThrow(/is not an event specs\/contracts\/asyncapi\.v<N>\.yaml says this API publishes/);
   // A message this API accepts is not one it may publish.
-  expect(() => events.create(CLOSED, { brewery_id: "br1" })).toThrow(/is not an event specs\/asyncapi\.v<N>\.yaml says this API publishes/);
+  expect(() => events.create(CLOSED, { brewery_id: "br1" })).toThrow(/is not an event specs\/contracts\/asyncapi\.v<N>\.yaml says this API publishes/);
 });
 
 test("a message received is the CloudEvent the contract describes, or it is refused", () => {

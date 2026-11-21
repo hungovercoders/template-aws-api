@@ -1,4 +1,4 @@
-# House rules for the data contract (specs/datacontract.yaml) of every API
+# House rules for the data contract (specs/contracts/datacontract.yaml) of every API
 # built from this template: the same standards as rules/house.yaml holds the
 # OpenAPI contract to. `task data:lint` runs them after the Data Contract CLI
 # has said the file is valid ODCS; warnings fail. Rules for one API go in

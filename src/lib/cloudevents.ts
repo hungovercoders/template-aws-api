@@ -1,5 +1,5 @@
 // Every message this API receives and every event it publishes is a
-// CloudEvent 1.0 in structured JSON mode, as specs/asyncapi.v<N>.yaml describes it.
+// CloudEvent 1.0 in structured JSON mode, as specs/contracts/asyncapi.v<N>.yaml describes it.
 // The envelope is the skeleton's: an operation supplies what happened, to
 // what, and the data; this sets the rest, and holds both directions to the
 // contract so nothing leaves or enters that the contract does not describe.
@@ -85,7 +85,7 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
      */
     create<Event extends CloudEvent>(type: Event["type"], data: Event["data"], subject?: string): Event {
       const schema = schemas.send.get(type);
-      if (!schema) throw new Error(`"${type}" is not an event specs/asyncapi.v<N>.yaml says this API publishes; an event is added to the contract, as a send operation, before it is published`);
+      if (!schema) throw new Error(`"${type}" is not an event specs/contracts/asyncapi.v<N>.yaml says this API publishes; an event is added to the contract, as a send operation, before it is published`);
       const event = {
         specversion: "1.0",
         id: randomUUID(),
@@ -98,7 +98,7 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
         data,
       } as Event;
       const violations = violationsOf(schema, event);
-      if (violations.length > 0) throw new Error(`the ${type} event does not match specs/asyncapi.v<N>.yaml: ${violations.map((v) => `${v.pointer || "/"} ${v.message}`).join("; ")}`);
+      if (violations.length > 0) throw new Error(`the ${type} event does not match specs/contracts/asyncapi.v<N>.yaml: ${violations.map((v) => `${v.pointer || "/"} ${v.message}`).join("; ")}`);
       return event;
     },
 
@@ -111,7 +111,7 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
       const type = (event as { type?: unknown } | null)?.type;
       if (typeof type !== "string") return ["it is not a CloudEvent: it has no type"];
       const schema = schemas.send.get(type);
-      if (!schema) return [`"${type}" is not an event specs/asyncapi.v<N>.yaml says this API publishes`];
+      if (!schema) return [`"${type}" is not an event specs/contracts/asyncapi.v<N>.yaml says this API publishes`];
       return violationsOf(schema, event).map((violation) => `${violation.pointer || "/"} ${violation.message}`);
     },
 
@@ -142,5 +142,5 @@ export function eventsOf(document: Document, source = () => process.env.EVENT_SO
   };
 }
 
-/** This API's events, from specs/asyncapi.v<N>.yaml. */
+/** This API's events, from specs/contracts/asyncapi.v<N>.yaml. */
 export const events = eventsOf(generated as unknown as Document);

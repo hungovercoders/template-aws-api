@@ -1,4 +1,4 @@
-// Turn the HTTP contracts - every live major, specs/openapi.v<N>.yaml - into
+// Turn the HTTP contracts - every live major, specs/contracts/openapi.v<N>.yaml - into
 // everything that can be derived from them without thought:
 //   src/generated/openapi.json  - every major's operations in one dereferenced
 //     document, each marked with the version of the contract it is from
@@ -55,7 +55,7 @@ writeFileSync("src/generated/openapi.json", JSON.stringify(document, null, 2) + 
 writeFileSync(
   "src/generated/api.d.ts",
   [
-    "// Generated from specs/openapi.v<N>.yaml by `task generate` - do not edit.",
+    "// Generated from specs/contracts/openapi.v<N>.yaml by `task generate` - do not edit.",
     "// Every major's operations, by operationId. A major's schemas are in its own file: api.v<N>.d.ts.",
     ...files.map(({ major }) => `import type { operations as v${major} } from "./api.v${major}.d.ts";`),
     `export type operations = ${files.length > 0 ? files.map(({ major }) => `v${major}`).join(" & ") : "Record<never, never>"};`,
@@ -69,7 +69,7 @@ const operationIds = Object.values(document.paths)
 writeFileSync(
   "src/generated/routes.ts",
   [
-    "// Generated from specs/openapi.v<N>.yaml by `task generate` - do not edit.",
+    "// Generated from specs/contracts/openapi.v<N>.yaml by `task generate` - do not edit.",
     "// A missing import means an operation has no file yet: run `task scaffold`.",
     'import type { Routes } from "../lib/router.ts";',
     ...operationIds.map((id) => `import { ${id} } from "../operations/${id}.ts";`),

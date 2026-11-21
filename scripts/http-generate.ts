@@ -55,7 +55,7 @@ for (const [path, item] of Object.entries(contract.paths ?? {})) {
 }
 
 const header = [
-  "# Generated from specs/openapi.v<N>.yaml by `task http:generate` - do not edit; commit it when the contract changes.",
+  "# Generated from specs/contracts/openapi.v<N>.yaml by `task http:generate` - do not edit; commit it when the contract changes.",
   "# Send with `task http`, or open in an editor with an HTTP client (httpYac, JetBrains).",
   "# Environments (mock, local, aws) are in http/http-client.env.json.",
   "",

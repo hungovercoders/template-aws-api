@@ -1,6 +1,6 @@
 # Implementing events the API publishes
 
-Read this when `specs/asyncapi.v<N>.yaml` has a `send` operation. It adds to the
+Read this when `specs/contracts/asyncapi.v<N>.yaml` has a `send` operation. It adds to the
 workflow in `SKILL.md`; nothing there changes.
 
 The skeleton already carries an event from the table to the event bus: it

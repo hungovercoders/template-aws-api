@@ -21,21 +21,21 @@ removal alike. Nothing is changed in the code alone.
 | You want to | The route |
 | --- | --- |
 | Add an operation or a behaviour | Add scenarios and the contract for it; `task scaffold` writes the stubs; implement them |
-| Change a rule | Change the scenarios that state it, and the contract if its shape changes. If consumers can observe the difference it is breaking - a new major, `specs/openapi.v<N+1>.yaml` beside the old - even when the contract's shape is the same; fix what goes red |
+| Change a rule | Change the scenarios that state it, and the contract if its shape changes. If consumers can observe the difference it is breaking - a new major, `specs/contracts/openapi.v<N+1>.yaml` beside the old - even when the contract's shape is the same; fix what goes red |
 | Fix a bug | A bug is a scenario that is missing or wrong. Write the scenario that fails first, then fix the code |
 | Remove something | Leave it out of the next major's file (breaking), mark it `deprecated: true` in the old one, and delete the old major's file once it is not called; delete the code and steps the gates then call unused |
 | Rename or reshape data | Change the contract; the generated types make the compiler find every use |
 <!-- component:consume:start -->
-| Take a new kind of message | Add its scenarios and a `receive` operation to `specs/asyncapi.v<N>.yaml`; `task scaffold` writes the stub in `src/consumers/`; implement it |
+| Take a new kind of message | Add its scenarios and a `receive` operation to `specs/contracts/asyncapi.v<N>.yaml`; `task scaffold` writes the stub in `src/consumers/`; implement it |
 | Stop taking a message | Leave its `receive` operation out of the next major's AsyncAPI file (breaking for whoever sends it), publish the old file with `info.x-deprecated: true`, then delete it with its scenarios; delete its file in `src/consumers/` and the steps `steps:check` then calls unused |
 <!-- component:consume:end -->
 <!-- component:publish:start -->
-| Publish a new event, or publish one in a new case | Add its scenarios and a `send` operation to `specs/asyncapi.v<N>.yaml`; `task generate` writes its function; write `outbox(event)` in the transaction of the change |
+| Publish a new event, or publish one in a new case | Add its scenarios and a `send` operation to `specs/contracts/asyncapi.v<N>.yaml`; `task generate` writes its function; write `outbox(event)` in the transaction of the change |
 | Change an event that is already published | A change subscribers would notice is a new event: add it with a type ending `.v2`, named `_v2`, and publish both for as long as they need. Remove `.v1` later, as below |
 | Stop publishing an event | Leave its `send` operation out of the next major's AsyncAPI file, then retire the old file as above; `task typecheck` then finds every place it was written |
 <!-- component:publish:end -->
 <!-- component:data:start -->
-| Change an event that is kept as data, or what is promised of the data | The event first, as above; `task data:generate` carries what was added or changed into `specs/datacontract.v<N>.yaml`, and names what is no longer published for you to remove - breaking for whoever reads the data: the next major's file, whose data lands beside the old. Owner, classification, retention and freshness change there, with a new version (`docs/data.md`) |
+| Change an event that is kept as data, or what is promised of the data | The event first, as above; `task data:generate` carries what was added or changed into `specs/contracts/datacontract.v<N>.yaml`, and names what is no longer published for you to remove - breaking for whoever reads the data: the next major's file, whose data lands beside the old. Owner, classification, retention and freshness change there, with a new version (`docs/data.md`) |
 <!-- component:data:end -->
 | Use a capability the API removed | `task component:add -- <name>` restores it from the template, with what it needs; then the spec first, as for any change |
 | Change who owns the API | `domain` and `team` in `infra/tags.auto.tfvars.json`; the next deploy re-tags the stack, and `task aws:bootstrap` the deploy role and state bucket. The data contract names its own `team` |

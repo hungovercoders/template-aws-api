@@ -153,10 +153,10 @@ flowchart TB
 
 | Interface | Direction | Contract | Optional |
 | --- | --- | --- | --- |
-| HTTP API | in and out | `specs/openapi.v<N>.yaml` | no |
-| Messages from a queue | in | `specs/asyncapi.v<N>.yaml`, `receive` | yes |
-| Events on a bus | out | `specs/asyncapi.v<N>.yaml`, `send` | yes |
-| Events as data in S3 | out | `specs/datacontract.v<N>.yaml` | yes |
+| HTTP API | in and out | `specs/contracts/openapi.v<N>.yaml` | no |
+| Messages from a queue | in | `specs/contracts/asyncapi.v<N>.yaml`, `receive` | yes |
+| Events on a bus | out | `specs/contracts/asyncapi.v<N>.yaml`, `send` | yes |
+| Events as data in S3 | out | `specs/contracts/datacontract.v<N>.yaml` | yes |
 
 Each part brings its Terraform, alarms, logs and tags. An API that does not
 need an optional part removes it, and can bring it back later:
@@ -212,16 +212,16 @@ the template once, not to one API.
 ## How it works
 
 ```
-specs/openapi.v<N>.yaml   ─┬─► request validation inside the Lambda
+specs/contracts/openapi.v<N>.yaml   ─┬─► request validation inside the Lambda
  (a file per live major)   ├─► types, the route table and a stub for every operation
                            ├─► API Gateway routes under /v<N> (Terraform reads them)
                            ├─► response validation on every call the features make
                            └─► generated fuzz requests (schemathesis)
 
-specs/asyncapi.v<N>.yaml  ─┬─► every message and event validated as a CloudEvent
+specs/contracts/asyncapi.v<N>.yaml  ─┬─► every message and event validated as a CloudEvent
  (messages, events)        └─► a typed stub per message, a typed function per event
 
-specs/datacontract.v<N>.yaml ─┬─► per major: a stream, its retention and alarms (Terraform reads it)
+specs/contracts/datacontract.v<N>.yaml ─┬─► per major: a stream, its retention and alarms (Terraform reads it)
  (events as data)             ├─► a daily compaction to Parquet, typed by the contract
                               └─► a test of what landed, raw and in Parquet
 
@@ -231,9 +231,9 @@ specs/features/*.feature ──► cucumber, strict, against the built Lambda
 
 | You bring | The template has | The agent writes |
 | --- | --- | --- |
-| `specs/openapi.v<N>.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
-| `specs/asyncapi.v<N>.yaml`, if it has messages or events | The queue, the outbox, the event bus | `src/consumers/`, and `outbox(event)` in a write |
-| `specs/datacontract.v<N>.yaml`: owner, retention, sensitivity | The bucket, delivery, the daily Parquet compaction, the data test | |
+| `specs/contracts/openapi.v<N>.yaml`, `specs/features/` | The Lambda, router, validation, harness, CI, Terraform | `src/operations/`, `steps/`, `src/domain/`, `src/store/` |
+| `specs/contracts/asyncapi.v<N>.yaml`, if it has messages or events | The queue, the outbox, the event bus | `src/consumers/`, and `outbox(event)` in a write |
+| `specs/contracts/datacontract.v<N>.yaml`: owner, retention, sensitivity | The bucket, delivery, the daily Parquet compaction, the data test | |
 | Who owns it: `domain` and `team` | Tags and a resource group | |
 
 ## See it working
@@ -281,7 +281,7 @@ such as `task features` and `task ci`, start and stop an emulator of their own.
 ## Where things are
 
 ```
-specs/                  the contracts and features/          ← you write
+specs/                  contracts/, features/, slos/: a starter of each ← you write
 src/operations/         one file per operation               ← written from the spec
 src/consumers/          one file per message received        ← written from the spec
 src/domain/, src/store/ your rules and data access           ← written from the spec

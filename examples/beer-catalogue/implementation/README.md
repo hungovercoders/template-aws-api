@@ -3,7 +3,7 @@
 
 A brewery's beer catalogue. Signed-in staff add the beers they brew, keep the details current and retire beers. Anyone can browse the catalogue, and drinkers rate beers from 1 to 5.
 
-**Versions** [v0](specs/openapi.v0.yaml) (0.2.0) at `/v0` · [behaviour](specs/features) · [try it](http/contract.http)
+**Versions** [v0](specs/contracts/openapi.v0.yaml) (0.2.0) at `/v0` · [behaviour](specs/features) · [try it](http/contract.http)
 
 ## Operations
 
@@ -16,7 +16,7 @@ A brewery's beer catalogue. Signed-in staff add the beers they brew, keep the de
 | `update_beer_v0` | `PATCH /v0/beers/{beer_id}` | Signed in | Change a beer's details |
 | `rate_beer_v0` | `POST /v0/beers/{beer_id}/ratings` | Anyone | Rate a beer |
 
-Messages and events have contracts of their own - [v0](specs/asyncapi.v0.yaml) (0.2.0) - with an [example of each](messages).
+Messages and events have contracts of their own - [v0](specs/contracts/asyncapi.v0.yaml) (0.2.0) - with an [example of each](messages).
 
 ## Messages it receives
 
@@ -35,7 +35,7 @@ Messages and events have contracts of their own - [v0](specs/asyncapi.v0.yaml) (
 
 ## Events kept as data
 
-Every event it publishes is also kept in S3, under a data contract - [v0](specs/datacontract.v0.yaml) (0.3.0): owned by the catalogue team, kept for 2 years, there to read within 15 minutes.
+Every event it publishes is also kept in S3, under a data contract - [v0](specs/contracts/datacontract.v0.yaml) (0.3.0): owned by the catalogue team, kept for 2 years, there to read within 15 minutes.
 See [events as data](docs/data.md) for how it is tested and queried.
 
 ## Working on it

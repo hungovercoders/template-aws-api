@@ -14,7 +14,7 @@ info:
 #
 # This file is major 0 of the contract: its version is 0.x.x, its paths start
 # /v0 and its operationIds end _v0 (e.g. POST /v0/things, create_thing_v0).
-# A later major is a file of its own beside it - specs/openapi.v1.yaml, /v1,
+# A later major is a file of its own beside it - specs/contracts/openapi.v1.yaml, /v1,
 # _v1 - served by the same stack, so both majors' consumers keep working.
 paths: {}
 

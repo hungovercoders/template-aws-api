@@ -6,7 +6,7 @@
   },
   "components": {
     "asyncapi": {
-      "title": "The AsyncAPI contract (specs/asyncapi.yaml), its gates and the CloudEvents envelope: the messages an API receives and the events it publishes",
+      "title": "The AsyncAPI contract (specs/contracts/asyncapi.yaml), its gates and the CloudEvents envelope: the messages an API receives and the events it publishes",
       "files": [
         "tools/asyncapi/",
         "rules/asyncapi.yaml",
@@ -91,7 +91,7 @@
       }
     },
     "data": {
-      "title": "Events as data: every published event is kept in S3 through Firehose, under an ODCS data contract (specs/datacontract.yaml) that drives the infrastructure and tests the data",
+      "title": "Events as data: every published event is kept in S3 through Firehose, under an ODCS data contract (specs/contracts/datacontract.yaml) that drives the infrastructure and tests the data",
       "needs": [
         "publish"
       ],

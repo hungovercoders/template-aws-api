@@ -32,7 +32,7 @@ Each gate fails for one reason and says what it is:
 <!-- component:asyncapi:start -->
 - **`asyncapi:check`**, **`asyncapi:lint`**, **`asyncapi:compat`**,
   **`asyncapi:examples:check`** - the same four failures for
-  `specs/asyncapi.v<N>.yaml` as `spec:check`, `spec:lint`, `spec:compat` and
+  `specs/contracts/asyncapi.v<N>.yaml` as `spec:check`, `spec:lint`, `spec:compat` and
   `http:check` have for the OpenAPI contract; see
   [Messages and events](spec.md#messages-and-events-the-asyncapi-contract).
   Without that file they have nothing to do.

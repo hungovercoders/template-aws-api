@@ -1,0 +1,43 @@
+# An SLO: how well the API must serve, one OpenSLO v1 file each, named after its
+# metadata.name. While this file is all comments it is not an SLO, and the alarms
+# keep the template's own thresholds. Uncomment it with the target the owner says
+# (the write-nfrs skill asks); `task slo:check` holds it to what the alarms read.
+# This one sets api-5xx: it alarms when more than 1 - target of requests are
+# answered with a server error. A latency SLO - a thresholdMetric of Latency at a
+# percentile, `op: lte`, `value` in ms, for the API or one operation - is in
+# docs/spec.md.
+#
+# apiVersion: openslo/v1
+# kind: SLO
+# metadata:
+#   name: availability
+#   displayName: The API answers without failing
+# spec:
+#   service: replace-me
+#   indicator:
+#     metadata:
+#       name: server-errors
+#     spec:
+#       ratioMetric:
+#         counter: true
+#         bad:
+#           metricSource:
+#             type: CloudWatch
+#             spec:
+#               namespace: AWS/ApiGateway
+#               metricName: 5xx
+#               stat: Sum
+#         total:
+#           metricSource:
+#             type: CloudWatch
+#             spec:
+#               namespace: AWS/ApiGateway
+#               metricName: Count
+#               stat: Sum
+#   timeWindow:
+#     - duration: 28d
+#       isRolling: true
+#   budgetingMethod: Occurrences
+#   objectives:
+#     - displayName: 99.9% of requests answered without a server error
+#       target: 0.999

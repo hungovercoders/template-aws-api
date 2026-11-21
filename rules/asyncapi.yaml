@@ -1,4 +1,4 @@
-# House rules for the AsyncAPI contract (specs/asyncapi.yaml) of every API built
+# House rules for the AsyncAPI contract (specs/contracts/asyncapi.yaml) of every API built
 # from this template: the same standards as rules/house.yaml holds the OpenAPI
 # contract to. `task asyncapi:lint` runs them; warnings fail. Rules for one
 # API go in .spectral.asyncapi.yaml, which extends this file.

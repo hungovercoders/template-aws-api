@@ -17,7 +17,7 @@ vars:
   SCHEMATHESIS_VERSION: 4.33.4
   MOCK_PORT: '{{.MOCK_PORT | default "4010"}}'
   # component:data:start
-  # The version of the Open Data Contract Standard specs/datacontract.v<N>.yaml are
+  # The version of the Open Data Contract Standard specs/contracts/datacontract.v<N>.yaml are
   # written in: the one place it is chosen. Moving to the next is this line,
   # the contract's apiVersion, and whatever `task data:lint` then says.
   ODCS_VERSION: v3.2.0
@@ -60,7 +60,7 @@ tasks:
       - node_modules/.package-lock.json
 
   generate:
-    desc: Generate the runtime contract, its types and the route table from every specs/openapi.v<N>.yaml
+    desc: Generate the runtime contract, its types and the route table from every specs/contracts/openapi.v<N>.yaml
     deps: [install]
     cmds:
       - node scripts/generate.ts
@@ -139,7 +139,7 @@ tasks:
       - tools/asyncapi/node_modules/.package-lock.json
 
   asyncapi:check:
-    desc: Gate - every specs/asyncapi.v<N>.yaml is a valid AsyncAPI 3 contract of major N with versioned names, and every operation is covered by a tagged scenario (nothing to do without one)
+    desc: Gate - every specs/contracts/asyncapi.v<N>.yaml is a valid AsyncAPI 3 contract of major N with versioned names, and every operation is covered by a tagged scenario (nothing to do without one)
     deps: [install]
     cmds:
       - node tools/asyncapi/asyncapi.ts check
@@ -151,8 +151,8 @@ tasks:
       NODE_OPTIONS: ''
     cmds:
       - |
-        set -- specs/asyncapi.v*.yaml
-        test -e "$1" || { echo "asyncapi:lint - no specs/asyncapi.v<N>.yaml, so this API has no asynchronous side to check"; exit 0; }
+        set -- specs/contracts/asyncapi.v*.yaml
+        test -e "$1" || { echo "asyncapi:lint - no specs/contracts/asyncapi.v<N>.yaml, so this API has no asynchronous side to check"; exit 0; }
         rules=rules/asyncapi.yaml; test -f .spectral.asyncapi.yaml && rules=.spectral.asyncapi.yaml
         node --import tsx scripts/rulesets.ts "$rules" rules/asyncapi.yaml || exit 1
         npx spectral lint "$@" --ruleset "$rules" --fail-severity warn
@@ -261,7 +261,7 @@ tasks:
 
   # component:data:start
   data:generate:
-    desc: Write into every specs/datacontract.v<N>.yaml (starting v0 when there is none) what the AsyncAPI contract decides - a schema object for every event the API publishes, each property's type and whether it is required. What a person wrote is kept; with no file yet, it starts one
+    desc: Write into every specs/contracts/datacontract.v<N>.yaml (starting v0 when there is none) what the AsyncAPI contract decides - a schema object for every event the API publishes, each property's type and whether it is required. What a person wrote is kept; with no file yet, it starts one
     deps: [generate]
     env:
       ODCS_VERSION: '{{.ODCS_VERSION}}'
@@ -287,8 +287,8 @@ tasks:
     cmds:
       - |
         set -e
-        set -- specs/datacontract.v*.yaml
-        test -e "$1" || { echo "data:lint - no specs/datacontract.v<N>.yaml, so the events this API publishes are not kept as data"; exit 0; }
+        set -- specs/contracts/datacontract.v*.yaml
+        test -e "$1" || { echo "data:lint - no specs/contracts/datacontract.v<N>.yaml, so the events this API publishes are not kept as data"; exit 0; }
         for contract in "$@"; do uvx --from "datacontract-cli[duckdb]=={{.DATACONTRACT_CLI_VERSION}}" datacontract lint "$contract"; done
         rules=rules/datacontract.yaml; test -f .spectral.datacontract.yaml && rules=.spectral.datacontract.yaml
         node --import tsx scripts/rulesets.ts "$rules" rules/datacontract.yaml
@@ -426,15 +426,15 @@ tasks:
       - node scripts/slo.ts check
 
   spec:lint:
-    desc: Gate - every major's contract (specs/openapi.v<N>.yaml) meets the house rules (rules/house.yaml) and this API's own (.spectral.yaml); warnings fail
+    desc: Gate - every major's contract (specs/contracts/openapi.v<N>.yaml) meets the house rules (rules/house.yaml) and this API's own (.spectral.yaml); warnings fail
     deps: [install]
     env:
       NODE_OPTIONS: ''
     cmds:
       - node --import tsx scripts/rulesets.ts .spectral.yaml rules/house.yaml
       - |
-        set -- specs/openapi.v*.yaml
-        test -e "$1" || { echo "spec:lint - there is no specs/openapi.v<N>.yaml to lint"; exit 1; }
+        set -- specs/contracts/openapi.v*.yaml
+        test -e "$1" || { echo "spec:lint - there is no specs/contracts/openapi.v<N>.yaml to lint"; exit 1; }
         npx spectral lint "$@" --ruleset .spectral.yaml --fail-severity warn
 
   mock:
@@ -451,7 +451,7 @@ tasks:
     cmds:
       - node scripts/http-generate.ts
     sources:
-      - specs/openapi.v*.yaml
+      - specs/contracts/openapi.v*.yaml
       - scripts/http-generate.ts
     generates:
       - http/contract.http

@@ -1,12 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { asyncapiNameProblems, type Contract, datacontractNameProblems, deprecated, majorOf, openapiNameProblems, rateLimitProblems, versionProblems } from "../scripts/contracts.ts";
+import { asyncapiNameProblems, type Contract, datacontractNameProblems, deprecated, majorOf, openapiNameProblems, operationTags, rateLimitProblems, versionProblems } from "../scripts/contracts.ts";
 
-const v1 = (kind: Contract["kind"]): Contract => ({ kind, path: `specs/${kind}.v1.yaml`, major: 1 });
+const v1 = (kind: Contract["kind"]): Contract => ({ kind, path: `specs/contracts/${kind}.v1.yaml`, major: 1 });
 
 test("a file holds one major: the one its name says", () => {
   expect(versionProblems(v1("openapi"), { info: { version: "1.4.2" } })).toEqual([]);
   expect(versionProblems(v1("datacontract"), { version: "1.0.0" })).toEqual([]);
-  expect(versionProblems(v1("openapi"), { info: { version: "2.0.0" } })).toEqual([expect.stringContaining("it is specs/openapi.v2.yaml, or its version is 1.x.x")]);
+  expect(versionProblems(v1("openapi"), { info: { version: "2.0.0" } })).toEqual([expect.stringContaining("it is specs/contracts/openapi.v2.yaml, or its version is 1.x.x")]);
   expect(versionProblems(v1("asyncapi"), { info: { version: "1.0" } })).toEqual([expect.stringContaining("not MAJOR.MINOR.PATCH")]);
   expect(majorOf("0.3.1")).toBe(0);
   expect(majorOf("01.0.0")).toBeUndefined();
@@ -54,20 +54,25 @@ describe("a rate limit and its 429 go together", () => {
   const operation = (responses: Record<string, unknown>) => ({ paths: { "/v1/things": { get: { operationId: "list_things_v1", responses } } } });
 
   test("a limit of two whole numbers, with 429 documented everywhere, is accepted", () => {
-    expect(rateLimitProblems("specs/openapi.v1.yaml", { "x-rate-limit": { requests_per_second: 10, burst: 20 }, ...operation({ "200": {}, "429": {} }) })).toEqual([]);
-    expect(rateLimitProblems("specs/openapi.v1.yaml", operation({ "200": {} }))).toEqual([]);
+    expect(rateLimitProblems("specs/contracts/openapi.v1.yaml", { "x-rate-limit": { requests_per_second: 10, burst: 20 }, ...operation({ "200": {}, "429": {} }) })).toEqual([]);
+    expect(rateLimitProblems("specs/contracts/openapi.v1.yaml", operation({ "200": {} }))).toEqual([]);
   });
 
   test("a limit without a documented 429, or a 429 without a limit, misleads a caller", () => {
-    expect(rateLimitProblems("specs/openapi.v1.yaml", { "x-rate-limit": { requests_per_second: 10, burst: 20 }, ...operation({ "200": {} }) })).toEqual([expect.stringContaining("list_things_v1 does not document 429")]);
-    expect(rateLimitProblems("specs/openapi.v1.yaml", operation({ "200": {}, "429": {} }))).toEqual([expect.stringContaining("no x-rate-limit")]);
+    expect(rateLimitProblems("specs/contracts/openapi.v1.yaml", { "x-rate-limit": { requests_per_second: 10, burst: 20 }, ...operation({ "200": {} }) })).toEqual([expect.stringContaining("list_things_v1 does not document 429")]);
+    expect(rateLimitProblems("specs/contracts/openapi.v1.yaml", operation({ "200": {}, "429": {} }))).toEqual([expect.stringContaining("no x-rate-limit")]);
   });
 
   test("a limit is two whole numbers from 1, its burst at least a second's requests", () => {
-    const limited = (limit: unknown) => rateLimitProblems("specs/openapi.v1.yaml", { "x-rate-limit": limit as never, ...operation({ "429": {} }) });
+    const limited = (limit: unknown) => rateLimitProblems("specs/contracts/openapi.v1.yaml", { "x-rate-limit": limit as never, ...operation({ "429": {} }) });
     expect(limited({ requests_per_second: 0, burst: 20 })).toEqual([expect.stringContaining("whole numbers from 1")]);
     expect(limited({ requests_per_second: 10 })).toEqual([expect.stringContaining("whole numbers from 1")]);
     expect(limited({ requests_per_second: 2.5, burst: 20 })).toEqual([expect.stringContaining("whole numbers from 1")]);
     expect(limited({ requests_per_second: 20, burst: 10 })).toEqual([expect.stringContaining("below its requests_per_second")]);
   });
+});
+
+test("a scenario covers an operation only through a tag line, never a tag in a comment", () => {
+  const feature = ["# @operation:commented_v0", "@operation:list_things_v0 @smoke", "Scenario: listed", "  # Given @operation:also_commented_v0", "  @operation:add_thing_v0"].join("\n");
+  expect(operationTags(feature)).toEqual(["list_things_v0", "add_thing_v0"]);
 });

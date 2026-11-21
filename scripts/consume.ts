@@ -19,7 +19,7 @@ function generate(): void {
   writeFileSync(
     "src/generated/consumers.ts",
     [
-      "// Generated from specs/asyncapi.v<N>.yaml by `task generate` - do not edit.",
+      "// Generated from specs/contracts/asyncapi.v<N>.yaml by `task generate` - do not edit.",
       "// A missing import means a receive operation has no file yet: run `task scaffold`.",
       'import type { Consumers } from "../lib/consumer.ts";',
       ...ids.map((id) => `import { ${id} } from "../consumers/${id}.ts";`),

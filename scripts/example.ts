@@ -61,11 +61,18 @@ export function skeletonFiles(root = "."): Set<string> {
   );
 }
 
+// What an API owns at each phase, and so all an overlay may hold (AGENTS.md: the business logic the specs describe).
+const OWNS: Record<Phase, RegExp> = {
+  spec: /^(specs\/.+|README\.md|\.stage|\.spectral\.yaml|http\/contract\.http|messages\/.+|infra\/(tags|budget)\.auto\.tfvars\.json)$/,
+  implementation: /^(README\.md|\.stage|src\/(operations|domain|store|consumers)\/.+|steps\/.+|test\/.+)$/,
+};
+
 /** What is wrong with a phase's overlay, given its files and the skeleton's. */
 export function overlayProblems(phase: Phase, files: string[], skeleton: Set<string>, stage: string | undefined): string[] {
   const problems: string[] = [];
   for (const path of files) {
     if (skeleton.has(path)) problems.push(`${path} is a skeleton file: change it on main, never in an example`);
+    else if (!OWNS[phase].test(path) && !(phase === "implementation" && path.startsWith(OWNED))) problems.push(`${path} is not something an API owns at ${phase}: if it changed on main since the copy was made, make it again (\`task example\`) and redo the change there`);
     if (path === EXAMPLES || path.startsWith(`${EXAMPLES}/`)) problems.push(`${path}: an example does not hold examples`);
   }
   if (phase === "implementation" && files.some((path) => path.startsWith(OWNED))) problems.push(`the implementation phase changes ${OWNED}: the spec is the spec phase's, so change it there`);

@@ -1,5 +1,5 @@
 // Gate: the spec is complete enough to drive an implementation.
-//   - every specs/openapi.v<N>.yaml is a valid OpenAPI document, its version's
+//   - every specs/contracts/openapi.v<N>.yaml is a valid OpenAPI document, its version's
 //     major is N, its paths start /v<N> and its operationIds end _v<N>
 //   - together they have at least one operation, and every operationId is unique
 //   - every operation is covered by a scenario tagged @operation:<operationId>
@@ -9,7 +9,7 @@ import SwaggerParser from "@apidevtools/swagger-parser";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { contracts, misnamed, openapiNameProblems, rateLimitProblems, versionProblems } from "./contracts.ts";
+import { contracts, misnamed, openapiNameProblems, operationTags, rateLimitProblems, versionProblems } from "./contracts.ts";
 
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options"];
 const problems: string[] = [...misnamed("openapi"), ...misnamed("asyncapi")];
@@ -23,7 +23,7 @@ type Api = {
 };
 
 const files = contracts("openapi");
-if (files.length === 0) problems.push("there is no specs/openapi.v<N>.yaml - add your API contract (specs/openapi.v0.yaml for a 0.x API)");
+if (files.length === 0) problems.push("there is no specs/contracts/openapi.v<N>.yaml - add your API contract (specs/contracts/openapi.v0.yaml for a 0.x API)");
 const operationIds: string[] = [];
 for (const contract of files) {
   let api: Api;
@@ -62,9 +62,11 @@ if (problems.length === 0 && operationIds.length === 0) {
 }
 
 const features = readdirSync("specs/features", { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".feature"));
-if (features.length === 0) problems.push("specs/features contains no .feature files - add your behaviour spec");
+// A file that is all comments - the template's starter - holds no scenario.
+const scenarios = features.filter((feature) => /^\s*(Scenario|Scenario Outline|Example)\s*:/m.test(readFileSync(join("specs/features", feature), "utf8")));
+if (scenarios.length === 0) problems.push("specs/features has no scenario yet - add your behaviour spec");
 
-// An API may also have AsyncAPI contracts (specs/asyncapi.v<N>.yaml). Their
+// An API may also have AsyncAPI contracts (specs/contracts/asyncapi.v<N>.yaml). Their
 // operations are tagged the same way; `task asyncapi:check` holds them to it.
 const asyncIds: string[] = [];
 for (const contract of contracts("asyncapi")) {
@@ -78,7 +80,7 @@ for (const id of new Set(asyncIds.filter((id) => operationIds.includes(id)))) pr
 
 const tagged = new Set<string>();
 for (const feature of features) {
-  for (const [, id] of readFileSync(join("specs/features", feature), "utf8").matchAll(/@operation:([\w.-]+)/g)) {
+  for (const id of operationTags(readFileSync(join("specs/features", feature), "utf8"))) {
     tagged.add(id!);
     if (!operationIds.includes(id!) && !asyncIds.includes(id!)) problems.push(`${feature} is tagged @operation:${id}, which is not an operationId in the contract`);
   }

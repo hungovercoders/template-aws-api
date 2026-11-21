@@ -37,7 +37,7 @@ export type Operation = {
   responses: Record<string, Response>;
   /** The contract's `security` requires a caller: API Gateway will only let authenticated requests through. */
   secured: boolean;
-  /** The version of the contract this operation is from (info.version of its specs/openapi.v<N>.yaml). */
+  /** The version of the contract this operation is from (info.version of its specs/contracts/openapi.v<N>.yaml). */
   version: string;
   /** Its major's rate limit, if the contract has one. */
   rateLimit?: RateLimit;

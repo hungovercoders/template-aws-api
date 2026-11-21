@@ -65,8 +65,8 @@ test("an API may not switch an inherited rule off, soften it or redefine it", as
 test("an API may not exempt files or paths from the rules", async () => {
   const house = await inherited(HOUSE);
   const extend = { extends: ["./rules/house.yaml"] };
-  expect(problems({ ...extend, overrides: [{ files: ["specs/openapi.yaml#/paths"], rules: { "house-paths-snake-case": "off" } }] }, AT, HOUSE, house)).toEqual([expect.stringContaining("overrides")]);
-  expect(problems({ ...extend, except: { "specs/openapi.yaml#/paths": ["house-paths-snake-case"] } }, AT, HOUSE, house)).toEqual([expect.stringContaining("except")]);
+  expect(problems({ ...extend, overrides: [{ files: ["specs/contracts/openapi.yaml#/paths"], rules: { "house-paths-snake-case": "off" } }] }, AT, HOUSE, house)).toEqual([expect.stringContaining("overrides")]);
+  expect(problems({ ...extend, except: { "specs/contracts/openapi.yaml#/paths": ["house-paths-snake-case"] } }, AT, HOUSE, house)).toEqual([expect.stringContaining("except")]);
 });
 
 test("the gate fails a weakened or missing ruleset and passes the house rules themselves", () => {

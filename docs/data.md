@@ -4,7 +4,7 @@
 
 Every event the API publishes is also kept in S3, where analysts and other
 systems read it long after it was sent. That is a product of its own, with a
-promise of its own: `specs/datacontract.v<N>.yaml`, an
+promise of its own: `specs/contracts/datacontract.v<N>.yaml`, an
 [Open Data Contract Standard](https://bitol-io.github.io/open-data-contract-standard/)
 (ODCS) document per live major. It says what the data is, who owns it, how
 sensitive each property is, where it is kept, for how long, and how soon after

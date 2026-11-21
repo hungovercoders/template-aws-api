@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterAll, expect, test, vi } from "vitest";
 import { parse, stringify } from "yaml";
-import { changes } from "../tools/asyncapi/asyncapi.ts";
+import { changes, enveloped } from "../tools/asyncapi/asyncapi.ts";
 
 const CONTRACT = `
 asyncapi: 3.1.0
@@ -57,7 +57,7 @@ components:
   schemas:
     BreweryClosedEvent:
       allOf:
-        - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
+        - $ref: '../../tools/asyncapi/cloudevent.yaml#/CloudEvent'
         - type: object
           required: [data]
           properties:
@@ -70,7 +70,7 @@ components:
                 brewery_id: { type: string }
     BeerCreatedEvent:
       allOf:
-        - $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent'
+        - $ref: '../../tools/asyncapi/cloudevent.yaml#/CloudEvent'
         - type: object
           required: [data]
           properties:
@@ -173,7 +173,7 @@ const repository = (name: string, contract: string | null = CONTRACT) => {
   // The envelope every message extends is the skeleton's, beside its tools.
   mkdirSync(join(dir, "tools/asyncapi"), { recursive: true });
   cpSync(ENVELOPE, join(dir, "tools/asyncapi/cloudevent.yaml"));
-  if (contract) write(dir, "specs/asyncapi.v1.yaml", contract);
+  if (contract) write(dir, "specs/contracts/asyncapi.v1.yaml", contract);
   write(dir, "specs/features/events.feature", FEATURE);
   git(dir, "init", "-q");
   git(dir, "add", "-A");
@@ -186,7 +186,7 @@ test("an API with no AsyncAPI contract has nothing to check", () => {
   const dir = repository("none", null);
   for (const command of ["check", "compat", "generate", "examples"]) {
     const result = run(dir, command);
-    expect(result.output).toContain("no specs/asyncapi.v<N>.yaml");
+    expect(result.output).toContain("no specs/contracts/asyncapi.v<N>.yaml");
     expect(result.status).toBe(0);
   }
 });
@@ -212,7 +212,7 @@ test("check says what is wrong with an invalid contract", () => {
 
 test("compat holds info.version to what changed", () => {
   const dir = repository("compat");
-  const publish = (document: Document) => write(dir, "specs/asyncapi.v1.yaml", stringify(document));
+  const publish = (document: Document) => write(dir, "specs/contracts/asyncapi.v1.yaml", stringify(document));
   const compat = () => run(dir, "compat");
   expect(compat().output).toContain("unchanged since");
 
@@ -230,11 +230,11 @@ test("compat holds info.version to what changed", () => {
   expect(compat().status).toBe(1);
 
   // The same change as a new major beside the published one breaks nobody.
-  write(dir, "specs/asyncapi.v1.yaml", CONTRACT);
-  write(dir, "specs/asyncapi.v2.yaml", stringify({ ...breaking, info: { ...breaking.info, version: "2.0.0" } }));
+  write(dir, "specs/contracts/asyncapi.v1.yaml", CONTRACT);
+  write(dir, "specs/contracts/asyncapi.v2.yaml", stringify({ ...breaking, info: { ...breaking.info, version: "2.0.0" } }));
   expect(compat().status).toBe(0);
-  expect(compat().output).toContain("v2 (specs/asyncapi.v2.yaml): new since");
-  rmSync(join(dir, "specs/asyncapi.v2.yaml"));
+  expect(compat().output).toContain("v2 (specs/contracts/asyncapi.v2.yaml): new since");
+  rmSync(join(dir, "specs/contracts/asyncapi.v2.yaml"));
 
   // Any other change needs a new minor version; an edit that changes nothing, any new version.
   const added = edited((d) => (data(d).properties.brewery_id = { type: "string" }));
@@ -242,42 +242,42 @@ test("compat holds info.version to what changed", () => {
   expect(compat().output).toContain("needs at least a new minor version");
   publish({ ...added, info: { ...added.info, version: "1.1.0" } });
   expect(compat().status).toBe(0);
-  write(dir, "specs/asyncapi.v1.yaml", `${CONTRACT}# a comment\n`);
+  write(dir, "specs/contracts/asyncapi.v1.yaml", `${CONTRACT}# a comment\n`);
   expect(compat().output).toContain("every published edit needs a new version");
 });
 
 test("a published major is retired only once it was published deprecated", () => {
   const dir = repository("retire");
-  write(dir, "specs/asyncapi.v2.yaml", CONTRACT.replace("version: 1.0.0", "version: 2.0.0"));
+  write(dir, "specs/contracts/asyncapi.v2.yaml", CONTRACT.replace("version: 1.0.0", "version: 2.0.0"));
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "v2 beside v1");
-  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
+  rmSync(join(dir, "specs/contracts/asyncapi.v1.yaml"));
   const sudden = run(dir, "compat");
   expect(sudden.status).toBe(1);
-  expect(sudden.output).toContain("specs/asyncapi.v1.yaml was removed, but the published one was not deprecated");
+  expect(sudden.output).toContain("specs/contracts/asyncapi.v1.yaml was removed, but the published one was not deprecated");
 
-  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replace("version: 1.0.0", "version: 1.0.1\n  x-deprecated: true"));
+  write(dir, "specs/contracts/asyncapi.v1.yaml", CONTRACT.replace("version: 1.0.0", "version: 1.0.1\n  x-deprecated: true"));
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "v1 deprecated");
-  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
+  rmSync(join(dir, "specs/contracts/asyncapi.v1.yaml"));
   const announced = run(dir, "compat");
   expect(announced.status).toBe(0);
-  expect(announced.output).toContain("v1 (specs/asyncapi.v1.yaml): retired");
+  expect(announced.output).toContain("v1 (specs/contracts/asyncapi.v1.yaml): retired");
 });
 
 test("check holds a file to its major and an event's names to its type's version", () => {
   const dir = repository("names");
-  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replace("version: 1.0.0", "version: 2.0.0"));
+  write(dir, "specs/contracts/asyncapi.v1.yaml", CONTRACT.replace("version: 1.0.0", "version: 2.0.0"));
   expect(run(dir, "check").output).toContain("a file holds one major");
-  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replaceAll("publish_beer_created_v1", "publish_beer_created"));
+  write(dir, "specs/contracts/asyncapi.v1.yaml", CONTRACT.replaceAll("publish_beer_created_v1", "publish_beer_created"));
   write(dir, "specs/features/events.feature", FEATURE.replaceAll("publish_beer_created_v1", "publish_beer_created"));
   expect(run(dir, "check").output).toContain("operation publish_beer_created carries v1 messages, so its name ends _v1");
-  write(dir, "specs/asyncapi.v1.yaml", CONTRACT.replaceAll("beer_created_v1", "beer_created").replaceAll("publish_beer_created", "publish_beer_created_v1"));
+  write(dir, "specs/contracts/asyncapi.v1.yaml", CONTRACT.replaceAll("beer_created_v1", "beer_created").replaceAll("publish_beer_created", "publish_beer_created_v1"));
   write(dir, "specs/features/events.feature", FEATURE);
   expect(run(dir, "check").output).toContain("message beer_created has type com.example.catalogue.beer.created.v1, so its name ends _v1");
-  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
-  write(dir, "specs/asyncapi.yaml", CONTRACT);
-  expect(run(dir, "check").output).toContain("specs/asyncapi.yaml is not read");
+  rmSync(join(dir, "specs/contracts/asyncapi.v1.yaml"));
+  write(dir, "specs/contracts/asyncapi.yaml", CONTRACT);
+  expect(run(dir, "check").output).toContain("specs/contracts/asyncapi.yaml is not read");
 });
 
 test("every message is a CloudEvent with a type of its own, named the house way", () => {
@@ -292,7 +292,7 @@ test("every message is a CloudEvent with a type of its own, named the house way"
 test("the house rules lint the contract's names and its event types", () => {
   const lint = (name: string, edit: (document: Document) => void) => {
     const dir = repository(name, stringify(edited(edit)));
-    const result = spawnSync(resolve("node_modules/.bin/spectral"), ["lint", "specs/asyncapi.v1.yaml", "--ruleset", resolve("rules/asyncapi.yaml"), "--fail-severity", "warn"], { cwd: dir, encoding: "utf8", env });
+    const result = spawnSync(resolve("node_modules/.bin/spectral"), ["lint", "specs/contracts/asyncapi.v1.yaml", "--ruleset", resolve("rules/asyncapi.yaml"), "--fail-severity", "warn"], { cwd: dir, encoding: "utf8", env });
     return { status: result.status, output: result.stdout + result.stderr };
   };
   expect(lint("clean", () => {}).status).toBe(0);
@@ -350,10 +350,10 @@ test("two enums of the same name in different payloads keep their own values", (
 test("removing a published contract is breaking, and examples are not left behind", () => {
   const dir = repository("removed");
   run(dir, "examples");
-  rmSync(join(dir, "specs/asyncapi.v1.yaml"));
+  rmSync(join(dir, "specs/contracts/asyncapi.v1.yaml"));
   const compat = run(dir, "compat");
   expect(compat.status).toBe(1);
-  expect(compat.output).toContain("specs/asyncapi.v1.yaml was removed, but the published one was not deprecated");
+  expect(compat.output).toContain("specs/contracts/asyncapi.v1.yaml was removed, but the published one was not deprecated");
   expect(run(dir, "examples", "check").output).toContain("still has examples");
   expect(run(dir, "check").status).toBe(0);
 });
@@ -422,4 +422,10 @@ test("examples are written from the contract and checked against it", () => {
   expect(stale.output).toContain("messages/old.json is not a message in the contract");
   run(dir, "examples");
   expect(existsSync(join(dir, "messages/old.json"))).toBe(false);
+});
+
+test("moving a contract changes how it spells the envelope's path, which is not a change to a message", () => {
+  const at = (ref: string) => ({ components: { schemas: { Thing: { allOf: [{ $ref: ref }, { type: "object" }] } } } });
+  expect(enveloped(at("../tools/asyncapi/cloudevent.yaml#/CloudEvent"))).toEqual(enveloped(at("../../tools/asyncapi/cloudevent.yaml#/CloudEvent")));
+  expect(enveloped(at("#/components/schemas/Other"))).toEqual(at("#/components/schemas/Other"));
 });

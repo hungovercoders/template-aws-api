@@ -1,4 +1,4 @@
-// The AsyncAPI contracts, specs/asyncapi.v<N>.yaml - one for each live major:
+// The AsyncAPI contracts, specs/contracts/asyncapi.v<N>.yaml - one for each live major:
 // the messages this API receives (`receive` operations) and the events it
 // publishes (`send` operations). The stack receives and publishes what every
 // live major holds; an event's own version is its type's .v<M>, and its
@@ -10,7 +10,7 @@
 //   node tools/asyncapi/asyncapi.ts generate         - src/generated/: the resolved contract, message types, the table of operations
 //   node tools/asyncapi/asyncapi.ts examples         - write messages/<message>.json, an example of every message
 //   node tools/asyncapi/asyncapi.ts examples check   - gate: the committed examples match the contract
-// An API with no asynchronous side has no specs/asyncapi.v<N>.yaml, and every
+// An API with no asynchronous side has no specs/contracts/asyncapi.v<N>.yaml, and every
 // one of these then has nothing to do.
 import { diff } from "@asyncapi/diff";
 import { TypeScriptGenerator } from "@asyncapi/modelina";
@@ -18,12 +18,12 @@ import { type AsyncAPIDocumentInterface, Parser, fromFile } from "@asyncapi/pars
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { asyncapiNameProblems, atBaseline, type Contract, contracts, misnamed, retired, versionProblems } from "../../scripts/contracts.ts";
+import { asyncapiNameProblems, atBaseline, type Contract, contracts, misnamed, operationTags, retired, versionProblems } from "../../scripts/contracts.ts";
 import { baseline, show } from "../../scripts/spec-baseline.ts";
 import { type Schema, merged, sample } from "../../scripts/sample.ts";
 
 /** How the contracts are named in what this says: one file, or the pattern. */
-const CONTRACT = "specs/asyncapi.v<N>.yaml";
+const CONTRACT = "specs/contracts/asyncapi.v<N>.yaml";
 const FEATURES = "specs/features";
 const EXAMPLES = "messages";
 
@@ -151,7 +151,7 @@ function envelopeProblems(all: Operation[]): string[] {
     const schema = merged(message.payload);
     const missing = ENVELOPE.filter((attribute) => !schema.required?.includes(attribute) || !schema.properties?.[attribute]);
     if (missing.length > 0 || schema.properties?.specversion?.const !== "1.0") {
-      problems.push(`message ${message.name} is not a CloudEvent: its payload must extend the envelope - allOf: [{ $ref: '../tools/asyncapi/cloudevent.yaml#/CloudEvent' }, ...]`);
+      problems.push(`message ${message.name} is not a CloudEvent: its payload must extend the envelope - allOf: [{ $ref: '../../tools/asyncapi/cloudevent.yaml#/CloudEvent' }, ...]`);
       continue;
     }
     // How a type is spelt, and the content type, are house rules: asyncapi:lint.
@@ -171,7 +171,7 @@ async function check(): Promise<void> {
     problems.push(...versionProblems(contract, parseYaml(readFileSync(contract.path, "utf8"))), ...asyncapiNameProblems(contract.path, own));
   }
   const features = existsSync(FEATURES) ? readdirSync(FEATURES, { recursive: true, encoding: "utf8" }).filter((file) => file.endsWith(".feature")) : [];
-  const tagged = new Set(features.flatMap((file) => [...readFileSync(join(FEATURES, file), "utf8").matchAll(/@operation:([\w.-]+)/g)].map(([, id]) => id!)));
+  const tagged = new Set(features.flatMap((file) => operationTags(readFileSync(join(FEATURES, file), "utf8"))));
   for (const operation of all) {
     if (!tagged.has(operation.id)) problems.push(`operation ${operation.id} has no scenario tagged @operation:${operation.id}`);
     if (operation.messages.length === 0) problems.push(`operation ${operation.id} names no message`);
@@ -240,6 +240,23 @@ export function changes(before: unknown, after: unknown): (Change & { level: Lev
 // that file changes every message without touching the contract. Words aside,
 // any difference in it is treated as breaking.
 const ENVELOPE_FILE = "tools/asyncapi/cloudevent.yaml";
+
+/**
+ * The contract with every reference to the envelope written one way. Where the contract sits
+ * decides how its relative path to the envelope is spelt (../ from specs/, ../../ from
+ * specs/contracts/); that is not a change to any message - a change to the envelope itself is
+ * envelopeChanges' to find.
+ */
+export function enveloped(document: unknown): unknown {
+  if (Array.isArray(document)) return document.map(enveloped);
+  if (document === null || typeof document !== "object") return document;
+  return Object.fromEntries(
+    Object.entries(document).map(([key, value]) => [
+      key,
+      key === "$ref" && typeof value === "string" ? value.replace(new RegExp(`^(?:\\.\\./)+${ENVELOPE_FILE.replace(/[./]/g, "\\$&")}#`), `${ENVELOPE_FILE}#`) : enveloped(value),
+    ]),
+  );
+}
 function envelopeChanges(ref: string): (Change & { level: Level })[] {
   const before = show(ref, ENVELOPE_FILE);
   if (before === undefined || !existsSync(ENVELOPE_FILE)) return [];
@@ -276,7 +293,7 @@ async function compat(): Promise<void> {
       continue;
     }
     const now = readFileSync(contract.path, "utf8");
-    const [old, current] = [parseYaml(before) as Document, parseYaml(now) as Document];
+    const [old, current] = [enveloped(parseYaml(before)) as Document, enveloped(parseYaml(now)) as Document];
     const found = [...changes(old, current).filter((change) => change.path !== "/info/version"), ...envelope];
     const breaking = found.filter((change) => change.level === "breaking");
     // What the rules cannot place is shown, and treated as breaking until a person has looked.
@@ -294,13 +311,15 @@ async function compat(): Promise<void> {
       any: major > oldMajor || (major === oldMajor && (minor > oldMinor || (minor === oldMinor && patch > oldPatch))),
     };
     const from = `${old.info?.version} (at ${short})`;
-    const edited = before.trim() !== now.trim() || found.length > 0;
+    // The text, with the envelope's path spelt one way (enveloped): moving the file is not an edit.
+    const spelt = (text: string) => text.replace(/(?:\.\.\/)+tools\/asyncapi\/cloudevent\.yaml#/g, `${ENVELOPE_FILE}#`).trim();
+    const edited = spelt(before) !== spelt(now) || found.length > 0;
     if (breaking.length + unknown.length > 0 && !(oldMajor === 0 && bumped.minor)) {
       const what = breaking.length > 0 ? "breaking changes" : "changes that could not be classified";
       problems.push(
         oldMajor === 0
           ? `${contract.path} has ${what} but info.version went from ${from} to ${current.info?.version}; while the contract is 0.x that needs a new minor version`
-          : `${contract.path} has ${what}: whoever sends or consumes v${contract.major} would fail. Publish a changed event as a new version beside the old one (a type ending .v<M+1>, a message and operations ending _v<M+1>), or make the change in specs/asyncapi.v${contract.major + 1}.yaml, and leave v${contract.major} as it is`,
+          : `${contract.path} has ${what}: whoever sends or consumes v${contract.major} would fail. Publish a changed event as a new version beside the old one (a type ending .v<M+1>, a message and operations ending _v<M+1>), or make the change in specs/contracts/asyncapi.v${contract.major + 1}.yaml, and leave v${contract.major} as it is`,
       );
     } else if (found.length > 0 && !bumped.minor) {
       problems.push(`${contract.path} changed but info.version went from ${from} to ${current.info?.version}; a change needs at least a new minor version`);
@@ -392,12 +411,12 @@ async function generate(): Promise<void> {
   }
   writeFileSync(
     "src/generated/messages.d.ts",
-    ["// Generated from specs/asyncapi.v<N>.yaml by `task generate` (Modelina) - do not edit.", ...[...types.values()].map((type) => `export ${type}`), ""].join("\n\n"),
+    ["// Generated from specs/contracts/asyncapi.v<N>.yaml by `task generate` (Modelina) - do not edit.", ...[...types.values()].map((type) => `export ${type}`), ""].join("\n\n"),
   );
   writeFileSync(
     "src/generated/async-operations.ts",
     [
-      "// Generated from specs/asyncapi.v<N>.yaml by `task generate` - do not edit.",
+      "// Generated from specs/contracts/asyncapi.v<N>.yaml by `task generate` - do not edit.",
       "// Every operation of every live major of the AsyncAPI contract: what is received and what is published.",
       `export const asyncOperations = ${JSON.stringify(
         all.map(({ id, action, channel, address, messages }) => ({ id, action, channel, address, messages: messages.map(({ name, type }) => ({ name, type })) })),
@@ -436,11 +455,11 @@ function absent(command: string | undefined, mode: string | undefined): void {
   const ref = command === "compat" ? baseline() : undefined;
   if (ref) {
     // A contract from before files were versioned, gone with its operations.
-    const legacy = show(ref, "specs/asyncapi.yaml");
+    const legacy = show(ref, "specs/contracts/asyncapi.yaml");
     const published = Object.keys((legacy ? (parseYaml(legacy) as { operations?: object } | null) : null)?.operations ?? {});
     const unannounced = [
       ...retired("asyncapi", ref).problems,
-      ...(published.length > 0 ? [`specs/asyncapi.yaml was removed, and with it ${published.length} published operations (${published.join(", ")}). Whoever sends or consumes them will fail. First publish it deprecated (set \`info.x-deprecated: true\` in it), then remove it in a later change.`] : []),
+      ...(published.length > 0 ? [`specs/contracts/asyncapi.yaml was removed, and with it ${published.length} published operations (${published.join(", ")}). Whoever sends or consumes them will fail. First publish it deprecated (set \`info.x-deprecated: true\` in it), then remove it in a later change.`] : []),
     ];
     if (unannounced.length > 0) stop(["asyncapi:compat failed", ...unannounced.map((problem) => `  - ${problem}`)].join("\n"));
   }
@@ -448,8 +467,8 @@ function absent(command: string | undefined, mode: string | undefined): void {
   if (command === "generate") {
     mkdirSync("src/generated", { recursive: true });
     writeFileSync("src/generated/asyncapi.json", "{}\n");
-    writeFileSync("src/generated/messages.d.ts", "// Generated by `task generate` - there is no specs/asyncapi.v<N>.yaml.\nexport {};\n");
-    writeFileSync("src/generated/async-operations.ts", "// Generated by `task generate` - there is no specs/asyncapi.v<N>.yaml.\nexport const asyncOperations = [] as const;\n");
+    writeFileSync("src/generated/messages.d.ts", "// Generated by `task generate` - there is no specs/contracts/asyncapi.v<N>.yaml.\nexport {};\n");
+    writeFileSync("src/generated/async-operations.ts", "// Generated by `task generate` - there is no specs/contracts/asyncapi.v<N>.yaml.\nexport const asyncOperations = [] as const;\n");
   }
   const left = command === "examples" && mode === "check" && existsSync(EXAMPLES) ? readdirSync(EXAMPLES).filter((file) => file.endsWith(".json")) : [];
   if (left.length > 0) stop(`asyncapi:examples:check failed\n  - ${EXAMPLES}/ still has examples (${left.join(", ")}) but there is no ${CONTRACT}; remove them`);

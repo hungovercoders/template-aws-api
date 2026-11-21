@@ -190,7 +190,7 @@ Nothing is lost yet, and nothing else is held up.
 5. Once the cause is fixed, `ENV=aws task dlq:redrive` sends them round again.
 
 **Usually** a sender and this API disagreeing about the contract. Compare
-the message with `specs/asyncapi.v<N>.yaml` and with `messages/`.
+the message with `specs/contracts/asyncapi.v<N>.yaml` and with `messages/`.
 
 ### queue-age
 

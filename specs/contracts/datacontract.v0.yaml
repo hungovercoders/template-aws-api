@@ -1,0 +1,41 @@
+# The events this API publishes, kept as data: an Open Data Contract Standard
+# contract (https://bitol-io.github.io/open-data-contract-standard/). Until it
+# names a `production` server, nothing is kept and its gates have nothing to
+# check. `task data:generate` writes a schema object for every event the
+# AsyncAPI contract says the API publishes; what is left is yours to say:
+#
+# servers:
+#   - server: production                  # the raw JSON, the audit copy
+#     type: s3
+#     location: s3://<org>-<api>-events/events/v0/
+#     format: json
+#     delimiter: new_line
+#     customProperties:
+#       - property: retention             # how long the raw JSON is kept: P7Y unless the owner says
+#         value: P7Y
+#   - server: production-parquet          # each day, compacted
+#     type: s3
+#     location: s3://<org>-<api>-events/parquet/v0/
+#     format: parquet
+# slaProperties:
+#   - property: retention                 # how long the Parquet is kept
+#     value: 2
+#     unit: y
+#   - property: latency                   # how soon after it happens an event is there to read
+#     value: 15
+#     unit: m
+#
+# Each property of an event's data needs a classification: public, internal,
+# confidential or restricted. The write-spec skill (data.md) asks the owner.
+apiVersion: v3.2.0
+kind: DataContract
+id: replace-me-events-v0
+name: Replace me
+version: 0.1.0
+status: draft
+description:
+  purpose: Replace this with what the data is for.
+team:
+  name: replace-me
+schema:
+  []

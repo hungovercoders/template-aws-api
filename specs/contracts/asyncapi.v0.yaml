@@ -1,0 +1,51 @@
+asyncapi: 3.1.0
+info:
+  title: Replace me
+  version: 0.1.0
+  description: >-
+    Replace this with the messages your API takes and the events it
+    publishes. Until it declares an operation, the API has no asynchronous
+    side: its gates have nothing to check, and nothing is sent or received.
+
+# Major 0 of the contract: its version is 0.x.x. Every message is a CloudEvent:
+# a message name and its operations end _v<M>, its type ends .v<M>.
+#
+# A message the API takes from its queue is a `receive` operation; it becomes
+# one function in src/consumers/. An event it publishes is a `send` operation;
+# the code writes it with outbox(event). For example:
+#
+# channels:
+#   thing_events:
+#     address: thing-events
+#     messages:
+#       thing_created_v1:
+#         $ref: "#/components/messages/thing_created_v1"
+# operations:
+#   publish_thing_created_v1:
+#     action: send
+#     summary: A thing was created
+#     channel:
+#       $ref: "#/channels/thing_events"
+#     messages:
+#       - $ref: "#/channels/thing_events/messages/thing_created_v1"
+# components:
+#   messages:
+#     thing_created_v1:
+#       name: thing_created_v1
+#       contentType: application/cloudevents+json
+#       payload:
+#         $ref: "#/components/schemas/ThingCreatedEvent"
+#   schemas:
+#     ThingCreatedEvent:
+#       allOf:
+#         - $ref: "../../tools/asyncapi/cloudevent.yaml#/CloudEvent"
+#         - type: object
+#           required: [data]
+#           properties:
+#             type: { type: string, const: com.example.things.thing.created.v1 }
+#             data: { type: object, required: [thing_id], properties: { thing_id: { type: string } } }
+#
+# `task asyncapi:examples` writes an example of every message to messages/;
+# `task data:generate` then keeps the published events as data.
+channels: {}
+operations: {}
