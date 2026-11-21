@@ -123,7 +123,7 @@ test("a type the contract accepts but nothing handles is put aside, loudly", asy
   const { run, deadLettered } = setup();
   expect(await run(record("m1", event("e1", { type: "com.example.catalogue.beer.unhandled.v1" })))).toEqual([]);
   expect(deadLettered).toEqual([{ id: "m1", reason: "no consumer for com.example.catalogue.beer.unhandled.v1" }]);
-  expect(JSON.parse(logged.mock.calls[0]![0] as string)).toMatchObject({ level: "error", outcome: "dead_lettered" });
+  expect(JSON.parse(logged.mock.calls[0]![0] as string)).toMatchObject({ SeverityText: "ERROR", Attributes: { outcome: "dead_lettered" } });
 });
 
 test("a message another delivery is still handling is offered again later", async () => {
@@ -162,11 +162,12 @@ test("every message is logged once, with what it was and what became of it", asy
     if (given.id === "bad") throw new Error("boom");
   });
   await run(record("m1", event("e1")), record("m2", event("bad")), record("m3", event("e1")));
-  expect(lines.map((line) => [line.message_id, line.outcome])).toEqual([
+  const attributes = lines.map((line) => line.Attributes as Record<string, unknown>);
+  expect(attributes.map((line) => [line.message_id, line.outcome])).toEqual([
     ["m1", "handled"],
     ["m2", "failed"],
     ["m3", "duplicate"],
   ]);
-  expect(lines[0]).toMatchObject({ level: "info", message: "message", event_id: "e1", event_type: TYPE, operation_id: "record_rating", receive_count: 1, trace_id: traceId() });
-  expect((lines[1]!.error as { message: string }).message).toBe("boom");
+  expect(lines[0]).toMatchObject({ SeverityText: "INFO", Body: "message", TraceId: traceId(), Attributes: { event_id: "e1", event_type: TYPE, operation_id: "record_rating", receive_count: 1 } });
+  expect((attributes[1]!.error as { message: string }).message).toBe("boom");
 });

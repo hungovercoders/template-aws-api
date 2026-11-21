@@ -137,10 +137,12 @@ test("every event is logged once, with what became of it and the trace it belong
     if (given.id === "later") throw new Error("throttled");
   });
   await run(inserted("e1", event("e1")), inserted("bad", event("bad")), inserted("later", event("later")));
-  expect(lines.map((line) => [line.event_id, line.outcome])).toEqual([
+  const attributes = lines.map((line) => line.Attributes as Record<string, unknown>);
+  expect(attributes.map((line) => [line.event_id, line.outcome])).toEqual([
     ["e1", "published"],
     ["bad", "set_aside"],
     ["later", "retrying"],
   ]);
-  expect(lines[0]).toMatchObject({ message: "event", event_type: "com.example.catalogue.beer.created.v1", trace_id: "0af7651916cd43dd8448eb211c80319c" });
+  // Each event's lines are in the trace the event carries.
+  expect(lines[0]).toMatchObject({ Body: "event", TraceId: "0af7651916cd43dd8448eb211c80319c", Attributes: { event_type: "com.example.catalogue.beer.created.v1" } });
 });
