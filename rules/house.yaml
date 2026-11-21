@@ -94,10 +94,10 @@ rules:
 
   # 401 is the exception: API Gateway's authorizer answers it, with its own body.
   house-errors-are-problems:
-    description: 4xx and 5xx responses (other than 401) are application/problem+json - the error body the router emits.
+    description: 4xx and 5xx responses (other than 401 and 429, which API Gateway answers with its own body) are application/problem+json - the error body the router emits.
     message: "Error responses must document application/problem+json content."
     severity: error
-    given: "$.paths[*][*].responses[?(@property && @property.match(/^(4(?!01)|5)/))]"
+    given: "$.paths[*][*].responses[?(@property && @property.match(/^(4(?!01|29)|5)/))]"
     then:
       field: content.application/problem+json
       function: truthy

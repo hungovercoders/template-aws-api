@@ -1,0 +1,11 @@
+# A fixture for infra/tests/http.tftest.hcl: a major with a rate limit.
+openapi: 3.1.0
+info: { title: Fixture, version: 1.0.0 }
+x-rate-limit:
+  requests_per_second: 25
+  burst: 50
+paths:
+  /v1/things:
+    get:
+      operationId: list_things_v1
+      responses: { "200": { description: Listed }, "429": { description: Slow down } }

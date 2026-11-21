@@ -191,9 +191,6 @@ published (`event_log_days`, 1 by default: it is for looking, not keeping).
 ## Limiting requests
 
 Without a limit a caller can make the API do, and cost, as much as the
-account allows. To set one, give both `throttle_rate_limit` (requests a
-second) and `throttle_burst_limit` (requests at once): from your machine
-`-- -var throttle_rate_limit=100 -var throttle_burst_limit=200`, in the CI
-deploy job the repository variables `THROTTLE_RATE_LIMIT` and
-`THROTTLE_BURST_LIMIT`. Over the limit the API answers 429. Set them in one
-place: an apply only knows the limits it is given.
+account allows. The limit is the contract's, where callers read it:
+`x-rate-limit` in each `specs/openapi.v<N>.yaml` ([rate limits](spec.md#rate-limits)).
+A deploy applies it to that major's routes; over it the API answers 429.

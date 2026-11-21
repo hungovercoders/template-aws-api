@@ -6,7 +6,10 @@
 // Reads what the last full feature run was answered with (steps/world.ts
 // records it), so it runs after `task features:run`, inside `task acceptance`.
 // Not required: 5XX and default responses, which no scenario should be able
-// to cause, and a 400 on an operation that takes no input.
+// to cause, and a 400 on an operation that takes no input. A 429 is API Gateway
+// throttling a route at its major's x-rate-limit - the same setting on every route
+// of that major, which infra/tests/http.tftest.hcl checks - so one scenario that
+// calls one of a major's operations too fast proves it for all of them.
 import { existsSync, readFileSync } from "node:fs";
 import { operations } from "../src/lib/contract.ts";
 
@@ -22,6 +25,7 @@ const unanswered = operations.flatMap((operation) => {
   return Object.keys(operation.responses)
     .filter((status) => /^[1-4]\d\d$/.test(status) && !(status === "400" && !takesInput))
     .filter((status) => !answered.has(`${operation.operationId} ${status}`))
+    .filter((status) => !(status === "429" && operations.some((other) => other.version.split(".")[0] === operation.version.split(".")[0] && answered.has(`${other.operationId} 429`))))
     .map((status) => `${operation.operationId} ${status}`);
 });
 

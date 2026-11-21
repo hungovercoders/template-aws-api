@@ -235,6 +235,11 @@ examples in the contract make it far more useful.
 Prism is not a gate and is not installed with the project; the task fetches
 the version pinned in `Taskfile.yml` the first time you run it.
 
+## Rate limits
+
+How fast a caller may call is part of each `openapi.v<N>.yaml`: `x-rate-limit: {requests_per_second, burst}` at its root.
+API Gateway applies it to each of that major's routes and answers `429` beyond it, which every operation documents (`spec:check`); `this.flood()` lets a scenario prove it.
+
 ## Conventions the template assumes
 
 - Request and response bodies are JSON.
