@@ -14,6 +14,11 @@
       "for": "Writing and changing the spec with the user: the contract and the feature files"
     },
     {
+      "name": "write-nfrs",
+      "owner": "template",
+      "for": "Capturing the non-functional requirements with the owner: retention, rate limits, SLOs, recovery and cost, each in its one home"
+    },
+    {
       "name": "implement-api",
       "owner": "template",
       "for": "Implementing the API from the spec until task ci is green"
