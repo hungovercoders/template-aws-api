@@ -3,19 +3,20 @@ import { CloudWatchClient, ListMetricsCommand } from "@aws-sdk/client-cloudwatch
 import { CreateDeliveryStreamCommand, DescribeDeliveryStreamCommand, FirehoseClient, PutRecordCommand } from "@aws-sdk/client-firehose";
 import { CreateBucketCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
 import { type Gap, role, sleep, terraform } from "../lib.ts";
+import { s3ControlUnreachable } from "../report.ts";
 
 export const gaps: Gap[] = [
   {
     id: "s3-control",
     kind: "workaround",
-    gap: "The emulator does not serve S3 Control, which the AWS provider's `aws_s3_bucket` calls, so that resource never finishes.",
+    gap: "The AWS provider's `aws_s3_bucket` calls S3 Control, which the emulator does not serve - and the provider sends that call to `<account id>.<endpoint host>`, which does not resolve locally - so that resource never finishes.",
     then: 'infra/data.tf makes the bucket with `awscc_s3_bucket`, through Cloud Control. Make it an `aws_s3_bucket` (a `moved` block cannot cross providers: `terraform state rm` and `import` for a deployed stack).',
     where: ["infra/data.tf"],
     async test() {
       // The provider retries the call for minutes, so the test stops it early and reads its log for that call.
       const applied = await terraform("s3-control", { seconds: 45, debug: true });
       if (applied.ok) return false;
-      if (/retrying request S3 Control\/ListTagsForResource/.test(applied.output)) return true;
+      if (s3ControlUnreachable(applied.output)) return true;
       throw new Error(`the apply failed, and not on S3 Control\n${applied.output.trim().slice(-1500)}`);
     },
   },

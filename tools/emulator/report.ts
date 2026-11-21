@@ -61,3 +61,11 @@ export function issue(outcome: Outcome, version: string): { title: string; body:
   lines.push(`- [ ] The gap \`${outcome.id}\` is removed from \`tools/emulator/gaps/\``);
   return { title: `Emulator gap closed: ${outcome.id}`, body: lines.join("\n") };
 }
+
+// What the s3-control gap reads in Terraform's debug log: the AWS provider
+// asking S3 Control about a bucket and getting nowhere. It sends the call to
+// <account id>.<endpoint host>. Behind a proxy that shows as the provider
+// retrying the call; with none, as that host not resolving.
+export function s3ControlUnreachable(log: string): boolean {
+  return /retrying request S3 Control\/ListTagsForResource/.test(log) || /S3 Control: ListTagsForResource[^\n]*lookup \d{12}\.[^\s:]+: no such host/.test(log);
+}
