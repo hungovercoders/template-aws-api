@@ -10,9 +10,10 @@
 [Why a template](#why-a-template-not-a-prompt) · [How it works](#how-it-works) · [See it working](#see-it-working) ·
 [Tasks](#everyday-tasks) · [By hand](#writing-the-spec-by-hand) · [Layout](#where-things-are) · [Guides](#guides)
 
-A template for AWS Lambda APIs where you write only what makes the API yours: what it
-does, in plain-language scenarios, and what it looks like, in a contract. Everything else
-is already here, and an AI agent fills in the business logic until every check passes.
+A template for AWS Lambda APIs where you write only what makes the API
+yours: what it does, in plain-language scenarios, and what it looks like, in
+a contract. Everything else is already here, and an AI agent fills in the
+business logic until every check passes.
 
 You write this:
 
@@ -35,9 +36,10 @@ export async function create_beer_v0({ body }: Context<"create_beer_v0">) {
 }
 ```
 
-`task ci` then runs your scenarios against the real Lambda, on a local copy of AWS,
-and says whether it is finished. Here it is running: a request, a refusal, the event
-published, then compacted to Parquet in S3 and queried (real output, shortened).
+`task ci` then runs your scenarios against the real Lambda, on a local copy
+of AWS, and says whether it is finished. Here it is running: a request, a
+refusal, the event it published, and that event compacted to Parquet in S3
+and queried there (real output, shortened).
 
 ![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, then compacted to Parquet in S3 and read back with SQL](.github/images/api-in-action.gif)
 
@@ -82,7 +84,8 @@ flowchart TB
   %% component:publish:end
   %% component:data:start
   bus --> firehose["Firehose"] --> raw[("S3: raw JSON")]
-  raw --> compactor["Lambda: compactor, daily (EventBridge Scheduler)"] --> parquet[("S3: Parquet, a file per event type and day")]
+  schedule["EventBridge Scheduler: daily"] --> compactor["Lambda: compactor"]
+  raw --> compactor --> parquet[("S3: Parquet, a file per event type and day")]
   raw & parquet -->|"data contract (ODCS)"| analyst(["Analysts: DuckDB, Harlequin"])
   %% component:data:end
 ```
@@ -94,8 +97,9 @@ flowchart TB
 | Events on a bus | out | `specs/asyncapi.v<N>.yaml`, `send` | yes |
 | Events as data in S3 | out | `specs/datacontract.v<N>.yaml` | yes |
 
-Each part brings its Terraform, alarms, logs and tags. An API that does not need an
-optional part removes it, and can bring it back later: `task component:list`.
+Each part brings its Terraform, alarms, logs and tags. An API that does not
+need an optional part removes it, and can bring it back later:
+`task component:list`.
 
 ## What you get
 
@@ -110,12 +114,14 @@ optional part removes it, and can bring it back later: `task component:list`.
 
 - A queue with retries and duplicate handling: one function per message.
 - Events published with the change they describe: `outbox(event)` in a write.
-- Those events kept in S3 and compacted daily to typed Parquet, both tested against a data contract, with DuckDB and Harlequin to query them.
+- Those events kept in S3 and compacted daily to typed Parquet, both tested
+  against a data contract, with DuckDB and Harlequin to query them.
 
 **Tests that mean something**
 
-- Your scenarios run against the built Lambda, through the stack your own Terraform
-  created on [AWS Emulator](https://github.com/aws/aws-emulator). Nothing is mocked.
+- Your scenarios run against the built Lambda, through the stack your own
+  Terraform created on [AWS Emulator](https://github.com/aws/aws-emulator).
+  Nothing is mocked.
 - Every response is checked against the contract, and the API is fuzzed.
 
 **Ready for production**
@@ -138,8 +144,9 @@ should be built once, not regenerated slightly differently by AI each time.
   comes from that command: identical every time, and it cannot drift.
 - **Every API looks the same.** Seen one, seen them all.
 
-If you catch yourself asking AI for a router, a test harness or a pipeline here, stop: it
-exists. If something every API needs is missing, add it to the template once, not to one API.
+If you catch yourself asking AI for a router, a test harness or a pipeline
+here, stop: it exists. If something every API needs is missing, add it to
+the template once, not to one API.
 
 ## How it works
 
@@ -153,8 +160,9 @@ specs/openapi.v<N>.yaml   ─┬─► request validation inside the Lambda
 specs/asyncapi.v<N>.yaml  ─┬─► every message and event validated as a CloudEvent
  (messages, events)        └─► a typed stub per message, a typed function per event
 
-specs/datacontract.v<N>.yaml ─► per major: a stream, its retention and alarms, a daily
- (events as data)               Parquet compaction, a test of what landed and of the Parquet
+specs/datacontract.v<N>.yaml ─┬─► per major: a stream, its retention and alarms (Terraform reads it)
+ (events as data)             ├─► a daily compaction to Parquet, typed by the contract
+                              └─► a test of what landed, raw and in Parquet
 
 specs/features/*.feature ──► cucumber, strict, against the built Lambda
    (the behaviour)           on infra/ applied to AWS Emulator
@@ -177,8 +185,11 @@ The Beer Catalogue API is built on this template, one branch per step:
 | [`example/spec`](../../tree/example/spec) | The template and a complete spec | Red - not implemented yet |
 | [`example/implementation`](../../tree/example/implementation) | That spec, delivered with `/implement-api` | Green |
 
-Compare them: [`main...example/spec`](../../compare/main...example/spec) is what a spec looks like,
-and [`example/spec...example/implementation`](../../compare/example/spec...example/implementation) what implementing one adds.
+Compare them:
+[`main...example/spec`](../../compare/main...example/spec) is what a spec
+looks like, and
+[`example/spec...example/implementation`](../../compare/example/spec...example/implementation)
+is what implementing one adds.
 
 `task ci` on `example/implementation` (selected lines):
 
