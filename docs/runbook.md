@@ -12,8 +12,9 @@ Every stack is deployed with the same alarms: the baseline in
 | `<name>-lambda-errors` | Any Lambda error in 5 minutes | An unhandled error, a timeout or out of memory |
 | `<name>-lambda-throttles` | Any throttled invocation in 5 minutes | The concurrency limit was reached |
 | `<name>-lambda-duration` | p99 duration above 80% of the timeout for 15 minutes | Timeouts are about to start |
-| `<name>-api-5xx` | Any 5xx response in 5 minutes | The API failed, or API Gateway could not reach the Lambda |
-| `<name>-api-latency` | p99 latency above 3 seconds for 15 minutes | Callers are waiting |
+| `<name>-api-5xx` | Any 5xx response in 5 minutes; with an availability SLO, more than 1 - its target of requests | The API failed, or API Gateway could not reach the Lambda |
+| `<name>-api-latency` | p99 latency above 3 seconds for 15 minutes, or the latency SLO's percentile above its value | Callers are waiting |
+| `<name>-latency-<operationId>` | That operation's latency SLO, on its route alone, for 15 minutes | Callers of that operation are waiting |
 | `<name>-table-throttles` | Any throttled DynamoDB read or write in 5 minutes | The table is refusing work |
 | Budget `<name>` | 80% of `monthly_budget_usd` spent, or 100% forecast for the month | The stack costs more than its owner said |
 <!-- component:consume:start -->
@@ -120,8 +121,9 @@ half-finished deploy.
 
 ### api-latency
 
-**Means** the slowest 1% of requests took over 3 seconds for 15 minutes.
-Nothing is failing yet; callers are waiting.
+**Means** the slowest 1% of requests took over 3 seconds for 15 minutes, or
+broke a latency SLO in `specs/slos` (its description names which; a
+`latency-<operationId>` alarm is one operation's). Nothing is failing yet.
 
 1. Compare with the Lambda's `Duration`. Close together: the time is in your
    code - see `lambda-duration`. Far apart: cold starts or API Gateway.
