@@ -13,7 +13,7 @@
 //   3. start a fresh one for this run, and stop it at the end:
 //      - on Linux: AWS_EMULATOR_BIN, then .tools/ (from `task emulator:install`), then PATH
 //      - on macOS and Windows, or with EMULATOR_DOCKER=1: a container of the image
-//        `task emulator:install` builds, aws-emulator:<EMULATOR_VERSION>
+//        `task emulator:install` builds, EMULATOR_IMAGE (aws-emulator:<EMULATOR_VERSION>)
 // AWS Emulator cannot be reset, so a stack is applied to an emulator once:
 // a second run against one that already has it says so instead of failing.
 import { spawn, spawnSync } from "node:child_process";
@@ -89,7 +89,7 @@ async function emulatorEnv() {
       // container shares that folder with the host at the same path.
       args = ["run", "--rm", "--name", name, "--memory=2g", "--memory-swap=2g", "-p", `127.0.0.1:${port}:${port}`,
         "-e", `HOME=${homedir()}`, "-e", "EMULATOR_TELEMETRY", "-v", `${shared}:${shared}`,
-        `aws-emulator:${process.env.EMULATOR_VERSION}`, "-p", String(port), ...telemetry];
+        process.env.EMULATOR_IMAGE, "-p", String(port), ...telemetry];
       hint = "Is Docker running? Start Docker Desktop, then `task emulator:install` builds the emulator's image.";
     } else {
       const local = join(".tools", "aws-emulator", "opt", "aws-emulator", "bin", "aws-emulator");

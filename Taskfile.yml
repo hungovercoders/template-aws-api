@@ -32,8 +32,9 @@ vars:
 env:
   # cucumber and the scripts load TypeScript directly.
   NODE_OPTIONS: --import tsx
-  # The emulator image local/stack.mjs runs on macOS and Windows.
-  EMULATOR_VERSION: '{{.EMULATOR_VERSION}}'
+  # The emulator image local/stack.mjs runs on macOS and Windows. (Not named
+  # EMULATOR_VERSION: the emulator workflow reads a change to that line as the pin moving.)
+  EMULATOR_IMAGE: 'aws-emulator:{{.EMULATOR_VERSION}}'
 
 tasks:
   default:
