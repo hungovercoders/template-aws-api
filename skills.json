@@ -4,7 +4,7 @@
     "aws": {
       "repository": "https://github.com/aws/agent-toolkit-for-aws",
       "branch": "main",
-      "commit": "5955ad2e46d35e7615b036f4e8863f1975f0ab72"
+      "commit": "947a491774eed33d2a117bbecea50debc6ac1a20"
     }
   },
   "skills": [
@@ -24,8 +24,8 @@
       "for": "The local stack: starting AWS Emulator, connection, certificate and signing errors, and whether an AWS operation is expected to work on it",
       "source": "aws",
       "path": "skills/core-skills/aws-emulator",
-      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
-      "sha256": "33d89f0c79cc82f4532b7fe6ae196d48bd2cb0bb5e8c2a3a1857468696ea02db"
+      "fetched": "947a491774eed33d2a117bbecea50debc6ac1a20",
+      "sha256": "967ad1e6f092f5e323a0c6e6ec05ede0d398b2a8f52755863d79f8ab670bdadf"
     },
     {
       "name": "aws-serverless",
@@ -33,8 +33,8 @@
       "for": "Lambda and API Gateway: how the function and the HTTP API behave and are configured",
       "source": "aws",
       "path": "skills/core-skills/aws-serverless",
-      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
-      "sha256": "3bfbe751f0d5d0bc864b29755278c0e2b7487d08b4c04fcbfe3aa9a8e2bd13b5"
+      "fetched": "947a491774eed33d2a117bbecea50debc6ac1a20",
+      "sha256": "2e587d33335b6eb6e0c2ed2dfe6a6f03244c687c53c8d3f0d8c3b0bdb0d9838f"
     },
     {
       "name": "aws-sdk-js-v3-usage",
@@ -42,7 +42,7 @@
       "for": "Calling AWS from the function with the AWS SDK for JavaScript v3",
       "source": "aws",
       "path": "skills/core-skills/aws-sdk-js-v3-usage",
-      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
+      "fetched": "947a491774eed33d2a117bbecea50debc6ac1a20",
       "sha256": "ec53410e4ada81ba38094de439cd15eeff44cbf63a53328deb1a67d88a604ec9"
     },
     {
@@ -51,7 +51,7 @@
       "for": "The function's role and the deploy role: policies that grant what is used and no more",
       "source": "aws",
       "path": "skills/core-skills/aws-iam",
-      "fetched": "5955ad2e46d35e7615b036f4e8863f1975f0ab72",
+      "fetched": "947a491774eed33d2a117bbecea50debc6ac1a20",
       "sha256": "1dcca0bcce2e95a6f5bc91ed93573626be5db8b7d09f6611a1ce76a87c4ab70a"
     }
   ],
