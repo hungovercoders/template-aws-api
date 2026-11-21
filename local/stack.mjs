@@ -10,8 +10,14 @@
 // AWS Emulator is found, in order:
 //   1. AWS_ENDPOINT_URL already set  - use that endpoint and the ambient AWS settings as they are
 //   2. one already serving on EMULATOR_PORT (e.g. the Docker container from `task emulator:docker`)
-//   3. start one: AWS_EMULATOR_BIN, then .tools/ (from `task emulator:install`), then PATH
+//   3. start a fresh one for this run, and stop it at the end:
+//      - on Linux: AWS_EMULATOR_BIN, then .tools/ (from `task emulator:install`), then PATH
+//      - on macOS and Windows, or with EMULATOR_DOCKER=1: a container of the image
+//        `task emulator:install` builds, aws-emulator:<EMULATOR_VERSION>
+// AWS Emulator cannot be reset, so a stack is applied to an emulator once:
+// a second run against one that already has it says so instead of failing.
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:https";
 import { homedir } from "node:os";
@@ -21,6 +27,8 @@ const args = process.argv.slice(2);
 const sep = args.indexOf("--");
 const command = sep === -1 ? [] : args.slice(sep + 1);
 const children = [];
+// Run when the stack stops: the container of a Docker emulator goes with it.
+const cleanups = [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Written while `task dev` is up, for `task http`.
@@ -31,6 +39,7 @@ const jwt = { issuer: "https://issuer.invalid/", audience: "local" };
 function stop(code) {
   rmSync(stackFile, { force: true });
   for (const child of children) child.kill("SIGTERM");
+  for (const cleanup of cleanups) cleanup();
   process.exit(code);
 }
 process.on("SIGINT", () => stop(130));
@@ -61,23 +70,46 @@ async function emulatorEnv() {
   if (await healthy(port, ca)) {
     console.log(`using the AWS Emulator already serving on port ${port}`);
   } else {
-    const local = join(".tools", "aws-emulator", "opt", "aws-emulator", "bin", "aws-emulator");
-    const bin = process.env.AWS_EMULATOR_BIN ?? (existsSync(local) ? local : "aws-emulator");
     const log = openSync(join(".local", "emulator.log"), "w");
     // AWS's own guidance: no usage telemetry from CI jobs. Anywhere else it is
     // the emulator's default (on) unless EMULATOR_TELEMETRY=off is set.
     const telemetry = process.env.CI ? ["-t", "off"] : [];
-    const emulator = spawn(bin, ["-p", String(port), ...telemetry], { stdio: ["ignore", log, log] });
+    // AWS ships a native package for Linux only; elsewhere the emulator runs in Docker.
+    const docker = process.env.EMULATOR_DOCKER === "1" || (process.platform !== "linux" && !process.env.AWS_EMULATOR_BIN);
+    let bin, args, hint;
+    if (docker) {
+      const name = `aws-emulator-${port}`;
+      const shared = join(homedir(), ".aws", "emulator");
+      mkdirSync(shared, { recursive: true });
+      // A container left by a run that was killed would hold the port.
+      spawnSync("docker", ["rm", "-f", name], { stdio: "ignore" });
+      cleanups.push(() => spawnSync("docker", ["rm", "-f", name], { stdio: "ignore" }));
+      bin = "docker";
+      // The emulator writes its credentials and certificate under HOME, so the
+      // container shares that folder with the host at the same path.
+      args = ["run", "--rm", "--name", name, "--memory=2g", "--memory-swap=2g", "-p", `127.0.0.1:${port}:${port}`,
+        "-e", `HOME=${homedir()}`, "-e", "EMULATOR_TELEMETRY", "-v", `${shared}:${shared}`,
+        `aws-emulator:${process.env.EMULATOR_VERSION}`, "-p", String(port), ...telemetry];
+      hint = "Is Docker running? Start Docker Desktop, then `task emulator:install` builds the emulator's image.";
+    } else {
+      const local = join(".tools", "aws-emulator", "opt", "aws-emulator", "bin", "aws-emulator");
+      bin = process.env.AWS_EMULATOR_BIN ?? (existsSync(local) ? local : "aws-emulator");
+      args = ["-p", String(port), ...telemetry];
+      hint = "Run `task emulator:install`.";
+    }
+    const emulator = spawn(bin, args, { stdio: ["ignore", log, log] });
     children.push(emulator);
     let failed = null;
-    emulator.on("error", (error) => (failed = `could not start AWS Emulator (${bin}): ${error.message}. Run \`task emulator:install\`.`));
-    emulator.on("exit", (code) => (failed ??= `AWS Emulator exited with code ${code}; see .local/emulator.log`));
-    for (let i = 0; i < 60 && !failed && !(await healthy(port, ca)); i++) await sleep(500);
+    emulator.on("error", (error) => (failed = `could not start AWS Emulator (${bin}): ${error.message}. ${hint}`));
+    emulator.on("exit", (code) => (failed ??= `AWS Emulator exited with code ${code}; see .local/emulator.log. ${hint}`));
+    // A container takes longer to start than the native package.
+    const seconds = docker ? 90 : 30;
+    for (let i = 0; i < seconds * 2 && !failed && !(await healthy(port, ca)); i++) await sleep(500);
     if (failed || !(await healthy(port, ca))) {
-      console.error(failed ?? "AWS Emulator did not become healthy within 30s; see .local/emulator.log");
+      console.error(failed ?? `AWS Emulator did not become healthy within ${seconds}s; see .local/emulator.log`);
       stop(1);
     }
-    console.log(`AWS Emulator ready on https://127.0.0.1:${port}`);
+    console.log(`AWS Emulator ready on https://127.0.0.1:${port}${docker ? " (in Docker)" : ""}`);
   }
 
   // From "Pointing your AWS SDK at AWS Emulator" in its user guide. The
@@ -101,6 +133,23 @@ async function emulatorEnv() {
 let stackOutputs = {};
 function deploy(env) {
   const state = resolve(".local", "emulator.tfstate");
+  // Each emulator writes a certificate of its own when it starts, so its hash
+  // says which emulator a stack was applied to. One that has the stack already
+  // - `task dev` still up, or one you started and ran against before - cannot
+  // be reset: say so, rather than fail on everything that already exists.
+  const applied = resolve(".local", "emulator.applied");
+  const emulator = env.AWS_CA_BUNDLE && existsSync(env.AWS_CA_BUNDLE) ? createHash("sha256").update(readFileSync(env.AWS_CA_BUNDLE)).digest("hex") : null;
+  if (emulator && existsSync(applied) && readFileSync(applied, "utf8").trim() === emulator) {
+    const port = new URL(env.AWS_ENDPOINT_URL).port;
+    console.error(
+      [
+        `The AWS Emulator on port ${port} already has this stack, from \`task dev\` still running or an earlier run,`,
+        "and an emulator cannot be reset. Stop it (Ctrl-C where it runs) and run this again - each run starts",
+        `a fresh one - or give this run a port of its own: EMULATOR_PORT=${Number(port) + 1} task <task>`,
+      ].join("\n"),
+    );
+    stop(1);
+  }
   for (const file of [state, `${state}.backup`]) rmSync(file, { force: true });
   // init and apply print straight to the console, so a CI log shows what was
   // created; only `output` is captured.
@@ -121,6 +170,8 @@ function deploy(env) {
   // The emulated authorizer checks a token's issuer and audience against
   // these; it does not fetch the issuer's keys, so the issuer need not exist.
   const authorizer = ["-var", `jwt_issuer=${jwt.issuer}`, "-var", `jwt_audience=${jwt.audience}`];
+  // Before the apply: one that fails half way has still left resources there.
+  if (emulator) writeFileSync(applied, emulator + "\n");
   console.log("applying infra/ to AWS Emulator");
   terraform(["apply", "-auto-approve", "-input=false", "-no-color", "-lock=false", `-state=${state}`, "-var", "name=api-local", "-var", `region=${region}`, ...authorizer]);
   const outputs = JSON.parse(terraform(["output", "-json", `-state=${state}`], true));
