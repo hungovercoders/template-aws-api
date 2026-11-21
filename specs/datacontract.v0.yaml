@@ -2,7 +2,7 @@ apiVersion: v3.2.0
 kind: DataContract
 id: beer-catalogue-events-v0
 name: Beer Catalogue events
-version: 0.2.0
+version: 0.3.0
 status: active
 description:
   purpose: What happened to every beer in the catalogue - created, updated, retired, rated - kept for analysis after the event was sent.
@@ -16,6 +16,9 @@ servers:
     location: s3://hungovercoders-beer-catalogue-events/events/v0/
     format: json
     delimiter: new_line
+    customProperties:
+      - property: retention
+        value: P7Y
   - server: production-parquet
     type: s3
     location: s3://hungovercoders-beer-catalogue-events/parquet/v0/
