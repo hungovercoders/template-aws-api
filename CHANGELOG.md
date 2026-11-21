@@ -7,6 +7,7 @@ Every change merged into the template's default branch, newest first. Written by
 
 ### Features
 
+- SLOs in specs/slos (OpenSLO) set the API's alarms, held by task slo:check ([#130](../../pull/130))
 - a changelog of the template, written from its history and held to it by a gate ([#129](../../pull/129))
 - every log line is an OpenTelemetry log record, in the trace of what caused it ([#128](../../pull/128))
 - a monthly cost budget the owner says, and the table's recovery held by a test ([#125](../../pull/125))
