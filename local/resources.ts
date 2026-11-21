@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-type State = { resources?: { mode?: string; instances?: { attributes?: { arn?: unknown } }[] }[] };
+type State = { resources?: { mode?: string; instances?: { attributes?: Record<string, unknown> }[] }[] };
 
 /** Every resource the state holds with an ARN of its own, each once. */
 export function arnsOf(state: State): string[] {
