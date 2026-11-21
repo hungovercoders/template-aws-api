@@ -57,7 +57,8 @@ run the same ones. On macOS you also need Docker.
 | Put it on your shell | `echo 'eval "$(mise activate zsh)"' >> ~/.zshrc` | `echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc` |
 | AWS Emulator, the local copy of AWS | Runs in Docker: install [Docker Desktop](https://www.docker.com/products/docker-desktop/), start it, and give it at least 4 GB of memory (Settings → Resources) | Nothing to install: the first run downloads and verifies it. It needs `gpg` and `dpkg-deb`, already there on Debian and Ubuntu |
 
-Then open a new terminal, so the shell picks mise up.
+Then open a new terminal, so the shell picks mise up. Check it with
+`mise --version`, and on macOS `docker info`.
 
 ### 2. See the example running
 
@@ -69,10 +70,16 @@ git checkout example/implementation
 mise trust && mise install
 ```
 
-**Terminal 1** - start the API with `task dev`, and leave it running. The first
-run takes a few minutes: it fetches AWS Emulator (on macOS, it builds its Docker
-image), starts it and applies `infra/` with Terraform, then prints the API's URL
-and a token. `Ctrl-C` stops it and throws the stack away.
+**Terminal 1** - start the API, and leave it running:
+
+```sh
+task dev
+```
+
+The first run takes a few minutes: it fetches AWS Emulator (on macOS, it
+builds its Docker image), starts it, and applies `infra/` to it with
+Terraform. Then it prints the API's URL and a token. `Ctrl-C` stops it and
+throws the stack away; the next `task dev` starts clean.
 
 **Terminal 2** - use it, in the same folder:
 
@@ -82,29 +89,37 @@ task events:tail   # follow the events the API publishes
 task data:query    # query the events kept in S3, with SQL
 ```
 
-**Run every check** with `task ci`, as CI does - about ten minutes. It starts
-an emulator of its own on port 9297, so stop `task dev` first, or keep it
-running and give the checks another port: `EMULATOR_PORT=9298 task ci`.
+**Run every check** - what CI runs, about ten minutes:
 
-macOS, Linux and CI run the same tasks on the same emulator version. Only where
-it runs differs: in a fresh Docker container for each run on macOS (an ARM build
-on Apple silicon), natively on Linux and in CI.
+```sh
+task ci                       # with task dev stopped: both use port 9297
+EMULATOR_PORT=9298 task ci    # or beside a running task dev
+```
+
+**macOS, Linux and CI** run the same tasks against the same emulator version.
+The only difference is where the emulator runs:
+
+| | macOS | Linux | CI (GitHub Actions) |
+| --- | --- | --- | --- |
+| AWS Emulator | In Docker, a fresh container each run (ARM on Apple silicon) | Native package, in `.tools/` | Native package, x86 |
+| First run | Builds the emulator's image | Downloads it and checks AWS's signature | The same, every run |
 
 ### 3. Build your own
 
 1. **Create your repository.** Click *Use this template* on GitHub, leave
    "Include all branches" unticked, clone it, then run `mise trust && mise install`.
 2. **Write the spec.** In [Claude Code](https://claude.com/claude-code), the
-   AI agent that works with you here, run `/write-spec`. It asks what the API should do, drafts the scenarios and
-   contracts with you, and checks them. Prefer to write it yourself?
-   [By hand](docs/spec.md#writing-it-by-hand).
+   AI agent that works with you here, run `/write-spec`. It asks what the API
+   should do, drafts the scenarios and contracts with you, and checks them.
+   Prefer to write it yourself? [By hand](docs/spec.md#writing-it-by-hand).
 3. **Make it yours.** Run `task adopt` once. It removes what is only about
    the template and replaces this README with one that describes your API.
 4. **Have it built.** Run `/implement-api`. The agent generates what follows
    from the spec, writes the logic, and works until `task ci` is green. It
    may not edit your spec, weaken a check or rebuild the template.
 5. **Deploy when you are ready.** `task deploy NAME=my-api`, or let CI deploy
-   `main` ([Deploying](docs/deploying.md#deploy)). Nothing deploys unasked.
+   `main` ([Deploying](docs/deploying.md#deploy)). Nothing deploys until you
+   opt in.
 
 ## The architecture you get
 
