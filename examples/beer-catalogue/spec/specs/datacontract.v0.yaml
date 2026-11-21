@@ -1,0 +1,369 @@
+apiVersion: v3.2.0
+kind: DataContract
+id: beer-catalogue-events-v0
+name: Beer Catalogue events
+version: 0.3.0
+status: active
+description:
+  purpose: What happened to every beer in the catalogue - created, updated, retired, rated - kept for analysis after the event was sent.
+  usage: One row per event. An event can be stored more than once; tell a repeat by its id. Order by time, not by arrival.
+  limitations: Only what happened since the catalogue began publishing; a beer's current state is the API's to answer.
+team:
+  name: catalogue
+servers:
+  - server: production
+    type: s3
+    location: s3://hungovercoders-beer-catalogue-events/events/v0/
+    format: json
+    delimiter: new_line
+    customProperties:
+      - property: retention
+        value: P7Y
+  - server: production-parquet
+    type: s3
+    location: s3://hungovercoders-beer-catalogue-events/parquet/v0/
+    format: parquet
+    description: Each day's events, compacted daily a little after midnight UTC - one file per event type and day they happened, typed by this contract, each event once.
+slaProperties:
+  - property: retention
+    value: 2
+    unit: y
+  - property: latency
+    value: 15
+    unit: m
+schema:
+  - name: beer_created_v1
+    physicalName: com.hungovercoders.beer_catalogue.beer.created.v1
+    physicalType: object
+    businessName: Beer created
+    description: A beer was added to the catalogue.
+    quality:
+      - metric: rowCount
+        mustBeGreaterThan: 0
+    properties:
+      - name: specversion
+        classification: public
+        logicalType: string
+        required: true
+        description: The version of CloudEvents the event follows.
+      - name: id
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Identifies the event; with source, unique. A consumer that sees one twice has seen the same event.
+      - name: source
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Where the event came from - the API that published it.
+      - name: type
+        classification: public
+        logicalType: string
+        required: true
+      - name: time
+        classification: public
+        logicalType: timestamp
+        required: true
+        description: When it happened.
+      - name: subject
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          minLength: 1
+        description: What it happened to - the identifier of the thing.
+      - name: datacontenttype
+        classification: public
+        logicalType: string
+        description: The media type of data.
+      - name: dataschema
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          format: uri
+        description: Where the schema of data is published.
+      - name: traceparent
+        classification: internal
+        logicalType: string
+        logicalTypeOptions:
+          pattern: ^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$
+        description: The W3C trace context of the request or message that caused the event.
+      - name: data
+        classification: public
+        logicalType: object
+        required: true
+        description: A beer as the catalogue describes it.
+        properties:
+          - name: beer_id
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: name
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: style
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: abv
+            classification: public
+            logicalType: number
+            required: true
+            logicalTypeOptions:
+              minimum: 0
+            description: Alcohol by volume, percent.
+  - name: beer_rated_v1
+    physicalName: com.hungovercoders.beer_catalogue.beer.rated.v1
+    physicalType: object
+    businessName: Beer rated
+    description: A drinker scored a beer.
+    quality:
+      - metric: rowCount
+        mustBeGreaterThan: 0
+    properties:
+      - name: specversion
+        classification: public
+        logicalType: string
+        required: true
+        description: The version of CloudEvents the event follows.
+      - name: id
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Identifies the event; with source, unique. A consumer that sees one twice has seen the same event.
+      - name: source
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Where the event came from - the API that published it.
+      - name: type
+        classification: public
+        logicalType: string
+        required: true
+      - name: time
+        classification: public
+        logicalType: timestamp
+        required: true
+        description: When it happened.
+      - name: subject
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          minLength: 1
+        description: What it happened to - the identifier of the thing.
+      - name: datacontenttype
+        classification: public
+        logicalType: string
+        description: The media type of data.
+      - name: dataschema
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          format: uri
+        description: Where the schema of data is published.
+      - name: traceparent
+        classification: internal
+        logicalType: string
+        logicalTypeOptions:
+          pattern: ^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$
+        description: The W3C trace context of the request or message that caused the event.
+      - name: data
+        classification: public
+        logicalType: object
+        required: true
+        properties:
+          - name: beer_id
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: score
+            classification: public
+            logicalType: integer
+            required: true
+            logicalTypeOptions:
+              minimum: 1
+              maximum: 5
+            description: A whole number from 1 to 5.
+  - name: beer_retired_v1
+    physicalName: com.hungovercoders.beer_catalogue.beer.retired.v1
+    physicalType: object
+    businessName: Beer retired
+    description: A beer was retired from the catalogue.
+    quality:
+      - metric: rowCount
+        mustBeGreaterThan: 0
+    properties:
+      - name: specversion
+        classification: public
+        logicalType: string
+        required: true
+        description: The version of CloudEvents the event follows.
+      - name: id
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Identifies the event; with source, unique. A consumer that sees one twice has seen the same event.
+      - name: source
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Where the event came from - the API that published it.
+      - name: type
+        classification: public
+        logicalType: string
+        required: true
+      - name: time
+        classification: public
+        logicalType: timestamp
+        required: true
+        description: When it happened.
+      - name: subject
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          minLength: 1
+        description: What it happened to - the identifier of the thing.
+      - name: datacontenttype
+        classification: public
+        logicalType: string
+        description: The media type of data.
+      - name: dataschema
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          format: uri
+        description: Where the schema of data is published.
+      - name: traceparent
+        classification: internal
+        logicalType: string
+        logicalTypeOptions:
+          pattern: ^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$
+        description: The W3C trace context of the request or message that caused the event.
+      - name: data
+        classification: public
+        logicalType: object
+        required: true
+        properties:
+          - name: beer_id
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: name
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+            description: The name it had when it was retired.
+  - name: beer_updated_v1
+    physicalName: com.hungovercoders.beer_catalogue.beer.updated.v1
+    physicalType: object
+    businessName: Beer updated
+    description: A beer's name, style or strength was changed.
+    quality:
+      - metric: rowCount
+        mustBeGreaterThan: 0
+    properties:
+      - name: specversion
+        classification: public
+        logicalType: string
+        required: true
+        description: The version of CloudEvents the event follows.
+      - name: id
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Identifies the event; with source, unique. A consumer that sees one twice has seen the same event.
+      - name: source
+        classification: public
+        logicalType: string
+        required: true
+        logicalTypeOptions:
+          minLength: 1
+        description: Where the event came from - the API that published it.
+      - name: type
+        classification: public
+        logicalType: string
+        required: true
+      - name: time
+        classification: public
+        logicalType: timestamp
+        required: true
+        description: When it happened.
+      - name: subject
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          minLength: 1
+        description: What it happened to - the identifier of the thing.
+      - name: datacontenttype
+        classification: public
+        logicalType: string
+        description: The media type of data.
+      - name: dataschema
+        classification: public
+        logicalType: string
+        logicalTypeOptions:
+          format: uri
+        description: Where the schema of data is published.
+      - name: traceparent
+        classification: internal
+        logicalType: string
+        logicalTypeOptions:
+          pattern: ^[0-9a-f]{2}-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$
+        description: The W3C trace context of the request or message that caused the event.
+      - name: data
+        classification: public
+        logicalType: object
+        required: true
+        description: A beer as the catalogue describes it.
+        properties:
+          - name: beer_id
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: name
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: style
+            classification: public
+            logicalType: string
+            required: true
+            logicalTypeOptions:
+              minLength: 1
+          - name: abv
+            classification: public
+            logicalType: number
+            required: true
+            logicalTypeOptions:
+              minimum: 0
+            description: Alcohol by volume, percent.

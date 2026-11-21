@@ -55,6 +55,7 @@ const SKELETON = [
   "test/changelog.test.ts",
   "test/slo.test.ts",
   "test/resources.test.ts",
+  "test/example.test.ts",
   "docs/data.md",
   "infra/",
   // The template's own skills. Skills copied from elsewhere are held by

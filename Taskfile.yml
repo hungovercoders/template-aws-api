@@ -94,6 +94,24 @@ tasks:
     cmds:
       - node scripts/docs-check.ts
 
+  example:
+    desc: Make a worked example at a phase - the template with the example's overlays laid over it (examples/<name>/<phase>) - as a repository of its own in .local/examples/<name>-<phase>, to run, change or test there (task example -- beer-catalogue implementation)
+    deps: [install]
+    cmds:
+      - node scripts/example.ts make {{.CLI_ARGS}}
+
+  example:save:
+    desc: Write what a made example adds to the phase below back into its overlay, after changing it in .local/examples/<name>-<phase> (task example:save -- beer-catalogue implementation)
+    deps: [install]
+    cmds:
+      - node scripts/example.ts save {{.CLI_ARGS}}
+
+  example:check:
+    desc: Gate - every example in examples/ has every phase, and each only adds what an API owns - never a skeleton file
+    deps: [install]
+    cmds:
+      - node scripts/example.ts check
+
   changelog:generate:
     desc: Write CHANGELOG.md from the history - every change merged into the default branch before this one, newest first, grouped by kind (the template's; an API's branch skips it)
     deps: [install]

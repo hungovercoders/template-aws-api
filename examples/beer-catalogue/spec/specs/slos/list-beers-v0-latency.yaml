@@ -1,0 +1,29 @@
+apiVersion: openslo/v1
+kind: SLO
+metadata:
+  name: list-beers-v0-latency
+  displayName: Listing the beers is quick
+  labels:
+    operation: list_beers_v0
+spec:
+  service: beer-catalogue
+  indicator:
+    metadata:
+      name: list-beers-v0-latency
+    spec:
+      thresholdMetric:
+        metricSource:
+          type: CloudWatch
+          spec:
+            namespace: AWS/ApiGateway
+            metricName: Latency
+            stat: p99
+  timeWindow:
+    - duration: 28d
+      isRolling: true
+  budgetingMethod: Occurrences
+  objectives:
+    - displayName: 99% of listings answered within 500 ms
+      op: lte
+      value: 500
+      target: 0.99

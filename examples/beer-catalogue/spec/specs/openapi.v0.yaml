@@ -1,0 +1,402 @@
+openapi: 3.1.0
+info:
+  title: Beer Catalogue API
+  version: 0.2.0
+  description: >
+    A brewery's beer catalogue. Signed-in staff add the beers they brew, keep
+    the details current and retire beers. Anyone can browse the catalogue, and
+    drinkers rate beers from 1 to 5.
+
+x-rate-limit:
+  requests_per_second: 20
+  burst: 40
+
+tags:
+  - name: beers
+  - name: ratings
+
+paths:
+  /v0/beers:
+    get:
+      operationId: list_beers_v0
+      summary: List the beers in the catalogue
+      tags: [beers]
+      parameters:
+        - name: style
+          in: query
+          description: Only return beers of this style.
+          schema:
+            $ref: "#/components/schemas/Style"
+        - name: limit
+          in: query
+          description: The most beers to return in one page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          description: >
+            The next_cursor of the previous page, to continue from where it
+            ended. Use it with the same style as the page it came from.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 1024
+      responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "200":
+          description: >
+            A page of beers in name order, ignoring case and accents. Follow
+            next_cursor until it is null to read the whole catalogue.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items:
+                    type: array
+                    maxItems: 100
+                    items:
+                      $ref: "#/components/schemas/Beer"
+                  next_cursor:
+                    description: Pass as cursor to get the next page; null on the last page.
+                    type: [string, "null"]
+              example:
+                next_cursor: null
+                items:
+                  - id: 3f6c1c2e-6a53-4d5e-9d0b-0a0f6d2a9d11
+                    name: Morning After
+                    style: ipa
+                    abv: 5.6
+                    rating_count: 2
+                    average_rating: 4.5
+                    created_at: "2026-11-14T09:00:00.000Z"
+                    updated_at: "2026-11-14T09:30:00.000Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: create_beer_v0
+      summary: Add a beer to the catalogue
+      tags: [beers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewBeer"
+            example:
+              name: Morning After
+              style: ipa
+              abv: 5.6
+      security:
+        - bearer_auth: []
+      responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "201":
+          description: The beer was added.
+          headers:
+            Location:
+              description: Where the new beer can be fetched.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v0/beers/{beer_id}:
+    parameters:
+      - $ref: "#/components/parameters/BeerId"
+    get:
+      operationId: get_beer_v0
+      summary: Fetch one beer
+      tags: [beers]
+      responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "200":
+          description: The beer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: update_beer_v0
+      summary: Change a beer's details
+      tags: [beers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeerChanges"
+            example:
+              abv: 5.8
+      security:
+        - bearer_auth: []
+      responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "200":
+          description: The beer with the changes applied.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      operationId: retire_beer_v0
+      summary: Retire a beer from the catalogue
+      tags: [beers]
+      security:
+        - bearer_auth: []
+      responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "204":
+          description: The beer was retired.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v0/beers/{beer_id}/ratings:
+    parameters:
+      - $ref: "#/components/parameters/BeerId"
+    post:
+      operationId: rate_beer_v0
+      summary: Rate a beer
+      tags: [ratings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewRating"
+            example:
+              score: 4
+      responses:
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "201":
+          description: The rating was recorded; the beer with its new average.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    # Staff sign in; the token is verified by API Gateway before the API runs.
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    BeerId:
+      name: beer_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Style:
+      type: string
+      enum: [lager, ale, ipa, stout, sour]
+
+    NewBeer:
+      type: object
+      required: [name, style, abv]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: \S
+          description: Unique in the catalogue, ignoring case and surrounding spaces.
+        style:
+          $ref: "#/components/schemas/Style"
+        abv:
+          type: number
+          minimum: 0
+          maximum: 20
+          description: Alcohol by volume, percent. Recorded to one decimal place.
+
+    BeerChanges:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+          pattern: \S
+        style:
+          $ref: "#/components/schemas/Style"
+        abv:
+          type: number
+          minimum: 0
+          maximum: 20
+
+    NewRating:
+      type: object
+      required: [score]
+      additionalProperties: false
+      properties:
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+
+    Beer:
+      type: object
+      required: [id, name, style, abv, rating_count, average_rating, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        style:
+          $ref: "#/components/schemas/Style"
+        abv:
+          type: number
+        rating_count:
+          type: integer
+          minimum: 0
+        average_rating:
+          description: Mean of the scores to one decimal place; null until the beer has a rating.
+          type: [number, "null"]
+          minimum: 1
+          maximum: 5
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # The error body the template's router emits (RFC 9457).
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required: [in, pointer, message]
+            properties:
+              in:
+                type: string
+                enum: [path, query, body]
+              pointer:
+                type: string
+              message:
+                type: string
+
+  responses:
+    TooManyRequests:
+      description: The caller called faster than the catalogue allows (x-rate-limit). API Gateway answers this itself; wait and try again.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message:
+                type: string
+          example:
+            message: Too Many Requests
+    Unauthorized:
+      description: The caller is not signed in. Only staff may change the catalogue.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [message]
+            properties:
+              message:
+                type: string
+          example:
+            message: Unauthorized
+    BadRequest:
+      description: The request does not satisfy the contract.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: about:blank
+            title: Bad Request
+            status: 400
+            detail: The request does not satisfy the contract.
+            errors:
+              - in: body
+                pointer: /abv
+                message: must be <= 20
+    NotFound:
+      description: There is no such beer in the catalogue.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: about:blank
+            title: Not Found
+            status: 404
+            detail: There is no such beer in the catalogue.
+    Conflict:
+      description: Another beer in the catalogue already has that name.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          example:
+            type: about:blank
+            title: Conflict
+            status: 409
+            detail: Another beer in the catalogue already has that name.

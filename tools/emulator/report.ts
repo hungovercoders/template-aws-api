@@ -56,7 +56,7 @@ export function issue(outcome: Outcome, version: string): { title: string; body:
     "",
   ];
   if (outcome.kind === "blocked") lines.push(`- [ ] #${outcome.issue} says this no longer blocks it`);
-  if (outcome.kind === "workaround") lines.push("- [ ] The workaround is gone and `task ci` is green on `example/implementation`");
+  if (outcome.kind === "workaround") lines.push("- [ ] The workaround is gone and `task ci` is green on the example's implementation (`task example -- beer-catalogue implementation`)");
   if (outcome.kind === "limit") lines.push("- [ ] `docs/testing.md` no longer says the local tests cannot show this");
   lines.push(`- [ ] The gap \`${outcome.id}\` is removed from \`tools/emulator/gaps/\``);
   return { title: `Emulator gap closed: ${outcome.id}`, body: lines.join("\n") };

@@ -90,40 +90,35 @@ skeleton every API shares.
 2. **Make it on `main`**, with `task skeleton:lock` in the same commit, and
    `task changelog:generate` once the branch is up to date with `main`.
    `ci` is red there by design (there is no spec to implement), so the check
-   that matters is `template`: every gate, with the example laid over your
-   change.
-3. **Merge it down** `main` → `example/spec` → `example/implementation`, and
-   confirm `stage` is green on each and `example/implementation` is green. After a change to a generator,
-   run it on `example/spec` (`task readme:generate`, `task http:generate`)
-   and commit what it writes: the gates there fail until you have.
+   that matters is `template`: it makes every step of every example over
+   your change and runs that step's gates there.
+3. **Change the example in the same pull request** when your change needs it
+   to move - a generator's new output, a new required file. Make the step,
+   change it there and save it back:
+   `task example -- beer-catalogue spec`, work in
+   `.local/examples/beer-catalogue-spec`, then
+   `task example:save -- beer-catalogue spec`; the same for `implementation`.
 
-| Branch | Is | CI |
+The example is kept on `main` as what each step adds, never as branches:
+
+| `examples/beer-catalogue/` | Holds | Made, `task ci` is |
 | --- | --- | --- |
-| `main` | The template | `ci` red by design; `stage` and `template` green |
-| `example/spec` | `main` plus the example spec | `ci` red by design; `stage` green |
-| `example/implementation` | `example/spec` plus its implementation | Green |
+| `spec/` | All of `specs/`, and what an API owns beside it: `README.md`, `.stage`, `http/`, `messages/`, its tags and budget | Red by design; `task check` green |
+| `implementation/` | What implementing it adds: `src/operations/`, `src/domain/`, `src/store/`, `src/consumers/`, `steps/` and their tests | Green |
 
-`stage` is green on every branch: `task check` for the stage in its `.stage`,
-and the gates that need no spec. Red, it means the branch broke something
-that should hold where `ci` is red anyway.
-
-- **Never change a skeleton file on an example branch.** The example branches
-  follow the route above themselves: a change to the example goes into
-  `example/spec` first, then `example/implementation`.
-- **The branches differ only in what an API owns:** `example/spec` adds
-  `specs/`, `http/contract.http` and its README; `example/implementation`
-  adds `src/operations/`, `src/domain/`, `src/store/`, `steps/` (but
-  `world.ts`) and their tests.
-- **When the starter `specs/openapi.v0.yaml` changes on `main`,** the example
-  branches keep their own contract: restore it from before the merge and
-  re-apply the idea by hand. Never resolve with `-X ours` or `-X theirs`.
-- **When `README.md` changes on `main`,** the merge conflicts, because the
-  example branches' READMEs are generated from their contract. Keep theirs
-  (`git checkout --ours README.md`).
+- **No step holds a skeleton file** (`task example:check`, in `task check`),
+  so an example always has the template as it is: there is nowhere to
+  change the skeleton but `main`. `example:save` refuses to save one.
+- **A made step is a repository of its own**, committed twice: as last
+  published on the default branch, then as it is in your tree. So
+  `spec:compat` and the other compat gates hold the example's contracts to
+  their versions as they would any API's.
+- **`task adopt` deletes `examples/`**, so an API made from the template
+  starts from the template alone.
 - **An optional part of the skeleton is a component:** declared in
   `components.json`, its sections of shared files marked, so an API can
   remove it and restore it. `test/components.test.ts` proves the mechanism.
-- **Never rewrite what is pushed.** `main` and `example/*` are protected
+- **Never rewrite what is pushed.** `main` is protected
   (`.github/rulesets/protect-demo-branches.json`); only add commits or merges.
 - `renovate.json` keeps npm, GitHub Actions, Terraform, mise, the emulator,
   Prism and schemathesis pins and the skill sources moving; install the
