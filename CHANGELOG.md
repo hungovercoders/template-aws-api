@@ -29,6 +29,10 @@ Every change merged into the template's default branch, newest first. Written by
 - the skills are up to date, and their detail lives in references beside them ([#126](../../pull/126))
 - the README shows the daily Parquet compaction, its diagram marks the optional parts ([#110](../../pull/110))
 
+### CI
+
+- the example is on main, so only main is built and protected ([#136](../../pull/136))
+
 ### Other
 
 - The events kept as data are compacted daily into Parquet, held to the data contract; the bootstrap covers every data stream, the compactor and its schedule. ([#109](../../pull/109))
