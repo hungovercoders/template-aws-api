@@ -41,7 +41,7 @@ of AWS, and says whether it is finished. Here it is running: a request, a
 refusal, the event it published, and that event compacted to Parquet in S3
 and queried there (real output, shortened).
 
-![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, then compacted to Parquet in S3 and read back with SQL](.github/images/api-in-action.gif)
+![The example API on AWS Emulator: a beer is added, a bad request is refused with the reasons, the published event is shown, then compacted to Parquet in S3 and read back with SQL, and aggregated by style in Harlequin, a SQL IDE in the terminal](.github/images/api-in-action.gif)
 
 ## Start here
 
