@@ -43,7 +43,8 @@ locals {
 resource "aws_cloudwatch_event_bus" "events" {
   count = local.own_bus ? 1 : 0
 
-  name = var.name
+  name        = var.name
+  description = "The events ${var.name} publishes. Put a rule on it to subscribe."
 }
 
 data "aws_cloudwatch_event_bus" "existing" {
@@ -89,6 +90,7 @@ resource "aws_cloudwatch_event_archive" "events" {
 
   name             = var.name
   event_source_arn = local.bus_arn
+  description      = "The events ${var.name} published, kept ${var.event_archive_days} days to replay to a new consumer."
   retention_days   = var.event_archive_days
   # Only what this API published, on a bus it may share.
   event_pattern = jsonencode({ source = ["/${var.name}"] })
@@ -197,6 +199,7 @@ data "aws_iam_policy_document" "forwarder" {
 
 resource "aws_iam_role" "forwarder" {
   name                 = "${var.name}-forwarder"
+  description          = "What the Lambda that publishes the events of ${var.name} may do."
   assume_role_policy   = data.aws_iam_policy_document.assume.json
   permissions_boundary = local.permissions_boundary
 }
@@ -214,6 +217,7 @@ resource "aws_cloudwatch_log_group" "forwarder" {
 
 resource "aws_lambda_function" "forwarder" {
   function_name    = "${var.name}-forwarder"
+  description      = "Publishes the events ${var.name} wrote to its outbox, onto its event bus."
   role             = aws_iam_role.forwarder.arn
   runtime          = "nodejs22.x"
   architectures    = ["arm64"]
@@ -262,7 +266,7 @@ resource "aws_lambda_event_source_mapping" "outbox" {
 
 resource "aws_cloudwatch_metric_alarm" "outbox_age" {
   alarm_name          = "${var.name}-outbox-age"
-  alarm_description   = "Events are waiting in the outbox: the forwarder is failing or cannot keep up, and nothing is being published. Runbook: docs/runbook.md#outbox-age"
+  alarm_description   = "Events are waiting in the outbox: the forwarder is failing or cannot keep up, and nothing is being published. Runbook: ${local.docs}/runbook.md#outbox-age"
   namespace           = "AWS/Lambda"
   metric_name         = "IteratorAge"
   dimensions          = { FunctionName = aws_lambda_function.forwarder.function_name }
@@ -278,7 +282,7 @@ resource "aws_cloudwatch_metric_alarm" "outbox_age" {
 
 resource "aws_cloudwatch_metric_alarm" "unpublished" {
   alarm_name          = "${var.name}-unpublished"
-  alarm_description   = "An event could not be published and was put aside. It is kept for 14 days. Runbook: docs/runbook.md#unpublished"
+  alarm_description   = "An event could not be published and was put aside. It is kept for 14 days. Runbook: ${local.docs}/runbook.md#unpublished"
   namespace           = "AWS/SQS"
   metric_name         = "ApproximateNumberOfMessagesVisible"
   dimensions          = { QueueName = aws_sqs_queue.unpublished.name }
@@ -294,7 +298,7 @@ resource "aws_cloudwatch_metric_alarm" "unpublished" {
 
 resource "aws_cloudwatch_metric_alarm" "forwarder_errors" {
   alarm_name          = "${var.name}-forwarder-errors"
-  alarm_description   = "The forwarder failed outright: an unhandled error, a timeout or out of memory. Its events are tried again. Runbook: docs/runbook.md#forwarder-errors"
+  alarm_description   = "The forwarder failed outright: an unhandled error, a timeout or out of memory. Its events are tried again. Runbook: ${local.docs}/runbook.md#forwarder-errors"
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   dimensions          = { FunctionName = aws_lambda_function.forwarder.function_name }
@@ -312,7 +316,7 @@ resource "aws_cloudwatch_metric_alarm" "event_log_failed" {
   count = var.event_log_days > 0 ? 1 : 0
 
   alarm_name          = "${var.name}-event-delivery-failed"
-  alarm_description   = "EventBridge could not deliver events to a target of a rule on the bus. Runbook: docs/runbook.md#event-delivery-failed"
+  alarm_description   = "EventBridge could not deliver events to a target of a rule on the bus. Runbook: ${local.docs}/runbook.md#event-delivery-failed"
   namespace           = "AWS/Events"
   metric_name         = "FailedInvocations"
   dimensions          = { EventBusName = local.bus_name, RuleName = one(aws_cloudwatch_event_rule.event_log[*].name) }

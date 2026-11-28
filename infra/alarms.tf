@@ -33,7 +33,7 @@ resource "aws_sns_topic_subscription" "email" {
 
 resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   alarm_name          = "${var.name}-lambda-errors"
-  alarm_description   = "The Lambda failed: an unhandled error, a timeout or out of memory. Find the request in its logs by request_id. Runbook: docs/runbook.md#lambda-errors"
+  alarm_description   = "The Lambda failed: an unhandled error, a timeout or out of memory. Find the request in its logs by request_id. Runbook: ${local.docs}/runbook.md#lambda-errors"
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   dimensions          = { FunctionName = aws_lambda_function.api.function_name }
@@ -49,7 +49,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
 
 resource "aws_cloudwatch_metric_alarm" "lambda_throttles" {
   alarm_name          = "${var.name}-lambda-throttles"
-  alarm_description   = "Requests were refused because the Lambda hit its concurrency limit. Runbook: docs/runbook.md#lambda-throttles"
+  alarm_description   = "Requests were refused because the Lambda hit its concurrency limit. Runbook: ${local.docs}/runbook.md#lambda-throttles"
   namespace           = "AWS/Lambda"
   metric_name         = "Throttles"
   dimensions          = { FunctionName = aws_lambda_function.api.function_name }
@@ -65,7 +65,7 @@ resource "aws_cloudwatch_metric_alarm" "lambda_throttles" {
 
 resource "aws_cloudwatch_metric_alarm" "lambda_duration" {
   alarm_name          = "${var.name}-lambda-duration"
-  alarm_description   = "The slowest 1% of invocations are within 20% of the Lambda timeout; timeouts are next. Runbook: docs/runbook.md#lambda-duration"
+  alarm_description   = "The slowest 1% of invocations are within 20% of the Lambda timeout; timeouts are next. Runbook: ${local.docs}/runbook.md#lambda-duration"
   namespace           = "AWS/Lambda"
   metric_name         = "Duration"
   dimensions          = { FunctionName = aws_lambda_function.api.function_name }
@@ -121,8 +121,8 @@ locals {
 resource "aws_cloudwatch_metric_alarm" "api_5xx" {
   alarm_name = "${var.name}-api-5xx"
   alarm_description = (local.availability == null
-    ? "Callers received a 5xx: the API failed, or API Gateway could not reach the Lambda. Runbook: docs/runbook.md#api-5xx"
-    : "Over ${format("%g", (1 - local.availability.target) * 100)}% of requests were answered 5xx in 5 minutes, against the ${local.availability.name} SLO (specs/slos). Runbook: docs/runbook.md#api-5xx"
+    ? "Callers received a 5xx: the API failed, or API Gateway could not reach the Lambda. Runbook: ${local.docs}/runbook.md#api-5xx"
+    : "Over ${format("%g", (1 - local.availability.target) * 100)}% of requests were answered 5xx in 5 minutes, against the ${local.availability.name} SLO (specs/slos). Runbook: ${local.docs}/runbook.md#api-5xx"
   )
   evaluation_periods  = 1
   comparison_operator = local.availability == null ? "GreaterThanOrEqualToThreshold" : "GreaterThanThreshold"
@@ -167,8 +167,8 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
 resource "aws_cloudwatch_metric_alarm" "api_latency" {
   alarm_name = "${var.name}-api-latency"
   alarm_description = (local.api_latency == null
-    ? "The slowest 1% of requests took over 3 seconds, for 15 minutes. Runbook: docs/runbook.md#api-latency"
-    : "Requests' ${local.api_latency.stat} latency was over ${local.api_latency.milliseconds} ms for 15 minutes, against the ${local.api_latency.name} SLO (specs/slos). Runbook: docs/runbook.md#api-latency"
+    ? "The slowest 1% of requests took over 3 seconds, for 15 minutes. Runbook: ${local.docs}/runbook.md#api-latency"
+    : "Requests' ${local.api_latency.stat} latency was over ${local.api_latency.milliseconds} ms for 15 minutes, against the ${local.api_latency.name} SLO (specs/slos). Runbook: ${local.docs}/runbook.md#api-latency"
   )
   namespace           = "AWS/ApiGateway"
   metric_name         = "Latency"
@@ -189,7 +189,7 @@ resource "aws_cloudwatch_metric_alarm" "operation_latency" {
   for_each = local.operation_latency
 
   alarm_name          = "${var.name}-latency-${each.key}"
-  alarm_description   = "${each.value.route}'s ${each.value.stat} latency was over ${each.value.milliseconds} ms for 15 minutes, against the ${each.value.name} SLO (specs/slos). Runbook: docs/runbook.md#api-latency"
+  alarm_description   = "${each.value.route}'s ${each.value.stat} latency was over ${each.value.milliseconds} ms for 15 minutes, against the ${each.value.name} SLO (specs/slos). Runbook: ${local.docs}/runbook.md#api-latency"
   namespace           = "AWS/ApiGateway"
   metric_name         = "Latency"
   dimensions          = { ApiId = aws_apigatewayv2_api.this.id, Stage = aws_apigatewayv2_stage.default.name, Route = each.value.route }
@@ -208,7 +208,7 @@ resource "aws_cloudwatch_metric_alarm" "operation_latency" {
 
 resource "aws_cloudwatch_metric_alarm" "table_throttles" {
   alarm_name          = "${var.name}-table-throttles"
-  alarm_description   = "DynamoDB throttled reads or writes on the table; the SDK retries, so callers see slowness before errors. Runbook: docs/runbook.md#table-throttles"
+  alarm_description   = "DynamoDB throttled reads or writes on the table; the SDK retries, so callers see slowness before errors. Runbook: ${local.docs}/runbook.md#table-throttles"
   evaluation_periods  = 1
   comparison_operator = "GreaterThanOrEqualToThreshold"
   threshold           = 1

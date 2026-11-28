@@ -6,6 +6,8 @@
 
 Every stack is deployed with the same alarms: the baseline in
 `infra/alarms.tf`, and each component's beside what it watches.
+Each alarm's description says what is wrong and ends on a link to its
+section below, in the repository the stack was deployed from.
 
 | Alarm | Fires when | Usually means |
 | --- | --- | --- |

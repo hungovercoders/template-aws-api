@@ -189,6 +189,7 @@ data "aws_iam_policy_document" "lambda" {
 
 resource "aws_iam_role" "lambda" {
   name                 = "${var.name}-lambda"
+  description          = "What the Lambda that answers the ${var.name} API may do."
   assume_role_policy   = data.aws_iam_policy_document.assume.json
   permissions_boundary = local.permissions_boundary
 }
@@ -206,6 +207,7 @@ resource "aws_cloudwatch_log_group" "lambda" {
 
 resource "aws_lambda_function" "api" {
   function_name    = var.name
+  description      = "Answers every request to the ${var.name} API, behind its API Gateway."
   role             = aws_iam_role.lambda.arn
   runtime          = "nodejs22.x"
   architectures    = ["arm64"]
@@ -234,6 +236,7 @@ resource "aws_lambda_function" "api" {
 
 resource "aws_apigatewayv2_api" "this" {
   name          = var.name
+  description   = "The ${var.name} API over HTTP: the routes of its OpenAPI contract, all answered by one Lambda."
   protocol_type = "HTTP"
 
   # Browsers on other origins may call the API only when you name them.
@@ -249,6 +252,7 @@ resource "aws_apigatewayv2_api" "this" {
 }
 
 resource "aws_apigatewayv2_integration" "lambda" {
+  description            = "Every route of the ${var.name} API, to its Lambda."
   api_id                 = aws_apigatewayv2_api.this.id
   integration_type       = "AWS_PROXY"
   integration_uri        = aws_lambda_function.api.invoke_arn
@@ -292,6 +296,7 @@ resource "aws_apigatewayv2_route" "operation" {
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
+  description = "The one stage of the ${var.name} API, deployed on every apply, with the rate limit its contract gives each route."
   auto_deploy = true
 
   # What each route's contract says callers may do (x-rate-limit): `task spec:check` holds it

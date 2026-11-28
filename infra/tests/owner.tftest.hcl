@@ -32,6 +32,20 @@ run "the_table_can_be_restored" {
   }
 }
 
+run "an_alarm_links_to_its_section_of_the_runbook" {
+  command = plan
+
+  assert {
+    condition     = endswith(aws_cloudwatch_metric_alarm.lambda_errors.alarm_description, "Runbook: https://example.com/plan-test/blob/HEAD/docs/runbook.md#lambda-errors")
+    error_message = "An alarm ends on a link to its runbook section in the stack's own repository, so it can be opened from the alarm."
+  }
+
+  assert {
+    condition     = aws_lambda_function.api.description != "" && aws_iam_role.lambda.description != "" && aws_apigatewayv2_api.this.description != ""
+    error_message = "The Lambda, its role and the API each say what they are."
+  }
+}
+
 run "the_stack_has_the_owners_budget" {
   command = plan
 
