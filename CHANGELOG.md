@@ -3,6 +3,12 @@
 Every change merged into the template's default branch, newest first. Written by
 `task changelog:generate` from the history; `task changelog:check` keeps it current.
 
+## 2026-11-22
+
+### Documentation
+
+- the README's GIF ends in Harlequin, aggregating the events kept as data ([#137](../../pull/137))
+
 ## 2026-11-21
 
 ### Features
