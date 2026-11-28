@@ -259,6 +259,7 @@ resource "aws_iam_role" "data" {
   count = local.data_count
 
   name                 = "${var.name}-data"
+  description          = "What the rule and the Firehose stream that keep the events of ${var.name} as data may do."
   assume_role_policy   = data.aws_iam_policy_document.data_assume.json
   permissions_boundary = local.permissions_boundary
 }
@@ -407,6 +408,7 @@ resource "aws_iam_role" "data_compactor" {
   count = local.data_count
 
   name                 = local.data_compactor
+  description          = "What the Lambda that compacts the events of ${var.name} into Parquet may do."
   assume_role_policy   = data.aws_iam_policy_document.data_compactor_assume.json
   permissions_boundary = local.permissions_boundary
 }
@@ -430,6 +432,7 @@ resource "aws_lambda_function" "data_compactor" {
   count = local.data_count
 
   function_name    = local.data_compactor
+  description      = "Compacts the events ${var.name} kept as data into Parquet, a day at a time."
   role             = one(aws_iam_role.data_compactor[*].arn)
   runtime          = "nodejs22.x"
   architectures    = ["arm64"]
@@ -480,7 +483,7 @@ resource "aws_cloudwatch_metric_alarm" "data_delivery" {
   for_each = local.data_majors
 
   alarm_name          = "${var.name}-data-${each.key}-delivery"
-  alarm_description   = "Firehose is failing to write events to S3: they are held for a day and then lost as data. Runbook: docs/data.md#data-delivery"
+  alarm_description   = "Firehose is failing to write events to S3: they are held for a day and then lost as data. Runbook: ${local.docs}/data.md#data-delivery"
   namespace           = "AWS/Firehose"
   metric_name         = "DeliveryToS3.Success"
   dimensions          = { DeliveryStreamName = aws_kinesis_firehose_delivery_stream.data[each.key].name }
@@ -498,7 +501,7 @@ resource "aws_cloudwatch_metric_alarm" "data_freshness" {
   for_each = local.data_majors
 
   alarm_name          = "${var.name}-data-${each.key}-freshness"
-  alarm_description   = "The oldest event not yet in S3 is older than the data contract promises. Runbook: docs/data.md#data-freshness"
+  alarm_description   = "The oldest event not yet in S3 is older than the data contract promises. Runbook: ${local.docs}/data.md#data-freshness"
   namespace           = "AWS/Firehose"
   metric_name         = "DeliveryToS3.DataFreshness"
   dimensions          = { DeliveryStreamName = aws_kinesis_firehose_delivery_stream.data[each.key].name }
@@ -516,7 +519,7 @@ resource "aws_cloudwatch_metric_alarm" "data_rule" {
   for_each = local.data_majors
 
   alarm_name          = "${var.name}-data-${each.key}-rule"
-  alarm_description   = "The bus could not hand events to Firehose: they were published but are not being kept. Runbook: docs/data.md#data-rule"
+  alarm_description   = "The bus could not hand events to Firehose: they were published but are not being kept. Runbook: ${local.docs}/data.md#data-rule"
   namespace           = "AWS/Events"
   metric_name         = "FailedInvocations"
   dimensions          = { EventBusName = local.bus_name, RuleName = aws_cloudwatch_event_rule.data[each.key].name }
@@ -534,7 +537,7 @@ resource "aws_cloudwatch_metric_alarm" "data_compaction" {
   count = local.data_count
 
   alarm_name          = "${var.name}-data-compaction"
-  alarm_description   = "The daily compaction to Parquet failed: the Parquet is behind the raw JSON until it succeeds. Runbook: docs/data.md#data-compaction"
+  alarm_description   = "The daily compaction to Parquet failed: the Parquet is behind the raw JSON until it succeeds. Runbook: ${local.docs}/data.md#data-compaction"
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   dimensions          = { FunctionName = one(aws_lambda_function.data_compactor[*].function_name) }

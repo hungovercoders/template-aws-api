@@ -94,6 +94,7 @@ data "aws_iam_policy_document" "consumer" {
 
 resource "aws_iam_role" "consumer" {
   name                 = "${var.name}-consumer"
+  description          = "What the Lambda that handles the messages sent to ${var.name} may do."
   assume_role_policy   = data.aws_iam_policy_document.assume.json
   permissions_boundary = local.permissions_boundary
 }
@@ -111,6 +112,7 @@ resource "aws_cloudwatch_log_group" "consumer" {
 
 resource "aws_lambda_function" "consumer" {
   function_name    = "${var.name}-consumer"
+  description      = "Handles the messages sent to ${var.name}, a batch at a time from its queue."
   role             = aws_iam_role.consumer.arn
   runtime          = "nodejs22.x"
   architectures    = ["arm64"]
@@ -147,7 +149,7 @@ resource "aws_lambda_event_source_mapping" "messages" {
 
 resource "aws_cloudwatch_metric_alarm" "queue_age" {
   alarm_name          = "${var.name}-queue-age"
-  alarm_description   = "Messages are waiting on the queue longer than they should: the consumer is failing, throttled or too slow. Runbook: docs/runbook.md#queue-age"
+  alarm_description   = "Messages are waiting on the queue longer than they should: the consumer is failing, throttled or too slow. Runbook: ${local.docs}/runbook.md#queue-age"
   namespace           = "AWS/SQS"
   metric_name         = "ApproximateAgeOfOldestMessage"
   dimensions          = { QueueName = aws_sqs_queue.messages.name }
@@ -163,7 +165,7 @@ resource "aws_cloudwatch_metric_alarm" "queue_age" {
 
 resource "aws_cloudwatch_metric_alarm" "dead_letters" {
   alarm_name          = "${var.name}-dead-letters"
-  alarm_description   = "A message could not be handled and was put on the dead-letter queue. It is kept for 14 days. Runbook: docs/runbook.md#dead-letters"
+  alarm_description   = "A message could not be handled and was put on the dead-letter queue. It is kept for 14 days. Runbook: ${local.docs}/runbook.md#dead-letters"
   namespace           = "AWS/SQS"
   metric_name         = "ApproximateNumberOfMessagesVisible"
   dimensions          = { QueueName = aws_sqs_queue.dead_letter.name }
@@ -179,7 +181,7 @@ resource "aws_cloudwatch_metric_alarm" "dead_letters" {
 
 resource "aws_cloudwatch_metric_alarm" "consumer_errors" {
   alarm_name          = "${var.name}-consumer-errors"
-  alarm_description   = "The consumer failed outright: an unhandled error, a timeout or out of memory. Its messages are offered again. Runbook: docs/runbook.md#consumer-errors"
+  alarm_description   = "The consumer failed outright: an unhandled error, a timeout or out of memory. Its messages are offered again. Runbook: ${local.docs}/runbook.md#consumer-errors"
   namespace           = "AWS/Lambda"
   metric_name         = "Errors"
   dimensions          = { FunctionName = aws_lambda_function.consumer.function_name }
@@ -195,7 +197,7 @@ resource "aws_cloudwatch_metric_alarm" "consumer_errors" {
 
 resource "aws_cloudwatch_metric_alarm" "consumer_throttles" {
   alarm_name          = "${var.name}-consumer-throttles"
-  alarm_description   = "The consumer was throttled: messages wait while the account's concurrency is used elsewhere. Runbook: docs/runbook.md#consumer-throttles"
+  alarm_description   = "The consumer was throttled: messages wait while the account's concurrency is used elsewhere. Runbook: ${local.docs}/runbook.md#consumer-throttles"
   namespace           = "AWS/Lambda"
   metric_name         = "Throttles"
   dimensions          = { FunctionName = aws_lambda_function.consumer.function_name }

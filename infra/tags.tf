@@ -50,6 +50,11 @@ locals {
     { domain = var.domain, team = var.team, service = var.name, repo = var.repo },
     local.environment == null ? {} : { environment = local.environment },
   )
+
+  # Where the docs are, as a link: every alarm ends on the section of the
+  # runbook that says what to do about it, and whoever is paged opens it from
+  # the alarm itself. HEAD is the default branch, whatever it is called.
+  docs = "${var.repo}/blob/HEAD/docs"
 }
 
 # Everything tagged with this service, in one place: the console's Resource
